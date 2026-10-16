@@ -1,24 +1,12 @@
 import { z } from "zod";
+import { assetRefSchema, mediaKindSchema } from "@open-cinema/contracts";
+export type { AssetRef, MediaKind } from "@open-cinema/contracts";
 
-// Browser-safe library DTOs. Move to @open-cinema/contracts with the MediaAsset model.
-export const mediaKindSchema = z.enum(["image", "video"]);
-export type MediaKind = z.infer<typeof mediaKindSchema>;
-export const mediaRoleSchema = z.enum(["source", "reference"]);
-export type MediaRole = z.infer<typeof mediaRoleSchema>;
-export const mediaTargetSchema = z.object({
-  kind: z.enum(["job", "element"]),
-  id: z.string().min(1).max(200),
-});
-export type MediaTarget = z.infer<typeof mediaTargetSchema>;
-export const mediaAttachmentSchema = z.object({
-  target: mediaTargetSchema,
-  role: mediaRoleSchema,
-  attachedAt: z.string(),
-});
-export type MediaAttachment = z.infer<typeof mediaAttachmentSchema>;
+// Browser-safe view of uploads and generated outputs for the library and picker.
 export const mediaItemSchema = z.object({
-  /** Uploads use a UUID; generated outputs use `generated~{jobId}~{outputId}`. */
+  /** Uploads use their asset ID; generated outputs use `generated~{jobId}~{outputId}`. */
   id: z.string(),
+  ref: assetRefSchema,
   origin: z.enum(["upload", "generated"]),
   kind: mediaKindSchema,
   mediaType: z.string(),
@@ -30,14 +18,14 @@ export const mediaItemSchema = z.object({
   createdAt: z.string(),
   url: z.string(),
   thumbnailUrl: z.string().nullable(),
-  attachments: z.array(mediaAttachmentSchema),
   prompt: z.string().nullable(),
-  jobId: z.string().nullable(),
 });
 export type MediaItem = z.infer<typeof mediaItemSchema>;
+/** How an embedding feature intends to use a picked item. */
+export type MediaRole = "source" | "reference";
 
 export const UPLOAD_ACCEPT =
-  "image/png,image/jpeg,image/webp,image/avif,image/gif,video/mp4,video/webm,video/quicktime";
+  "image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime";
 export const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 export const MAX_VIDEO_BYTES = 95 * 1024 * 1024;
 export const MAX_VIDEO_SECONDS = 120;

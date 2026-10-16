@@ -5,6 +5,7 @@ export { applyJobSnapshot } from "./jobs";
 export { createProject, updateProject } from "./projects";
 export {
   createPendingMediaAsset,
+  deleteMediaAsset,
   markMediaAssetFailed,
   markMediaAssetReady,
   updateMediaAssetMetadata,

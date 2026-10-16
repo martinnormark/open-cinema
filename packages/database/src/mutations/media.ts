@@ -91,3 +91,21 @@ export async function updateMediaAssetMetadata(
     data: metadata,
   });
 }
+
+/**
+ * Removes the record; the caller deletes the R2 bytes. Element references and
+ * revisions hold typed refs, not foreign keys, so they resolve to null after.
+ */
+export async function deleteMediaAsset(
+  db: DatabaseContext,
+  scope: OwnerScope,
+  id: string,
+): Promise<MediaAsset | null> {
+  const client = getClient(db);
+  const row = await client.mediaAsset.findFirst({
+    where: { id, ownerId: scope.ownerId },
+  });
+  if (!row) return null;
+  await client.mediaAsset.deleteMany({ where: { id, ownerId: scope.ownerId } });
+  return toMediaAsset(row);
+}

@@ -2,43 +2,31 @@ import { createServerFn } from "@tanstack/react-start";
 import { env } from "cloudflare:workers";
 import { z } from "zod";
 import { createDatabase } from "@open-cinema/database";
-import { listJobs } from "@open-cinema/database/queries";
+import { listJobs, listMediaAssets } from "@open-cinema/database/queries";
+import { deleteMediaAsset } from "@open-cinema/database/mutations";
 import { deleteUploadObjects, signMediaPath } from "@open-cinema/assets";
-import type { Job } from "@open-cinema/contracts";
-import {
-  mediaRoleSchema,
-  mediaTargetSchema,
-  type MediaItem,
-} from "@/features/library/model";
+import type { Job, MediaAsset } from "@open-cinema/contracts";
+import type { MediaItem } from "@/features/library/model";
 import { requireSameOrigin, requireSession } from "./session";
-import { r2SidecarStore, type UploadRecord } from "./media-store";
 
-export function mediaStore() {
-  return r2SidecarStore(env.GENERATED_ASSETS);
-}
-
-export function uploadToItem(record: UploadRecord): MediaItem {
-  const base = `/api/media/${encodeURIComponent(record.id)}`;
+export function assetToItem(asset: MediaAsset): MediaItem {
+  const url = `/api/media/${encodeURIComponent(asset.id)}`;
   return {
-    id: record.id,
+    id: asset.id,
+    ref: { type: "media-asset", assetId: asset.id },
     origin: "upload",
-    kind: record.kind,
-    mediaType: record.mediaType,
-    title: record.filename,
-    sizeBytes: record.sizeBytes,
-    width: record.width,
-    height: record.height,
-    durationSeconds: record.durationSeconds,
-    createdAt: record.createdAt,
-    url: base,
-    thumbnailUrl: record.posterKey
-      ? `${base}?variant=poster`
-      : record.kind === "image"
-        ? base
-        : null,
-    attachments: record.attachments,
+    kind: asset.kind,
+    mediaType: asset.mediaType,
+    title: asset.filename,
+    sizeBytes: asset.sizeBytes,
+    width: asset.width,
+    height: asset.height,
+    durationSeconds: asset.durationMs ? asset.durationMs / 1000 : null,
+    createdAt: asset.createdAt,
+    url,
+    // Falls back to the original image when no poster was rendered.
+    thumbnailUrl: `${url}?variant=poster`,
     prompt: null,
-    jobId: null,
   };
 }
 
@@ -57,32 +45,32 @@ function generatedItems(jobs: readonly Job[]): MediaItem[] {
         const kind = output.mediaType.startsWith("video/") ? "video" : "image";
         return {
           id: `${GENERATED}${job.id}~${output.id}`,
+          ref: { type: "job-output", jobId: job.id, outputId: output.id },
           origin: "generated" as const,
           kind,
           mediaType: output.mediaType,
           title: job.prompt || "Generated image",
           sizeBytes: output.sizeBytes,
-          // The MVP Router workflow renders 1K squares; video jobs report later.
+          // The MVP Router image workflow renders 1K squares.
           width: kind === "image" ? 1024 : null,
           height: kind === "image" ? 1024 : null,
           durationSeconds: null,
           createdAt: job.updatedAt,
           url,
           thumbnailUrl: kind === "image" ? url : null,
-          attachments: [],
           prompt: job.prompt || null,
-          jobId: job.id,
         };
       }),
   );
 }
 
 async function listForOwner(ownerId: string) {
+  const db = createDatabase(env.DB);
   const [uploads, jobs] = await Promise.all([
-    mediaStore().list(ownerId),
-    listJobs(createDatabase(env.DB), { ownerId }).catch(() => [] as Job[]),
+    listMediaAssets(db, { ownerId }),
+    listJobs(db, { ownerId }),
   ]);
-  return [...uploads.map(uploadToItem), ...generatedItems(jobs)].sort((a, b) =>
+  return [...uploads.map(assetToItem), ...generatedItems(jobs)].sort((a, b) =>
     b.createdAt.localeCompare(a.createdAt),
   );
 }
@@ -96,7 +84,7 @@ async function optionalSession() {
   }
 }
 
-/** Uploads and generated outputs, newest first. */
+/** Ready uploads and saved generated outputs, newest first. */
 export const listMedia = createServerFn({ method: "GET" }).handler(
   async (): Promise<{ signedIn: boolean; items: MediaItem[] }> => {
     const session = await optionalSession();
@@ -105,89 +93,40 @@ export const listMedia = createServerFn({ method: "GET" }).handler(
   },
 );
 
-export const getMedia = createServerFn({ method: "GET" })
-  .validator(z.object({ id: z.string().min(1).max(400) }))
-  .handler(async ({ data }): Promise<MediaItem | null> => {
-    const session = await requireSession();
-    if (data.id.startsWith(GENERATED))
-      return (
-        (await listForOwner(session.userId)).find(
-          (item) => item.id === data.id,
-        ) ?? null
-      );
-    const record = await mediaStore().get(session.userId, data.id);
-    return record ? uploadToItem(record) : null;
-  });
-
+/** Deletes an upload's record and bytes. Generated outputs stay with their job. */
 export const deleteMedia = createServerFn({ method: "POST" })
   .validator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data }) => {
     requireSameOrigin();
     const session = await requireSession();
-    const store = mediaStore();
-    if (!(await store.get(session.userId, data.id))) return { ok: false };
-    await deleteUploadObjects(env.GENERATED_ASSETS, session.userId, data.id);
-    await store.delete(session.userId, data.id);
-    return { ok: true };
-  });
-
-/** Records that an upload feeds a job or an Element as a source or reference. */
-export const attachMedia = createServerFn({ method: "POST" })
-  .validator(
-    z.object({
-      id: z.string().uuid(),
-      target: mediaTargetSchema,
-      role: mediaRoleSchema,
-      attached: z.boolean().default(true),
-    }),
-  )
-  .handler(async ({ data }): Promise<MediaItem | null> => {
-    requireSameOrigin();
-    const session = await requireSession();
-    const store = mediaStore();
-    const record = await store.get(session.userId, data.id);
-    if (!record) return null;
-    const others = record.attachments.filter(
-      (a) =>
-        !(
-          a.target.kind === data.target.kind &&
-          a.target.id === data.target.id &&
-          a.role === data.role
-        ),
+    const scope = { ownerId: session.userId };
+    const removed = await deleteMediaAsset(
+      createDatabase(env.DB),
+      scope,
+      data.id,
     );
-    const next: UploadRecord = {
-      ...record,
-      attachments: data.attached
-        ? [
-            ...others,
-            {
-              target: data.target,
-              role: data.role,
-              attachedAt: new Date().toISOString(),
-            },
-          ]
-        : others,
-    };
-    await store.put(next);
-    return uploadToItem(next);
+    if (!removed) return { ok: false };
+    await deleteUploadObjects(env.GENERATED_ASSETS, session.userId, data.id);
+    return { ok: true };
   });
 
 /**
  * Absolute, time-limited URL for handing an upload to a generation provider
- * that cannot present the session cookie. Server-side callers only.
+ * that cannot present the session cookie. Server-side callers only; resolve
+ * the asset with `resolveAssetRef` first so ownership and readiness hold.
  */
 export async function signedUploadUrl(
   origin: string,
   ownerId: string,
-  id: string,
+  assetId: string,
   ttlMs = 60 * 60_000,
 ) {
   const { expires, signature } = await signMediaPath(
     env.LOCAL_SESSION_SECRET,
-    `${ownerId}/${id}/original`,
+    `${ownerId}/${assetId}/original`,
     Date.now() + ttlMs,
   );
-  const url = new URL(`/api/media/${encodeURIComponent(id)}`, origin);
+  const url = new URL(`/api/media/${encodeURIComponent(assetId)}`, origin);
   url.searchParams.set("owner", ownerId);
   url.searchParams.set("expires", expires);
   url.searchParams.set("signature", signature);

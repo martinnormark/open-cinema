@@ -1,14 +1,22 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { env } from "cloudflare:workers";
-import { storeUpload, UploadError } from "@open-cinema/assets";
+import { storeUpload, UploadError, uploadObjectKey } from "@open-cinema/assets";
+import { mediaKindFor } from "@open-cinema/contracts";
+import { createDatabase } from "@open-cinema/database";
+import {
+  createPendingMediaAsset,
+  markMediaAssetFailed,
+  markMediaAssetReady,
+} from "@open-cinema/database/mutations";
 import { requireSameOrigin, requireSession } from "@/server/session";
-import { mediaStore, uploadToItem } from "@/server/media";
-import type { UploadRecord } from "@/server/media-store";
+import { assetToItem } from "@/server/media";
 import { MAX_VIDEO_SECONDS } from "@/features/library/model";
 
 function dimension(value: string | null) {
   const n = Number(value);
-  return value && Number.isSafeInteger(n) && n > 0 && n <= 16384 ? n : null;
+  return value && Number.isSafeInteger(n) && n > 0 && n <= 16384
+    ? n
+    : undefined;
 }
 function json(body: unknown, status = 200) {
   return Response.json(body, {
@@ -18,69 +26,82 @@ function json(body: unknown, status = 200) {
 }
 
 /**
- * Raw-body upload: the file is the request body so it streams straight into R2
- * without buffering a multipart form. Browser-measured dimensions and duration
- * travel in headers and are advisory.
+ * Raw-body upload: the file is the request body, so it streams straight into
+ * R2 without buffering a multipart form. Browser-measured dimensions and
+ * duration travel in headers and are advisory; size and type are verified.
  */
 async function upload(request: Request) {
   requireSameOrigin();
   const session = await requireSession();
-  if (!request.body) return json({ error: "Choose a file to upload." }, 400);
-  const length = request.headers.get("Content-Length");
-  const declaredLength =
-    length !== null && Number.isSafeInteger(Number(length))
-      ? Number(length)
-      : null;
-  const rawName = request.headers.get("X-Media-Filename") ?? "";
+  const scope = { ownerId: session.userId };
+  const mediaType = (request.headers.get("Content-Type") ?? "")
+    .split(";")[0]!
+    .trim()
+    .toLowerCase();
+  const length = Number(request.headers.get("Content-Length"));
+  if (!request.body || !Number.isSafeInteger(length) || length <= 0)
+    return json({ error: "Choose a file to upload." }, 411);
+  if (!mediaKindFor(mediaType))
+    return json(
+      {
+        error:
+          "Upload a PNG, JPEG, or WebP image, or an MP4, WebM, or MOV video.",
+      },
+      415,
+    );
   let filename = "Untitled";
   try {
-    filename = decodeURIComponent(rawName).trim().slice(0, 200) || filename;
+    filename =
+      decodeURIComponent(request.headers.get("X-Media-Filename") ?? "")
+        .trim()
+        .slice(0, 255) || filename;
   } catch {
     /* Keep the default for malformed names. */
   }
-  const duration = Number(request.headers.get("X-Media-Duration"));
+  const seconds = Number(request.headers.get("X-Media-Duration"));
+  const durationMs =
+    mediaType.startsWith("video/") && Number.isFinite(seconds) && seconds > 0
+      ? Math.round(seconds * 1000)
+      : undefined;
+  if (durationMs !== undefined && durationMs > MAX_VIDEO_SECONDS * 1000)
+    return json(
+      { error: `Videos can be up to ${MAX_VIDEO_SECONDS / 60} minutes.` },
+      422,
+    );
   const id = crypto.randomUUID();
+  const db = createDatabase(env.DB);
+  let pending = false;
   try {
+    const width = dimension(request.headers.get("X-Media-Width"));
+    const height = dimension(request.headers.get("X-Media-Height"));
+    await createPendingMediaAsset(db, scope, {
+      id,
+      r2Key: uploadObjectKey(session.userId, id, "original"),
+      filename,
+      mediaType,
+      sizeBytes: length,
+      ...(width ? { width } : {}),
+      ...(height ? { height } : {}),
+      ...(durationMs !== undefined ? { durationMs } : {}),
+    });
+    pending = true;
     const stored = await storeUpload(
       env.GENERATED_ASSETS,
       session.userId,
       id,
       request.body,
-      request.headers.get("Content-Type") ?? "",
-      declaredLength,
+      mediaType,
+      length,
     );
-    const durationSeconds =
-      stored.kind === "video" && Number.isFinite(duration) && duration > 0
-        ? Math.round(duration * 100) / 100
-        : null;
-    if (durationSeconds !== null && durationSeconds > MAX_VIDEO_SECONDS) {
-      await env.GENERATED_ASSETS.delete(stored.r2Key);
-      return json(
-        { error: `Videos can be up to ${MAX_VIDEO_SECONDS / 60} minutes.` },
-        422,
-      );
-    }
-    const record: UploadRecord = {
-      id,
-      ownerId: session.userId,
-      kind: stored.kind,
-      mediaType: stored.mediaType,
-      filename,
-      sizeBytes: stored.sizeBytes,
-      etag: stored.etag,
-      r2Key: stored.r2Key,
-      posterKey: null,
-      width: dimension(request.headers.get("X-Media-Width")),
-      height: dimension(request.headers.get("X-Media-Height")),
-      durationSeconds,
-      createdAt: new Date().toISOString(),
-      attachments: [],
-    };
-    await mediaStore().put(record);
-    return json(uploadToItem(record), 201);
+    const asset = await markMediaAssetReady(db, scope, id, stored);
+    if (asset?.status !== "ready") throw new Error("Upload was not recorded");
+    return json(assetToItem(asset), 201);
   } catch (error) {
+    if (pending) await markMediaAssetFailed(db, scope, id).catch(() => {});
     if (error instanceof UploadError)
       return json({ error: error.message }, error.status);
+    if (error instanceof Error && /larger than/.test(error.message))
+      return json({ error: error.message }, 413);
     return json(
       { error: "Storage is temporarily unavailable. Try again." },
       503,

@@ -4,41 +4,55 @@ import {
   serveObject,
   storePoster,
   UploadError,
+  uploadObjectKey,
   verifyMediaPath,
 } from "@open-cinema/assets";
+import { createDatabase } from "@open-cinema/database";
+import { getMediaAsset } from "@open-cinema/database/queries";
 import { requireSameOrigin, requireSession } from "@/server/session";
-import { mediaStore } from "@/server/media";
 
-async function owner(request: Request, id: string, variant: string) {
+async function owner(request: Request, id: string) {
   const query = new URL(request.url).searchParams;
   const signed = query.get("owner");
-  if (signed !== null) {
-    const valid = await verifyMediaPath(
-      env.LOCAL_SESSION_SECRET,
-      `${signed}/${id}/${variant}`,
-      query.get("expires"),
-      query.get("signature"),
-    );
-    return valid ? signed : null;
-  }
-  return (await requireSession()).userId;
+  if (signed === null) return (await requireSession()).userId;
+  // Signed links cover the original only; posters stay session-scoped.
+  if (query.get("variant")) return null;
+  const valid = await verifyMediaPath(
+    env.LOCAL_SESSION_SECRET,
+    `${signed}/${id}/original`,
+    query.get("expires"),
+    query.get("signature"),
+  );
+  return valid ? signed : null;
 }
 
 async function stream(request: Request, id: string) {
-  const variant =
-    new URL(request.url).searchParams.get("variant") === "poster"
-      ? "poster"
-      : "original";
-  const ownerId = await owner(request, id, variant);
+  const ownerId = await owner(request, id);
   if (!ownerId) return new Response("Link expired", { status: 403 });
   try {
-    const record = await mediaStore().get(ownerId, id);
-    const key = variant === "poster" ? record?.posterKey : record?.r2Key;
-    if (!key) return new Response("Media not found", { status: 404 });
-    const response = await serveObject(env.GENERATED_ASSETS, key, request);
-    // Uploads are immutable; posters may be added later, so revalidate those.
-    if (response.ok && variant === "original")
-      response.headers.set("Cache-Control", "private, max-age=3600");
+    const asset = await getMediaAsset(createDatabase(env.DB), { ownerId }, id);
+    if (asset?.status !== "ready")
+      return new Response("Media not found", { status: 404 });
+    if (new URL(request.url).searchParams.get("variant") === "poster") {
+      const poster = await serveObject(
+        env.GENERATED_ASSETS,
+        uploadObjectKey(ownerId, id, "poster"),
+        request,
+      );
+      // Small images have no separate poster; they are their own thumbnail.
+      if (poster.status !== 404 || asset.kind === "video") return poster;
+    }
+    const response = await serveObject(
+      env.GENERATED_ASSETS,
+      asset.r2Key,
+      request,
+    );
+    // Upload bytes never change under an ID; a poster fallback may be replaced.
+    if (response.ok && !new URL(request.url).searchParams.has("variant"))
+      response.headers.set(
+        "Cache-Control",
+        "private, max-age=86400, immutable",
+      );
     return response;
   } catch {
     return new Response("Media is temporarily unavailable. Try again.", {
@@ -51,21 +65,24 @@ async function stream(request: Request, id: string) {
 async function putPoster(request: Request, id: string) {
   requireSameOrigin();
   const session = await requireSession();
-  const store = mediaStore();
-  const record = await store.get(session.userId, id);
-  if (!record) return new Response("Media not found", { status: 404 });
+  const asset = await getMediaAsset(
+    createDatabase(env.DB),
+    { ownerId: session.userId },
+    id,
+  );
+  if (asset?.status !== "ready")
+    return new Response("Media not found", { status: 404 });
   try {
     const length = Number(request.headers.get("Content-Length"));
     if (!(length > 0 && length <= 2 * 1024 * 1024))
       throw new UploadError("The poster is missing or too large.", 413);
-    const stored = await storePoster(
+    await storePoster(
       env.GENERATED_ASSETS,
       session.userId,
       id,
       await request.arrayBuffer(),
       request.headers.get("Content-Type") ?? "",
     );
-    await store.put({ ...record, posterKey: stored.r2Key });
     return new Response(null, { status: 204 });
   } catch (error) {
     return error instanceof UploadError

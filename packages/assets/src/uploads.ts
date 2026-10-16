@@ -1,24 +1,22 @@
+import {
+  MAX_UPLOAD_BYTES,
+  mediaKindFor,
+  type MediaKind,
+} from "@open-cinema/contracts";
+
 const PART_BYTES = 5 * 1024 * 1024;
 
-export type UploadKind = "image" | "video";
+export type UploadKind = MediaKind;
 
-/** Workers cap request bodies at 100 MB on most plans; stay under it. */
+/**
+ * Contract limits, further capped for direct uploads: Workers reject request
+ * bodies over 100 MB on most plans.
+ */
 export const UPLOAD_LIMITS = {
-  image: 25 * 1024 * 1024,
-  video: 95 * 1024 * 1024,
+  image: MAX_UPLOAD_BYTES.image,
+  video: Math.min(MAX_UPLOAD_BYTES.video, 95 * 1024 * 1024),
   poster: 2 * 1024 * 1024,
 } as const;
-
-export const UPLOAD_MEDIA_TYPES: Readonly<Record<string, UploadKind>> = {
-  "image/png": "image",
-  "image/jpeg": "image",
-  "image/webp": "image",
-  "image/avif": "image",
-  "image/gif": "image",
-  "video/mp4": "video",
-  "video/webm": "video",
-  "video/quicktime": "video",
-};
 const POSTER_TYPES = new Set(["image/webp", "image/jpeg", "image/png"]);
 
 export class UploadError extends Error {
@@ -108,10 +106,10 @@ export async function storeUpload(
   declaredLength: number | null,
 ): Promise<StoredUpload> {
   const mediaType = declaredType.split(";")[0]?.trim().toLowerCase() ?? "";
-  const kind = UPLOAD_MEDIA_TYPES[mediaType];
+  const kind = mediaKindFor(mediaType);
   if (!kind)
     throw new UploadError(
-      "Upload a PNG, JPEG, WebP, AVIF, or GIF image, or an MP4, WebM, or MOV video.",
+      "Upload a PNG, JPEG, or WebP image, or an MP4, WebM, or MOV video.",
       415,
     );
   const limit = UPLOAD_LIMITS[kind];
