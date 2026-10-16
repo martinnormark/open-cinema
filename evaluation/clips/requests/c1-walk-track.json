@@ -1,0 +1,16 @@
+{
+ "instances": [
+  {
+   "prompt": "Documentary-style handheld shot. Two adult friends, a woman with a dark bob haircut in a mustard wool coat and a bearded man in a navy jacket, walk side by side along a busy city sidewalk talking and gesturing with their hands. The camera tracks backwards in front of them at walking pace, keeping both in a medium shot. Storefronts, parked cars and other pedestrians pass behind them. Natural overcast afternoon light. Realistic, 35mm film look."
+  }
+ ],
+ "parameters": {
+  "aspectRatio": "16:9",
+  "durationSeconds": 6,
+  "resolution": "720p",
+  "generateAudio": false,
+  "personGeneration": "allow_adult",
+  "sampleCount": 1,
+  "seed": 1207
+ }
+}

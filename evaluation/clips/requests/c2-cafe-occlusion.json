@@ -1,0 +1,16 @@
+{
+ "instances": [
+  {
+   "prompt": "Static medium shot inside a caf\u00e9. A woman with long auburn hair in a cream knit sweater sits at a small round wooden table by the window, lifts a white ceramic coffee cup, sips and laughs. Halfway through, a waiter in a black apron carrying a tray walks across the frame between the camera and her, briefly hiding half of her body, then exits frame. Warm morning light. Realistic, cinematic."
+  }
+ ],
+ "parameters": {
+  "aspectRatio": "16:9",
+  "durationSeconds": 6,
+  "resolution": "720p",
+  "generateAudio": false,
+  "personGeneration": "allow_adult",
+  "sampleCount": 1,
+  "seed": 1207
+ }
+}
