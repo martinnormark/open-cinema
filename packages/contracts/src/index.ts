@@ -131,3 +131,8 @@ export interface GenerationCoordinatorApi {
     outputId: string,
   ): Promise<JobOutput | null>;
 }
+
+export * from "./media";
+export * from "./elements";
+export * from "./replacement";
+export * from "./workflows";

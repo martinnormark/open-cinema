@@ -9,10 +9,14 @@ datasource db {
 }
 
 model User {
-  id        String   @id
-  createdAt DateTime @default(now())
+  id        String          @id
+  createdAt DateTime        @default(now())
   workflows Workflow[]
   jobs      GenerationJob[]
+  projects  Project[]
+  elements  Element[]
+  media     MediaAsset[]
+  revisions Revision[]
 }
 
 model Workflow {
@@ -29,9 +33,9 @@ model Workflow {
 }
 
 model GenerationJob {
-  id               String   @id
+  id               String      @id
   ownerId          String
-  owner            User     @relation(fields: [ownerId], references: [id])
+  owner            User        @relation(fields: [ownerId], references: [id])
   state            String
   version          Int
   idempotencyKey   String
@@ -40,12 +44,14 @@ model GenerationJob {
   inputsSnapshot   Json
   providerJobId    String?
   error            String?
-  prompt           String @default("")
-  model            String @default("FLUX 3 Image Klein")
+  prompt           String      @default("")
+  model            String      @default("FLUX 3 Image Klein")
+  workflowKind     String      @default("image.flux")
+  projectId        String?
   seed             Int?
   progress         Float?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
   outputs          JobOutput[]
 
   @@unique([ownerId, idempotencyKey])
@@ -54,14 +60,135 @@ model GenerationJob {
 }
 
 model JobOutput {
-  id              String @id
+  id              String        @id
   jobId           String
   job             GenerationJob @relation(fields: [jobId], references: [id])
   providerAssetId String
   mediaType       String
-  r2Key           String? @unique
+  r2Key           String?       @unique
   sizeBytes       Int?
   etag            String?
 
   @@index([jobId])
+}
+
+model Project {
+  id        String       @id
+  ownerId   String
+  owner     User         @relation(fields: [ownerId], references: [id])
+  name      String
+  direction String       @default("")
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  elements  Element[]
+  media     MediaAsset[]
+  revisions Revision[]
+
+  @@index([ownerId, updatedAt])
+}
+
+model Element {
+  id          String             @id
+  ownerId     String
+  owner       User               @relation(fields: [ownerId], references: [id])
+  projectId   String?
+  project     Project?           @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  type        String
+  name        String
+  handle      String
+  description String             @default("")
+  version     Int                @default(1)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  references  ElementReference[]
+  states      ElementState[]
+
+  @@unique([ownerId, handle])
+  @@index([ownerId, type, updatedAt])
+}
+
+model ElementState {
+  id          String             @id
+  elementId   String
+  element     Element            @relation(fields: [elementId], references: [id], onDelete: Cascade)
+  name        String
+  description String             @default("")
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  references  ElementReference[]
+
+  @@unique([elementId, name])
+}
+
+/// Asset refs are stored as typed columns, not foreign keys: job outputs are
+/// projected to D1 asynchronously, so ownership is checked in mutations.
+model ElementReference {
+  id           String        @id
+  elementId    String
+  element      Element       @relation(fields: [elementId], references: [id], onDelete: Cascade)
+  stateId      String?
+  state        ElementState? @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  assetType    String
+  mediaAssetId String?
+  jobId        String?
+  outputId     String?
+  status       String
+  view         String?
+  roles        Json
+  note         String        @default("")
+  sortOrder    Int           @default(0)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([elementId, status])
+  @@index([stateId])
+}
+
+model MediaAsset {
+  id         String   @id
+  ownerId    String
+  owner      User     @relation(fields: [ownerId], references: [id])
+  projectId  String?
+  project    Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  kind       String
+  status     String
+  mediaType  String
+  filename   String
+  r2Key      String   @unique
+  sizeBytes  Int?
+  etag       String?
+  width      Int?
+  height     Int?
+  durationMs Int?
+  fps        Float?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([ownerId, kind, createdAt])
+}
+
+model Revision {
+  id               String   @id
+  ownerId          String
+  owner            User     @relation(fields: [ownerId], references: [id])
+  projectId        String?
+  project          Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  parentRevisionId String?
+  sourceType       String
+  sourceAssetId    String?
+  sourceJobId      String?
+  sourceOutputId   String?
+  resultJobId      String?
+  resultOutputId   String?
+  jobId            String?
+  workflowKind     String
+  intent           String
+  status           String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([ownerId, createdAt])
+  @@index([jobId])
+  @@index([sourceAssetId])
+  @@index([sourceJobId, sourceOutputId])
 }
