@@ -1,12 +1,12 @@
 # Architecture
 
-Status: agreed technology choices and initial implementation design. This document describes the target architecture; the repository currently contains research documentation, not an implemented application. Documentation references were checked on 2026-10-16.
+Status: agreed technology choices and implementation design. The repository now contains the initial Bun workspace scaffold, a TanStack Start studio shell, a private jobs Worker, and shared contracts/database/Comfy packages. The local generation MVP now implements durable acceptance, SDK polling, cancellation, versioned D1 projections, permanent R2 output storage, WebSocket snapshots, and the floating Orb. See [generation implementation](docs/generation-mvp.md) for current limits, local-only session behavior, and Router model support. The broader production lifecycle below remains the target architecture. See [README.md](README.md) for implemented boundaries, local commands, and outstanding integration work. Documentation references were checked on 2026-10-16.
 
 ## System overview
 
-The application is a TypeScript, Bun-workspace monorepo. A TanStack Start web application runs on Cloudflare Workers. Cloudflare D1 stores application records, with Prisma providing typed database access through a dedicated database package. Cloudflare Durable Objects own generation job orchestration and publish live job updates to the browser over WebSockets.
+The application is a TypeScript, Bun-workspace monorepo. A TanStack Start web application runs on Cloudflare Workers. Cloudflare R2 stores generated asset bytes. Cloudflare D1 stores application records and R2 object references, with Prisma providing typed database access through a dedicated database package. Cloudflare Durable Objects own generation job orchestration and publish live job updates to the browser over WebSockets.
 
-Comfy executes the actual workflows on external GPU infrastructure. Durable Objects submit, monitor, reconcile, and cancel those executions through the official TypeScript SDK. Generation must continue independently of the initiating HTTP request, browser tab, and WebSocket connection.
+Comfy Router executes the MVP model requests on external GPU infrastructure; the broader architecture also supports Comfy workflows. Durable Objects submit, monitor, reconcile, and cancel those executions through the official TypeScript SDK. Generation must continue independently of the initiating HTTP request, browser tab, and WebSocket connection.
 
 ```mermaid
 flowchart LR
@@ -15,6 +15,7 @@ flowchart LR
     Jobs[Jobs Worker: GenerationCoordinator Durable Objects]
     DB[(Cloudflare D1)]
     State[(Durable Object storage)]
+    Assets[(Private Cloudflare R2 bucket)]
     Comfy[Comfy API: GPU workflow execution]
 
     Browser -->|HTTPS: pages and server functions| Web
@@ -24,6 +25,8 @@ flowchart LR
     Jobs -->|database package mutations| DB
     Jobs <-->|database package checkpoint access| State
     Jobs <-->|Comfy SDK: submission, events, status, cancellation| Comfy
+    Jobs -->|Copy every completed output| Assets
+    Web -->|Authorized asset streams| Assets
 ```
 
 ## Technology decisions
@@ -38,6 +41,7 @@ flowchart LR
 | Build and deployment | Vite, Cloudflare Vite plugin, Wrangler | Workers-compatible builds, local runtime, bindings, and deployment |
 | Application hosting | Cloudflare Workers | Web application and Durable Object deployment entry points |
 | Relational persistence | Cloudflare D1 | Users, workflows, generation history, and output metadata |
+| Generated media | Cloudflare R2 | Durable, application-owned output bytes served through the web Worker |
 | ORM | Prisma with `@prisma/adapter-d1` | Typed D1 access confined to `packages/database` |
 | Job coordination | SQLite-backed Cloudflare Durable Objects | Durable execution state, scheduling, concurrency, and live subscriptions |
 | Comfy integration | Official `@comfyorg/sdk` TypeScript package | Workflow submission and execution monitoring |
@@ -80,6 +84,8 @@ Bun is the development toolchain, not the production server runtime. Deployed co
 │   │       │   ├── workflows.ts
 │   │       │   └── coordinator.ts      # DO checkpoint writes and recovery schedule
 │   │       └── durable/               # Versioned DO record codecs/upgrades
+│   ├── assets/
+│   │   └── src/                        # Server-only R2 archival and streaming delivery
 │   ├── comfy/
 │   │   └── src/                        # Server-only SDK adapter and event mapping
 │   └── contracts/
@@ -93,8 +99,9 @@ Bun is the development toolchain, not the production server runtime. Deployed co
 The two applications are deployment units. The web Worker serves the public origin; the jobs Worker owns the Durable Object namespace and has no public application API. The web Worker accesses its objects through a cross-Worker Durable Object binding. Packages are shared libraries, not independently deployed services.
 
 - `apps/web` owns presentation, authentication, authorization, request validation, and ordinary application operations. It may import the public database APIs and contracts, but must not execute generation through the Comfy SDK.
-- `apps/jobs` owns all long-running Comfy SDK operations, job state transitions, scheduling, and WebSocket delivery. It imports the database, Comfy, and contracts packages.
+- `apps/jobs` owns all long-running Comfy SDK operations, job state transitions, scheduling, and WebSocket delivery. It imports the database, Comfy, assets, and contracts packages.
 - `packages/database` owns **all database schemas, migrations, queries, and mutations**, including persistence helpers for Durable Object checkpoints. Prisma is used for D1; DO storage uses Cloudflare's native storage API behind the same package boundary.
+- `packages/assets` owns blob transfer and R2 delivery. It has no database or Comfy SDK dependency; callers supply authorized output metadata and a provider URL resolver. Relational metadata and checkpoint writes remain exclusively in `packages/database`.
 - `packages/comfy` wraps the SDK behind application-oriented methods. It has no database or UI dependencies. It maps provider responses to contracts without deciding job persistence or retry policy.
 - `packages/contracts` contains browser-safe types and validators. It has no Prisma, Cloudflare binding, SDK, or React dependency.
 
@@ -125,7 +132,7 @@ The initial logical records are:
 | User | Stable identity used to scope records and coordinator routing |
 | Workflow | Owner, name, version, API-format graph, timestamps |
 | Generation job | Application ID, owner, workflow/input snapshot, state, state version, idempotency key, request hash, provider job ID, timestamps, and sanitized error |
-| Job output | Job ID, provider asset identifier, media type, dimensions/duration where available, and stable storage reference when applicable |
+| Job output | Job ID, provider asset identifier, media type, dimensions/duration where available, R2 object key, byte size, and ETag |
 
 Index job history by owner and creation time, and outstanding work by owner and state. Enforce uniqueness of the application idempotency key within its owner scope. Store the immutable workflow/input snapshot used for each job so subsequent workflow edits cannot alter its meaning.
 
@@ -135,7 +142,7 @@ D1 is the durable application catalog and historical read model. The owning Dura
 
 For each transition, atomically persist the coordinator checkpoint and pending projection update locally, then apply the update to D1 through `mutations/`. D1 updates are idempotent and conditional on version so delayed updates cannot overwrite newer state. Clear a pending update only after D1 confirms it. A persisted alarm retries pending synchronization even when no browser is connected.
 
-There is no distributed transaction spanning D1, Durable Object storage, and Comfy. D1 history can briefly lag the live coordinator snapshot. The UI uses coordinator state for active jobs and includes the new job immediately after acceptance. Do not acknowledge acceptance until both the command and its recovery schedule are durable; a failed response can be retried using the same application key.
+There is no distributed transaction spanning D1, Durable Object storage, R2, and Comfy. D1 history can briefly lag the live coordinator snapshot. The UI uses coordinator state for active jobs and includes the new job immediately after acceptance. Do not acknowledge acceptance until both the command and its recovery schedule are durable; a failed response can be retried using the same application key.
 
 ### Migrations
 
@@ -160,7 +167,8 @@ Each coordinator limits accepted queue length and in-flight submissions. Provide
 3. The coordinator deduplicates by owner and key, rejects key reuse with different input, and durably records the job and next wake-up before acknowledging acceptance.
 4. Scheduled processing moves the job to `submitting`, persists a provider submission key, and invokes the Comfy adapter. It stores the returned provider job ID immediately.
 5. The coordinator monitors provider progress, normalizes events, persists state, updates the D1 projection, and broadcasts application events.
-6. On confirmed completion, it persists output metadata and the terminal state. The browser updates the result view and aggregate Orb state.
+6. On confirmed provider completion, it checkpoints every output descriptor and enters `persisting`. Durable alarms copy the bytes into R2, checkpoint each completed copy, and project the references into D1.
+7. Only after every output is stored does the job enter `succeeded`. The browser serves the saved assets from our origin and the aggregate Orb returns to Idle if no other jobs are active.
 
 Only the owning coordinator changes execution state. Async handlers may interleave: use persisted versions, short local transactions, and attempt tokens to reject stale completions. Do not hold initialization/concurrency locks across external network calls.
 
@@ -171,13 +179,14 @@ Only the owning coordinator changes execution state. Async handlers may interlea
 | `queued` | Durably accepted, waiting for admission | Thinking |
 | `submitting` | Provider submission in progress | Thinking |
 | `running` | Provider execution or result collection in progress | Thinking |
+| `persisting` | Provider finished; output bytes are being saved to R2 | Thinking |
 | `cancelling` | Cancellation requested, provider outcome unresolved | Thinking |
-| `succeeded` | Provider success confirmed and result metadata persisted | Idle |
+| `succeeded` | Provider success confirmed and every output durably stored in R2 | Idle |
 | `failed` | Definitive failure; no further automatic processing | Idle |
 | `cancelled` | Confirmed cancellation, or removed before submission | Idle |
 | `needs_attention` | Ambiguous outcome; automatic submission suspended | Idle, with a separate visible alert |
 
-Normal execution is `queued → submitting → running → succeeded`. Definitive errors transition to `failed`. Submitted jobs pass through `cancelling`; completion may win a cancellation race. `needs_attention` is a suspended, unresolved state, not a terminal success or proof that provider execution stopped. Recovery must reconcile the original execution before resuming it. An intentional rerun creates a new application job.
+Normal execution is `queued → submitting → running → persisting → succeeded`. Definitive errors transition to `failed`. Submitted jobs pass through `cancelling`; completion may win a cancellation race. `needs_attention` is a suspended, unresolved state, not a terminal success or proof that provider execution stopped. Recovery must reconcile the original execution before resuming it. An intentional rerun creates a new application job.
 
 ### Durability and recovery
 
@@ -187,13 +196,33 @@ Prefer submit-then-monitor SDK operations over a single uncheckpointed call that
 
 Use bounded retries with backoff and jitter for safe reads and definitive retryable failures. Persist attempt counts, next-attempt times, and deadlines. A monitoring timeout must not falsely claim provider execution stopped; unresolved submissions move to `needs_attention`.
 
-Comfy workflow submission keys reject duplicates rather than replaying the original response. Persist the key before submission and the provider job ID immediately afterward. If submission is ambiguous and no provider ID was recorded, suspend automatic resubmission; do not mint a fresh key and risk duplicate execution. Router requests have different retry semantics and require a separate adapter policy if introduced. See the [Comfy SDK submission contract](https://docs.comfy.org/development/api-development/sdks#retrying-a-submit-the-idempotency-key).
+The MVP uses Router queued model requests (`comfy.models.submit` / `comfy.models.handle`). Persist the exact model/input and idempotency key before submission, then persist the request ID before polling. Router replays acceptance for the same key: bounded retries recover a lost receipt using identical input and key. Never mint a replacement key during recovery. A provider discriminator preserves the separate Cloud workflow policy for old checkpoints: workflow submission keys reject duplicates, so ambiguous workflow submissions without receipts remain suspended. See the [Comfy SDK submission contract](https://docs.comfy.org/development/api-development/sdks#retrying-a-submit-the-idempotency-key).
 
 ### Comfy runtime boundary
 
-The SDK's workflow event feed uses SSE/polling; our browser-facing transport is WebSocket. The adapter converts between provider events and application contracts. The SDK documents Node 22+, so Workers compatibility is an implementation gate: test submission, event consumption, rehydration, cancellation, and asset access in `workerd`. Use in-memory graphs and byte/stream APIs rather than filesystem helpers. See the [TypeScript SDK reference](https://github.com/Comfy-Org/comfy-typescript-sdk).
+Router status is polled in bounded SDK calls from durable alarms; our browser-facing transport is WebSocket. A Router `COMPLETED` response can carry failure or cancellation in `error_type`, including in the result body; completion alone is not success. The adapter converts between provider events and application contracts. The SDK documents Node 22+, so Workers compatibility is an implementation gate: test submission, event consumption, rehydration, cancellation, and asset access in `workerd`. Use in-memory graphs and byte/stream APIs rather than filesystem helpers. See the [TypeScript SDK reference](https://github.com/Comfy-Org/comfy-typescript-sdk).
 
-Persist asset identifiers rather than treating expiring download URLs as permanent outputs. Resolve fresh access URLs when needed. Application-owned long-term media storage and its retention policy remain an explicit follow-up decision; D1 stores metadata, not generated media bytes.
+### Asset storage, delivery, and retention
+
+**Every generated asset is application-owned data and must be copied into a private R2 bucket. Provider URLs are temporary ingestion sources, never permanent output references or browser delivery URLs.** Comfy Router request expiry must not remove access to assets already saved by Open Cinema.
+
+The `GENERATED_ASSETS` binding in both Workers identifies the same environment-specific bucket. The jobs Worker writes; the web Worker reads. Keep the bucket private: no public `r2.dev` URL or unauthenticated custom-domain access. Local development uses persisted local R2; preview and production require separately provisioned buckets. The configured development name is `open-cinema-generated-assets`.
+
+`JobOutput` owns the R2 object reference because a job can produce multiple assets. Store `r2Key`, `sizeBytes`, `etag`, and `mediaType` alongside its job ID and provider asset identifier. The bucket is deployment configuration, not an expiring URL embedded in a row. New completed outputs require non-null storage metadata; nullable columns exist to migrate historical provider-only records. D1 and DO checkpoints store metadata, never image/video bytes or signed source URLs.
+
+Use deterministic, owner/job/output-scoped object keys under `generated/v1/`. Check for an already-completed object before contacting Comfy. Copy with bounded memory and checkpoint progress per asset. A crash after R2 completion but before the checkpoint is acknowledged is recovered by inspecting that same key. Never regenerate to recover a storage failure. R2, D1, and DO storage have no distributed transaction: pending D1 projections retry independently, and old projections cannot erase a stored reference.
+
+The current transfer implementation uses 5 MiB multipart buffers, a 512 MiB per-asset safety bound, a 60-second source transfer deadline, and one asset per alarm. It validates HTTPS source hosts and redirects, never forwards Comfy credentials to asset hosts, rejects incomplete bodies and unsupported media types, and aborts incomplete multipart uploads on handled failures. Configure an R2 lifecycle rule to abort orphaned multipart uploads; **do not expire completed generated objects**. Larger assets or transfers need a resumable transfer design before enabling models that exceed these limits. Provider adapters must enumerate every output; transfer failure must remain visible rather than silently dropping assets.
+
+Storage retries use persisted backoff and a 15-minute initial archival deadline. Exhausted retries become `needs_attention` with a storage-specific message. Check again resumes saving the original outputs; it never starts another provider execution. The UI labels `persisting` as Saving and keeps the Orb Thinking. Cancellation cannot discard outputs once provider completion is known.
+
+The authenticated same-origin `/api/jobs/output` endpoint resolves ownership through the database package, with the coordinator as a fallback while D1 catches up. It streams R2 bytes directly and supports HEAD, ETag revalidation, and single byte ranges. It never redirects to Comfy or calls the provider to serve an archived asset. Storage keys are identifiers, not authorization tokens. Responses use private caching and `nosniff`.
+
+Checkpoint schema v4 upgrades existing successful provider-only jobs to `persisting` on coordinator activation and schedules archival. Dormant coordinators require activation or a future administrative sweep. Already-expired sources cannot be reconstructed by this migration; report them as needing attention. Do not claim historical assets are migrated until their R2 references have been written.
+
+Completed assets have no automatic expiry. Product deletion and retention controls must explicitly coordinate object deletion with catalog references; never use provider-job expiry or coordinator cleanup as a signal to delete an R2 object. Backup/recovery policy and user-directed deletion remain separate operational work.
+
+R2 API behavior follows the [Workers R2 binding reference](https://developers.cloudflare.com/r2/api/workers/workers-api-reference/).
 
 ## WebSocket protocol and UI synchronization
 
@@ -244,6 +273,6 @@ Before scaffolding is considered complete, resolve and validate:
 1. The pinned TanStack RSC/Vite/Cloudflare and Prisma/D1 combinations.
 2. SDK compatibility in Durable Objects against the selected Comfy hosting target.
 3. Authentication/session implementation and provider-wide generation capacity.
-4. Media retention and delivery requirements.
+4. User-directed media deletion, backup/recovery policy, and production R2 provisioning.
 
 These are implementation gates and remaining product choices; they do not change the selected Bun, TanStack Start, Workers, Durable Objects, D1, and Prisma architecture.

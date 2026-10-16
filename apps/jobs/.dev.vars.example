@@ -1,0 +1,3 @@
+# Copy to .dev.vars to enable Comfy Router generation.
+# No credentials are needed for the scaffold or integration tests.
+COMFY_API_KEY=""

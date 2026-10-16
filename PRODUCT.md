@@ -2,7 +2,7 @@
 
 <!-- impeccable:product-schema 1 -->
 
-Confirmed on 2026-10-16 from [GOALS.md](GOALS.md) and [ARCHITECTURE.md](ARCHITECTURE.md). This record summarizes durable product context; GOALS.md contains the full vision and ARCHITECTURE.md owns implementation decisions. The repository currently contains planning and research documents, not an implemented application. Capabilities below describe the intended product, not shipped functionality.
+Confirmed on 2026-10-16 from [GOALS.md](GOALS.md) and [ARCHITECTURE.md](ARCHITECTURE.md). This record summarizes durable product context; GOALS.md contains the full vision and ARCHITECTURE.md owns implementation decisions. The repository contains an initial application scaffold with a sidebar and shallow studio pages. Capabilities below describe the intended product, not shipped functionality.
 
 ## Platform
 
@@ -12,7 +12,7 @@ web
 
 The agreed target is a strict TypeScript monorepo using Bun workspaces, TanStack Start with React and TanStack Router, Tailwind CSS, and shadcn/ui. Cloudflare Workers host the application; Durable Objects coordinate generation and stream job updates over WebSockets. Cloudflare D1 and Prisma provide application persistence through a dedicated database package. The official Comfy TypeScript SDK connects to external GPU workflow execution. Bun is the development toolchain, not the production runtime.
 
-These choices are established, but the application is not scaffolded. Runtime and dependency compatibility gates remain in ARCHITECTURE.md.
+The initial scaffold implements these workspace boundaries. Live Comfy execution, authentication, and production readiness gates remain in ARCHITECTURE.md and README.md.
 
 ## Users
 
@@ -72,7 +72,7 @@ No visual identity, palette, typography, or additional voice rules were selected
 - [ARCHITECTURE.md](ARCHITECTURE.md): selected technology, target package boundaries, execution lifecycle, reliability requirements, accessibility requirements for job activity, and unresolved implementation gates.
 - [docs/README.md](docs/README.md) and linked local research: Comfy developer capabilities and competition context, researched on 2026-10-16. Verify changing external details before implementation or submission.
 
-The repository has no implemented application, verified generation demonstrations, customer testimonials, benchmarks, or shipped product imagery. Do not invent these. The intended decisive demonstration is a short film with recognizable Elements across shots, followed by background replacement and character recasting that preserve the remaining approved work. Competition participation is an opportunity to demonstrate the product, not its enduring purpose.
+The repository has a navigable studio shell but no implemented creative workflows, verified generation demonstrations, customer testimonials, benchmarks, or shipped product imagery. Do not invent these. The intended decisive demonstration is a short film with recognizable Elements across shots, followed by background replacement and character recasting that preserve the remaining approved work. Competition participation is an opportunity to demonstrate the product, not its enduring purpose.
 
 ## Product Principles
 

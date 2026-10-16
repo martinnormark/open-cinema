@@ -1,0 +1,44 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "compatibility_date": "2026-10-16",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "traces": {
+      "enabled": true,
+    },
+  },
+  "r2_buckets": [
+    {
+      "binding": "GENERATED_ASSETS",
+      "bucket_name": "open-cinema-generated-assets",
+    },
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "open-cinema",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "../../packages/database/migrations",
+    },
+  ],
+  "name": "open-cinema-jobs",
+  "main": "src/index.ts",
+  "workers_dev": false,
+  "preview_urls": false,
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "GENERATION_COORDINATORS",
+        "class_name": "GenerationCoordinator",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["GenerationCoordinator"],
+    },
+  ],
+  "secrets": { "required": ["COMFY_API_KEY"] },
+}

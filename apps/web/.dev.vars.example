@@ -1,0 +1,4 @@
+# LOCAL ONLY: never enable this on a public deployment.
+LOCAL_MVP_ENABLED=true
+# Generate with: openssl rand -base64 48
+LOCAL_SESSION_SECRET=

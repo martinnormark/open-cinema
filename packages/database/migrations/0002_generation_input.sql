@@ -1,0 +1,4 @@
+ALTER TABLE "GenerationJob" ADD COLUMN "prompt" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "GenerationJob" ADD COLUMN "model" TEXT NOT NULL DEFAULT 'FLUX 3 Image Klein';
+ALTER TABLE "GenerationJob" ADD COLUMN "seed" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "GenerationJob" ADD COLUMN "progress" REAL;

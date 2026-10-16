@@ -1,0 +1,67 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+  runtime  = "cloudflare"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id        String   @id
+  createdAt DateTime @default(now())
+  workflows Workflow[]
+  jobs      GenerationJob[]
+}
+
+model Workflow {
+  id        String   @id
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id])
+  name      String
+  version   Int      @default(1)
+  graph     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId, createdAt])
+}
+
+model GenerationJob {
+  id               String   @id
+  ownerId          String
+  owner            User     @relation(fields: [ownerId], references: [id])
+  state            String
+  version          Int
+  idempotencyKey   String
+  requestHash      String
+  workflowSnapshot Json
+  inputsSnapshot   Json
+  providerJobId    String?
+  error            String?
+  prompt           String @default("")
+  model            String @default("FLUX 3 Image Klein")
+  seed             Int?
+  progress         Float?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  outputs          JobOutput[]
+
+  @@unique([ownerId, idempotencyKey])
+  @@index([ownerId, createdAt])
+  @@index([ownerId, state])
+}
+
+model JobOutput {
+  id              String @id
+  jobId           String
+  job             GenerationJob @relation(fields: [jobId], references: [id])
+  providerAssetId String
+  mediaType       String
+  r2Key           String? @unique
+  sizeBytes       Int?
+  etag            String?
+
+  @@index([jobId])
+}

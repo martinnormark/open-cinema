@@ -1,0 +1,14 @@
+{
+  "name": "@open-cinema/assets",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@open-cinema/contracts": "workspace:*"
+  }
+}
