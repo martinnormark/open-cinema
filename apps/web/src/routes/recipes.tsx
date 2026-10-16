@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { BookOpen } from "lucide-react";
 import { PlaceholderPage } from "@/components/placeholder-page";
 
 export const Route = createFileRoute("/recipes")({
@@ -7,7 +8,9 @@ export const Route = createFileRoute("/recipes")({
     <PlaceholderPage
       title="Recipes"
       description="Keep a creative direction worth using again."
-      detail="Save combinations of visual direction, references, and capabilities for future work. Recipe authoring is not available yet."
+      icon={BookOpen}
+      emptyTitle="No recipes saved"
+      detail="When a look works, save its direction, references and capabilities as a recipe and apply it to new subjects without rewriting the prompt."
     />
   ),
 });

@@ -1,42 +1,41 @@
+import type { ComponentType, SVGProps } from "react";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft } from "lucide-react";
+import { Clapperboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/empty-state";
+import { PageHeader } from "@/components/page-header";
 
 export function PlaceholderPage({
   title,
   description,
   detail,
+  emptyTitle = "Nothing in frame yet",
+  icon = Clapperboard,
 }: {
   title: string;
   description: string;
   detail: string;
+  emptyTitle?: string;
+  icon?: ComponentType<SVGProps<SVGSVGElement>>;
 }) {
   return (
     <section
-      className="mx-auto w-full max-w-5xl px-6 py-10 md:px-12 md:py-16"
+      className="mx-auto w-full max-w-6xl px-6 py-10 md:px-12 md:py-14"
       aria-labelledby="page-title"
     >
-      <h1
-        id="page-title"
-        className="text-3xl font-semibold tracking-tight text-balance"
+      <PageHeader title={title} description={description} />
+      <EmptyState
+        className="mt-10"
+        icon={icon}
+        title={emptyTitle}
+        actions={
+          <Button asChild>
+            <Link to="/">Make a first frame</Link>
+          </Button>
+        }
       >
-        {title}
-      </h1>
-      <p className="mt-3 max-w-2xl text-base leading-7 text-muted-foreground">
-        {description}
-      </p>
-      <div className="mt-12 border-t border-border pt-8">
-        <h2 className="text-base font-medium">This space is taking shape</h2>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-          {detail}
-        </p>
-        <Button asChild variant="outline" className="mt-6">
-          <Link to="/">
-            <ArrowLeft aria-hidden="true" />
-            Back to Studio
-          </Link>
-        </Button>
-      </div>
+        <p>{detail}</p>
+      </EmptyState>
     </section>
   );
 }

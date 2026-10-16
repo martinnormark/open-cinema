@@ -23,6 +23,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { BrandMark } from "@/components/brand-mark";
 
 const navigation = [
   { title: "Studio", to: "/", icon: Clapperboard },
@@ -40,13 +41,13 @@ export function AppSidebar() {
   const { setOpenMobile } = useSidebar();
   return (
     <Sidebar collapsible="icon" role="complementary" aria-label="Workspace">
-      <SidebarHeader className="h-16 justify-center border-b border-sidebar-border">
+      <SidebarHeader className="h-14 justify-center border-b border-sidebar-border">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild size="lg" tooltip="Open Cinema">
               <Link to="/" onClick={() => setOpenMobile(false)}>
-                <Clapperboard aria-hidden="true" className="size-5" />
-                <span className="text-base font-semibold tracking-tight">
+                <BrandMark className="size-5 shrink-0" />
+                <span className="text-[0.9375rem] font-semibold tracking-[-0.01em]">
                   Open Cinema
                 </span>
               </Link>

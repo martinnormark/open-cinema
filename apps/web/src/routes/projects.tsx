@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { FolderOpen } from "lucide-react";
 import { PlaceholderPage } from "@/components/placeholder-page";
 
 export const Route = createFileRoute("/projects")({
@@ -7,7 +8,9 @@ export const Route = createFileRoute("/projects")({
     <PlaceholderPage
       title="Projects"
       description="Give every story a place to grow."
-      detail="Project direction, related images, and shot sequences will live here. Project creation is not available yet."
+      icon={FolderOpen}
+      emptyTitle="No projects yet"
+      detail="A project holds its direction, related images and shot sequence, so every new shot belongs. Start from a first frame and the project grows from there."
     />
   ),
 });

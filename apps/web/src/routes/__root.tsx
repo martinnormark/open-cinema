@@ -7,6 +7,9 @@ import {
 } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
+import { EmptyState } from "@/components/empty-state";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   SidebarInset,
   SidebarProvider,
@@ -31,19 +34,36 @@ export const Route = createRootRoute({
   shellComponent: RootDocument,
   component: AppLayout,
   notFoundComponent: () => (
-    <section className="p-10">
-      <h1 className="text-2xl font-semibold">Page not found</h1>
-      <Link className="mt-4 inline-block underline" to="/">
-        Back to Studio
-      </Link>
+    <section className="mx-auto w-full max-w-6xl px-6 py-10 md:px-12 md:py-14">
+      <h1 id="page-title" className="sr-only">
+        Page not found
+      </h1>
+      <EmptyState
+        title="This page is off the reel"
+        actions={
+          <Button asChild>
+            <Link to="/">Back to Studio</Link>
+          </Button>
+        }
+      >
+        <p>The address may be mistyped, or the page has moved.</p>
+      </EmptyState>
     </section>
   ),
   errorComponent: ({ reset }) => (
-    <section className="p-10">
-      <h1 className="text-2xl font-semibold">Something went wrong</h1>
-      <button className="mt-4 underline" onClick={reset}>
-        Try again
-      </button>
+    <section className="mx-auto w-full max-w-6xl px-6 py-10 md:px-12 md:py-14">
+      <h1 id="page-title" className="sr-only">
+        Something went wrong
+      </h1>
+      <EmptyState
+        title="Something went wrong"
+        actions={<Button onClick={reset}>Try again</Button>}
+      >
+        <p>
+          Your generations keep running in the background. Try again, or reload
+          the page if this keeps happening.
+        </p>
+      </EmptyState>
     </section>
   ),
 });
@@ -59,14 +79,11 @@ function AppLayout() {
       </a>
       <AppSidebar />
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-3 border-b border-border px-4 md:px-6">
-          <SidebarTrigger />
-          <span className="text-sm text-muted-foreground">
-            Your creative workspace
-          </span>
-          <span className="ml-auto text-xs text-muted-foreground">
+        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-3 md:px-4">
+          <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
+          <Badge variant="outline" className="ml-auto text-muted-foreground">
             Early preview
-          </span>
+          </Badge>
         </header>
         <main id="main-content" tabIndex={-1} className="flex-1 outline-none">
           <Outlet />

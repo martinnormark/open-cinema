@@ -1,33 +1,48 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "@fontsource-variable/inter/opsz.css";
+
+/*
+ * Open Cinema design tokens. Dark-first "screening room": warm graphite
+ * surfaces that stay neutral beside images, bone-white type and primary
+ * actions, and a single tungsten accent for focus, live state and progress.
+ * See docs/design.md for usage rules.
+ */
 
 @theme inline {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono:
+    ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--foreground);
+  --color-popover: var(--elevated);
+  --color-popover-foreground: var(--foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--foreground);
   --color-muted: var(--secondary);
   --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--secondary);
+  --color-subtle-foreground: var(--subtle-foreground);
+  --color-accent: var(--hover);
   --color-accent-foreground: var(--foreground);
-  --color-popover: var(--background);
-  --color-popover-foreground: var(--foreground);
-  --color-destructive: #b91c1c;
-  --color-card: var(--background);
-  --color-card-foreground: var(--foreground);
-  --color-success: #15803d;
-  --color-warning: #b45309;
+  --color-tungsten: var(--tungsten);
+  --color-tungsten-foreground: var(--tungsten-foreground);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
   --color-border: var(--border);
-  --color-input: var(--border);
+  --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-surface: var(--surface);
+  --color-elevated: var(--elevated);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--foreground);
   --color-sidebar-primary: var(--primary);
   --color-sidebar-primary-foreground: var(--primary-foreground);
-  --color-sidebar-accent: var(--secondary);
+  --color-sidebar-accent: var(--hover);
   --color-sidebar-accent-foreground: var(--foreground);
   --color-sidebar-border: var(--border);
   --color-sidebar-ring: var(--ring);
@@ -35,38 +50,94 @@
   --radius-md: 0.375rem;
   --radius-lg: 0.5rem;
   --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
 }
 
 :root {
-  color-scheme: light;
-  --background: #fff;
-  --foreground: #202020;
-  --primary: #252525;
-  --primary-foreground: #fff;
-  --secondary: #ececea;
-  --muted-foreground: #646460;
-  --border: #e3e3df;
-  --ring: #646460;
-  --sidebar: #f7f7f5;
-  --panel-open-duration: 250ms;
-  --panel-close-duration: 150ms;
-  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  color-scheme: dark;
+
+  /* Surfaces, darkest to lightest. Hue 70 keeps them warm but near-neutral. */
+  --background: oklch(0.155 0.004 70);
+  --sidebar: oklch(0.172 0.004 70);
+  --surface: oklch(0.19 0.005 70);
+  --elevated: oklch(0.225 0.006 70);
+  --secondary: oklch(0.245 0.006 70);
+  --hover: oklch(0.27 0.007 70);
+  --border: oklch(0.29 0.006 70);
+  --input: oklch(0.34 0.007 70);
+
+  /* Type */
+  --foreground: oklch(0.94 0.012 85);
+  --muted-foreground: oklch(0.72 0.012 80);
+  --subtle-foreground: oklch(0.6 0.01 80);
+
+  /* Actions and signals */
+  --primary: oklch(0.94 0.012 85);
+  --primary-foreground: oklch(0.17 0.004 70);
+  --tungsten: oklch(0.8 0.13 70);
+  --tungsten-foreground: oklch(0.2 0.03 70);
+  --ring: oklch(0.8 0.13 70 / 0.7);
+  --destructive: oklch(0.7 0.17 28);
+  --success: oklch(0.77 0.13 155);
+  --warning: oklch(0.82 0.13 80);
+
+  /* Motion (transitions.dev scale; match tokens by usage, not number) */
+  --duration-stagger: 40ms;
+  --duration-micro: 80ms;
+  --duration-quick: 150ms;
+  --duration-fast: 250ms;
+  --duration-medium: 350ms;
+  --duration-slow: 400ms;
+  --duration-very-slow: 500ms;
+  --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out: var(--ease-smooth-out);
+  --panel-open-duration: var(--duration-slow);
+  --panel-close-duration: var(--duration-medium);
 }
 
 @layer base {
   * {
     @apply border-border;
   }
+  html {
+    background: var(--background);
+  }
   body {
     @apply m-0 bg-background font-sans text-foreground antialiased;
+    font-feature-settings:
+      "cv11" 1,
+      "ss03" 1;
+    text-rendering: optimizeLegibility;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+    letter-spacing: -0.02em;
   }
   ::selection {
-    background: var(--foreground);
-    color: var(--background);
+    background: oklch(0.8 0.13 70 / 0.35);
+    color: var(--foreground);
   }
   :focus-visible {
     outline-color: var(--ring);
   }
+  input,
+  textarea {
+    caret-color: var(--tungsten);
+  }
+  a {
+    text-underline-offset: 0.2em;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--input) transparent;
+  }
+}
+
+/* Tabular figures for durations, costs, seeds and progress. */
+.tabular {
+  font-variant-numeric: tabular-nums;
 }
 
 /* Keep desktop layout changes immediate; animate only the mobile overlay. */
@@ -77,8 +148,13 @@
 }
 [data-slot="sheet-content"],
 [data-mobile="true"],
-[data-slot="sheet-overlay"] {
-  animation-timing-function: var(--ease-out);
+[data-slot="sheet-overlay"],
+[data-slot="dialog-content"],
+[data-slot="dialog-overlay"],
+[data-slot="dropdown-menu-content"],
+[data-slot="dropdown-menu-sub-content"],
+[data-slot="select-content"] {
+  animation-timing-function: var(--ease-smooth-out);
 }
 [data-slot="sheet-content"][data-state="open"],
 [data-mobile="true"][data-state="open"],
@@ -89,6 +165,20 @@
 [data-mobile="true"][data-state="closed"],
 [data-slot="sheet-overlay"][data-state="closed"] {
   animation-duration: var(--panel-close-duration);
+}
+[data-slot="dialog-content"][data-state="open"],
+[data-slot="dialog-overlay"][data-state="open"],
+[data-slot="dropdown-menu-content"][data-state="open"],
+[data-slot="dropdown-menu-sub-content"][data-state="open"],
+[data-slot="select-content"][data-state="open"] {
+  animation-duration: var(--duration-fast);
+}
+[data-slot="dialog-content"][data-state="closed"],
+[data-slot="dialog-overlay"][data-state="closed"],
+[data-slot="dropdown-menu-content"][data-state="closed"],
+[data-slot="dropdown-menu-sub-content"][data-state="closed"],
+[data-slot="select-content"][data-state="closed"] {
+  animation-duration: var(--duration-quick);
 }
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -112,14 +202,16 @@
   padding: 0.25rem 1rem 0.25rem 0.25rem;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: var(--background);
+  background: var(--elevated);
+  box-shadow: 0 8px 24px -8px oklch(0 0 0 / 0.6);
+  transition: background-color var(--duration-quick) var(--ease-smooth-out);
 }
 .generation-orb:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 4px;
 }
 .generation-orb:hover {
-  background: var(--muted);
+  background: var(--hover);
 }
 .orb-fallback {
   position: absolute;
@@ -133,9 +225,6 @@
   );
 }
 textarea::selection {
-  background: var(--primary);
-  color: var(--primary-foreground);
-}
-textarea {
-  caret-color: var(--primary);
+  background: oklch(0.8 0.13 70 / 0.35);
+  color: var(--foreground);
 }

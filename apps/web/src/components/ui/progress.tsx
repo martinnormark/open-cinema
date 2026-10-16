@@ -23,7 +23,7 @@ function Progress({
       {/* Transform-only fill keeps live job progress on the compositor. */}
       <ProgressPrimitive.Indicator
         data-slot="progress-indicator"
-        className="h-full w-full flex-1 bg-primary transition-transform duration-300 ease-[var(--ease-out)]"
+        className="h-full w-full flex-1 bg-primary transition-transform duration-300 ease-(--ease-smooth-out)"
         style={{ transform: `translateX(-${100 - (value ?? 0)}%)` }}
       />
     </ProgressPrimitive.Root>
