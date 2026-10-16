@@ -1,0 +1,71 @@
+/* Element authoring motion. Tokens follow transitions.dev; opacity, transform and
+   filter only so live job updates never trigger layout animation. */
+:root {
+  --elements-open-dur: 250ms;
+  --elements-close-dur: 150ms;
+  --elements-reveal-dur: 400ms;
+  --elements-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Mention suggestions grow from the composer (menu dropdown). */
+.mention-list:not([hidden]) {
+  transform-origin: top left;
+  animation: elements-dropdown var(--elements-open-dur) var(--elements-ease);
+}
+@keyframes elements-dropdown {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+/* A generated reference resolves from its placeholder (skeleton reveal). */
+.reference-reveal {
+  animation: elements-reveal var(--elements-reveal-dur) ease-in-out;
+}
+@keyframes elements-reveal {
+  from {
+    opacity: 0;
+    filter: blur(2px);
+  }
+}
+
+/* Waiting placeholder for an image that is still generating. */
+.reference-pending {
+  background: linear-gradient(
+    100deg,
+    var(--secondary) 30%,
+    color-mix(in oklab, var(--secondary), white 55%) 50%,
+    var(--secondary) 70%
+  );
+  background-size: 300% 100%;
+  animation: elements-shimmer 1.6s linear infinite;
+}
+@keyframes elements-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+/* Inline panels such as the new-state form (panel reveal). */
+.elements-panel {
+  animation: elements-panel var(--elements-open-dur) var(--elements-ease);
+}
+@keyframes elements-panel {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mention-list:not([hidden]),
+  .reference-reveal,
+  .reference-pending,
+  .elements-panel {
+    animation: none;
+  }
+}

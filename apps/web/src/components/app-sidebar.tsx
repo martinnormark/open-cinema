@@ -61,24 +61,29 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <nav aria-label="Main navigation">
               <SidebarMenu>
-                {navigation.map(({ title, to, icon: Icon }) => (
-                  <SidebarMenuItem key={to}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={pathname === to}
-                      tooltip={title}
-                    >
-                      <Link
-                        to={to}
-                        aria-current={pathname === to ? "page" : undefined}
-                        onClick={() => setOpenMobile(false)}
+                {navigation.map(({ title, to, icon: Icon }) => {
+                  const active =
+                    pathname === to ||
+                    (to !== "/" && pathname.startsWith(`${to}/`));
+                  return (
+                    <SidebarMenuItem key={to}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={active}
+                        tooltip={title}
                       >
-                        <Icon aria-hidden="true" />
-                        <span>{title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
+                        <Link
+                          to={to}
+                          aria-current={active ? "page" : undefined}
+                          onClick={() => setOpenMobile(false)}
+                        >
+                          <Icon aria-hidden="true" />
+                          <span>{title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
               </SidebarMenu>
             </nav>
           </SidebarGroupContent>
