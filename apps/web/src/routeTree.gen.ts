@@ -19,6 +19,8 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ApiHealthRouteImport } from './routes/api.health'
 import { Route as ApiJobsOutputRouteImport } from './routes/api.jobs.output'
 import { Route as ApiJobsStreamRouteImport } from './routes/api.jobs.stream'
+import { Route as ApiMediaIdRouteImport } from './routes/api.media.$id'
+import { Route as ApiMediaUploadRouteImport } from './routes/api.media.upload'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -70,6 +72,16 @@ const ApiJobsStreamRoute = ApiJobsStreamRouteImport.update({
   path: '/api/jobs/stream',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMediaIdRoute = ApiMediaIdRouteImport.update({
+  id: '/api/media/$id',
+  path: '/api/media/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMediaUploadRoute = ApiMediaUploadRouteImport.update({
+  id: '/api/media/upload',
+  path: '/api/media/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -82,6 +94,8 @@ export interface FileRoutesByFullPath {
   '/api/health': typeof ApiHealthRoute
   '/api/jobs/output': typeof ApiJobsOutputRoute
   '/api/jobs/stream': typeof ApiJobsStreamRoute
+  '/api/media/$id': typeof ApiMediaIdRoute
+  '/api/media/upload': typeof ApiMediaUploadRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -94,6 +108,8 @@ export interface FileRoutesByTo {
   '/api/health': typeof ApiHealthRoute
   '/api/jobs/output': typeof ApiJobsOutputRoute
   '/api/jobs/stream': typeof ApiJobsStreamRoute
+  '/api/media/$id': typeof ApiMediaIdRoute
+  '/api/media/upload': typeof ApiMediaUploadRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -107,6 +123,8 @@ export interface FileRoutesById {
   '/api/health': typeof ApiHealthRoute
   '/api/jobs/output': typeof ApiJobsOutputRoute
   '/api/jobs/stream': typeof ApiJobsStreamRoute
+  '/api/media/$id': typeof ApiMediaIdRoute
+  '/api/media/upload': typeof ApiMediaUploadRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -121,6 +139,8 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/api/jobs/output'
     | '/api/jobs/stream'
+    | '/api/media/$id'
+    | '/api/media/upload'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -133,6 +153,8 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/api/jobs/output'
     | '/api/jobs/stream'
+    | '/api/media/$id'
+    | '/api/media/upload'
   id:
     | '__root__'
     | '/'
@@ -145,6 +167,8 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/api/jobs/output'
     | '/api/jobs/stream'
+    | '/api/media/$id'
+    | '/api/media/upload'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -158,6 +182,8 @@ export interface RootRouteChildren {
   ApiHealthRoute: typeof ApiHealthRoute
   ApiJobsOutputRoute: typeof ApiJobsOutputRoute
   ApiJobsStreamRoute: typeof ApiJobsStreamRoute
+  ApiMediaIdRoute: typeof ApiMediaIdRoute
+  ApiMediaUploadRoute: typeof ApiMediaUploadRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -232,6 +258,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiJobsStreamRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/media/$id': {
+      id: '/api/media/$id'
+      path: '/api/media/$id'
+      fullPath: '/api/media/$id'
+      preLoaderRoute: typeof ApiMediaIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/media/upload': {
+      id: '/api/media/upload'
+      path: '/api/media/upload'
+      fullPath: '/api/media/upload'
+      preLoaderRoute: typeof ApiMediaUploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -246,6 +286,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiHealthRoute: ApiHealthRoute,
   ApiJobsOutputRoute: ApiJobsOutputRoute,
   ApiJobsStreamRoute: ApiJobsStreamRoute,
+  ApiMediaIdRoute: ApiMediaIdRoute,
+  ApiMediaUploadRoute: ApiMediaUploadRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

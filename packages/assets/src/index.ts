@@ -182,7 +182,16 @@ export async function serveStoredOutput(
 ): Promise<Response> {
   if (!output.r2Key)
     return new Response("Output is still being saved", { status: 409 });
-  const object = await bucket.head(output.r2Key);
+  return serveObject(bucket, output.r2Key, request);
+}
+
+/** Streams a private object with ETag and byte-range support. Authorize first. */
+export async function serveObject(
+  bucket: R2Bucket,
+  key: string,
+  request: Request,
+): Promise<Response> {
+  const object = await bucket.head(key);
   if (!object) return new Response("Stored output not found", { status: 404 });
   const headers = new Headers({
     "Content-Type":
@@ -237,7 +246,7 @@ export async function serveStoredOutput(
         headers: { "Content-Range": `bytes */${object.size}` },
       });
   }
-  const stored = await bucket.get(output.r2Key, range ? { range } : undefined);
+  const stored = await bucket.get(key, range ? { range } : undefined);
   if (!stored) return new Response("Stored output not found", { status: 404 });
   if (range) {
     headers.set(
@@ -248,3 +257,5 @@ export async function serveStoredOutput(
   }
   return new Response(stored.body, { status: range ? 206 : 200, headers });
 }
+
+export * from "./uploads";
