@@ -19,6 +19,12 @@
       "skillPath": "SKILL.md",
       "computedHash": "149b47d59d4327f349171431ce0478e519b830b022e941f0a22fa951bb442e07"
     },
+    "test-audit": {
+      "source": "openclaw/openclaw",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/test-audit/SKILL.md",
+      "computedHash": "c1f706b2a12cf90d21168aa91e58952f26559b6bb2e773fc691fdc43af8914fb"
+    },
     "transitions-dev": {
       "source": "Jakubantalik/transitions.dev",
       "sourceType": "github",
