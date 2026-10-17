@@ -86,7 +86,20 @@ Cost per 6 s clip: Kling $0.76 (5.4 Kling credits at $0.14), SwitchX $0.71–0.8
 
 ## Packaging status
 
-The workflow is packaged in [`workflows/background-replace/`](../workflows/background-replace/README.md): the Kling graph (default), the SwitchX graph, and `comfy-build.yaml`, which passes `comfy build validate`. Both graphs ran end to end in a local ComfyUI on all clips above. **No platform release has been cut**: `comfy build push` and `release create` need a signed-in Comfy workspace and the owner's go-ahead, because a release cannot be undone.
+The shipped path is the Router request the app already makes: `video.background-replace` in the workflow registry builds a `kling/kling-v3-omni` request from the take and the Location's references ([`definitions.ts`](../packages/comfy/src/workflows/definitions.ts), [`background-replace.ts`](../packages/comfy/src/workflows/background-replace.ts)). It needs no platform release.
+
+The same workflow is packaged for the Comfy platform in [`workflows/background-replace/`](../workflows/background-replace/README.md): the Kling graph (default), the SwitchX graph, and `comfy-build.yaml` (ComfyUI v0.41.2, no models or custom nodes, the two partner nodes allowlisted). Both graphs ran end to end in a local ComfyUI on all clips above. As of this report, `comfy build validate workflows/background-replace` passes and `comfy build push workflows/background-replace --dry-run` reports nothing to upload.
+
+**No release has been cut.** A release cannot be undone and needs the owner's signed-in Comfy workspace. To cut one, from the repository root on a machine signed in to that workspace (comfy-cli 1.22 or later):
+
+```sh
+comfy build validate workflows/background-replace
+comfy build push workflows/background-replace          # creates the Build in the signed-in workspace
+comfy build release create workflows/background-replace --target linux/nvidia --watch
+comfy build release ls workflows/background-replace     # confirm the release and its status
+```
+
+If `push` records a Build id in `comfy-build.yaml`, commit it. Serving the release as an endpoint follows the `comfy-deploy` skill (`comfy skills show comfy-deploy`).
 
 ## Follow-ups
 

@@ -18,7 +18,7 @@ Source limits: Kling edits 3–10 s clips, 720–2160 px per side, 24–60 fps, 
 
 - `comfy build validate` passes for `comfy-build.yaml` (offline).
 - Both graphs were submitted to a local ComfyUI at `fc04da9` (CPU, partner calls through a loopback relay). Both passed ComfyUI's prompt validation with no node errors. The Kling graph was executed end to end on clip C5 of the evaluation set; the result and its comparison are in `artifacts/evaluation/background/runs/c5-comfyui-kling/` (ignored). The SwitchX graph was validated and then removed from the queue, because the same SwitchX request had already been measured through Router.
-- No platform release has been cut. `comfy build push` and `comfy build release create --target linux/nvidia` need a signed-in Comfy workspace and the owner's go-ahead; a cut is not undoable.
+- No platform release has been cut. The exact release commands are in [docs/phase0-background.md](../../docs/phase0-background.md#packaging-status); a cut needs a signed-in Comfy workspace and the owner's go-ahead, because it cannot be undone.
 
 ## Running locally
 
