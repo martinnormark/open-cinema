@@ -1,4 +1,4 @@
-import type { Job } from "@open-cinema/contracts";
+import { resultOutputs, type Job } from "@open-cinema/contracts";
 import { getClient, type DatabaseContext } from "../client";
 import type { ExecutionRecord } from "../durable/schema";
 
@@ -112,7 +112,8 @@ async function projectRevision(
       createdAt: new Date(job.createdAt),
     },
   });
-  const output = job.outputs.find((o) => o.r2Key);
+  // The first presentable result: the foreground lock when the job made one.
+  const output = resultOutputs(job.outputs).find((o) => o.r2Key);
   if (job.state === "succeeded" && output)
     await client.revision.updateMany({
       where: { id: job.id, status: "pending" },

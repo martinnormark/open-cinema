@@ -37,6 +37,40 @@ export const jobOutputSchema = z.object({
   etag: z.string().nullable().default(null),
 });
 export type JobOutput = z.infer<typeof jobOutputSchema>;
+
+/**
+ * Alternative results of one job that a creator chooses between. Background
+ * replacement offers the foreground lock (the source performers composited over
+ * the generated background) and the unlocked edit (the model's own relit
+ * performers), both conformed to the source's frame rate and audio.
+ */
+export const resultVariantSchema = z.enum(["locked", "unlocked"]);
+export type ResultVariant = z.infer<typeof resultVariantSchema>;
+/** Outputs of a job's later stages are stored as `{stage}:{asset}`. */
+export const LOCK_STAGE = "lock";
+export function outputVariant(
+  output: Pick<JobOutput, "providerAssetId">,
+): ResultVariant | null {
+  const [stage, asset] = output.providerAssetId.split(":");
+  const variant = resultVariantSchema.safeParse(asset);
+  return stage === LOCK_STAGE && variant.success ? variant.data : null;
+}
+/**
+ * The outputs a creator sees: the variants when a job made them (locked first),
+ * otherwise every output. Intermediates such as a matte or the unconformed edit
+ * stay stored with the job but are not results.
+ */
+export function resultOutputs<T extends Pick<JobOutput, "providerAssetId">>(
+  outputs: readonly T[],
+): T[] {
+  const variants = outputs.filter((o) => outputVariant(o));
+  if (!variants.length) return [...outputs];
+  const order = resultVariantSchema.options;
+  return variants.sort(
+    (a, b) =>
+      order.indexOf(outputVariant(a)!) - order.indexOf(outputVariant(b)!),
+  );
+}
 export const jobSchema = z.object({
   id: z.string(),
   ownerId: z.string(),
@@ -52,6 +86,8 @@ export const jobSchema = z.object({
   projectId: z.string().nullable().default(null),
   seed: z.number().int().nonnegative().nullable().default(null),
   progress: z.number().min(0).max(1).nullable().default(null),
+  /** Creator-facing step of a multi-step job, e.g. "Locking the performers". */
+  stage: z.string().nullable().optional(),
   outputs: z.array(jobOutputSchema),
 });
 export type Job = z.infer<typeof jobSchema>;

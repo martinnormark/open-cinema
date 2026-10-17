@@ -77,15 +77,34 @@ export async function setRevisionStatus(
   scope: OwnerScope,
   input: SetRevisionStatusInput,
 ): Promise<Revision | null> {
-  const { id, status } = setRevisionStatusInputSchema.parse(input);
+  const { id, status, resultOutputId } =
+    setRevisionStatusInputSchema.parse(input);
   const client = getClient(db);
+  let variant: { resultOutputId: string } | null = null;
+  if (resultOutputId) {
+    // Only another saved output of the revision's own result job qualifies.
+    const revision = await client.revision.findFirst({
+      where: { id, ownerId: scope.ownerId },
+    });
+    const output =
+      revision?.resultJobId &&
+      (await client.jobOutput.findFirst({
+        where: {
+          id: resultOutputId,
+          jobId: revision.resultJobId,
+          r2Key: { not: null },
+        },
+      }));
+    if (!output) return null;
+    variant = { resultOutputId: output.id };
+  }
   const { count } = await client.revision.updateMany({
     where: {
       id,
       ownerId: scope.ownerId,
       status: { in: ["proposed", "kept", "rejected"] },
     },
-    data: { status },
+    data: { status, ...variant },
   });
   if (count === 0) return null;
   return toRevision(await client.revision.findUniqueOrThrow({ where: { id } }));

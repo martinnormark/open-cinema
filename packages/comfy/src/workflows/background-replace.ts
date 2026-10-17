@@ -3,7 +3,13 @@ import type {
   ResolvedMention,
 } from "@open-cinema/contracts";
 import { expandMentions, httpsUrl, mediaTypeFromUrl } from "./results";
-import type { ProviderOutput, ProviderRequest } from "./types";
+import { LOCK_STAGE } from "@open-cinema/contracts";
+import type {
+  MediaStage,
+  ProviderOutput,
+  ProviderRequest,
+  RouterStage,
+} from "./types";
 
 /**
  * Background replacement pipelines measured in Phase 0 (docs/phase0-background.md).
@@ -204,3 +210,86 @@ export function backgroundReplaceOutputs(data: unknown): ProviderOutput[] {
   }
   return outputs;
 }
+
+/**
+ * The foreground lock (docs/phase0-background.md, docs/background-job.md).
+ * Kling relights the performers and returns 24 fps up to two frames short, so
+ * after the edit the job mattes the source performers and then, in the media
+ * container, composites them over the edit on the source's own frame grid with
+ * the source audio (the locked variant). The edit is conformed the same way as
+ * the unlocked variant for takes where Kling's relight reads better.
+ */
+export const BACKGROUND_MATTE_MODEL = "bria/video-edit-remove-background";
+export const MATTE_STAGE = "matte";
+
+/** Bria's transparent VP9 keeps a soft alpha edge; its result is at `result.video_url`. */
+export function backgroundMatteRequest(videoUrl: string): ProviderRequest {
+  return {
+    model: BACKGROUND_MATTE_MODEL,
+    input: {
+      video: videoUrl,
+      background_color: "Transparent",
+      output_container_and_codec: "webm_vp9",
+      preserve_audio: false,
+    },
+  };
+}
+
+export function backgroundMatteOutputs(data: unknown): ProviderOutput[] {
+  const url = httpsUrl(at(data, "result", "video_url"));
+  return url
+    ? [
+        {
+          providerAssetId: "video",
+          url,
+          mediaType: mediaTypeFromUrl(url, "video/webm"),
+        },
+      ]
+    : [];
+}
+
+export const backgroundMatteStage: RouterStage<"video.background-replace"> = {
+  kind: "router",
+  id: MATTE_STAGE,
+  label: "Matting the performers",
+  model: BACKGROUND_MATTE_MODEL,
+  deadlineMs: 30 * 60_000,
+  async build(inputs, context) {
+    const source = await context.asset(inputs.source);
+    return backgroundMatteRequest(await source.fetchableUrl());
+  },
+  outputs: backgroundMatteOutputs,
+};
+
+export const backgroundLockStage: MediaStage<"video.background-replace"> = {
+  kind: "media",
+  id: LOCK_STAGE,
+  label: "Locking the performers to the take",
+  deadlineMs: 20 * 60_000,
+  tasks(inputs, context) {
+    // The edit is the first request's output; later stages store `{stage}:{asset}`.
+    const editId = context.saved.find((id) => !id.includes(":"));
+    const edit = editId ? context.output(editId) : null;
+    const matte = context.output(`${MATTE_STAGE}:video`);
+    if (!edit || !matte) throw new Error("The edit or its matte is missing");
+    return [
+      {
+        output: "locked",
+        operation: "lock",
+        parts: [
+          { name: "source", ref: inputs.source },
+          { name: "edit", ref: edit },
+          { name: "matte", ref: matte },
+        ],
+      },
+      {
+        output: "unlocked",
+        operation: "conform",
+        parts: [
+          { name: "source", ref: inputs.source },
+          { name: "edit", ref: edit },
+        ],
+      },
+    ];
+  },
+};

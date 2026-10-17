@@ -1,6 +1,8 @@
 import type { AssetRef } from "@open-cinema/contracts";
 import { fluxImageInput, FLUX_IMAGE_MODEL } from "./flux-image";
 import {
+  backgroundLockStage,
+  backgroundMatteStage,
   backgroundReplaceOutputs,
   DEFAULT_BACKGROUND_PIPELINE,
   BACKGROUND_REPLACE_MODELS,
@@ -175,6 +177,13 @@ export const backgroundReplaceWorkflow: WorkflowDefinition<"video.background-rep
       return klingBackgroundRequest(inputs, location, media);
     },
     outputs: backgroundReplaceOutputs,
+    // SwitchX keeps its matted subject itself; Kling's edit gets the lock.
+    ...(DEFAULT_BACKGROUND_PIPELINE === "kling"
+      ? {
+          label: "Replacing the background",
+          stages: [backgroundMatteStage, backgroundLockStage],
+        }
+      : {}),
   };
 
 export const characterReplaceWorkflow: WorkflowDefinition<"video.character-replace"> =

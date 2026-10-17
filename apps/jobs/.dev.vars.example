@@ -12,3 +12,8 @@ COMFY_API_KEY=""
 # MEDIA_PUBLIC_ORIGIN="https://studio.example.com"
 # The signing secret is production-only: `wrangler secret put MEDIA_SIGNING_SECRET`
 # with the web Worker's LOCAL_SESSION_SECRET. .dev.vars does not load it.
+
+# Development only: the media server that locks and conforms background
+# replacements (docs/background-job.md). `wrangler dev` does not run the
+# container; start `node apps/jobs/media/server.mjs` or the Docker image.
+# MEDIA_ORIGIN="http://127.0.0.1:8080"

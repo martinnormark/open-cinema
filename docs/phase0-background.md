@@ -27,7 +27,7 @@ The bar is met with caveats that matter for a release decision:
 - **Kling's own output varies between runs.** The same C2 request removed the café completely through ComfyUI but left the seated patrons and café chairs at the left through Router (A1 = 3). Users should be able to rerun a take.
 - **Turnaround through the shared Router queue failed the 60 min deadline tonight.** See below.
 
-The default is already wired: `DEFAULT_BACKGROUND_PIPELINE = "kling"` in [`packages/comfy/src/workflows/background-replace.ts`](../packages/comfy/src/workflows/background-replace.ts). The foreground lock is not yet in the product; it exists as the evaluation composite in [`evaluation/scripts/run_background.py`](../evaluation/scripts/run_background.py) (`lock`). Building it into the job is the main follow-up.
+The default is already wired: `DEFAULT_BACKGROUND_PIPELINE = "kling"` in [`packages/comfy/src/workflows/background-replace.ts`](../packages/comfy/src/workflows/background-replace.ts). The foreground lock, frame-rate conform, source audio and the unlocked variant are built into the job; see [background-job.md](background-job.md). The job mattes with Bria instead of SwitchX.
 
 ## Supported envelope
 
@@ -110,8 +110,7 @@ If `push` records a Build id in `comfy-build.yaml`, commit it. Serving the relea
 
 ## Follow-ups
 
-1. Build the foreground lock into the job: subject matte, time-map the Kling result to the source frame grid, composite, and keep the source audio.
-2. Offer the unlocked Kling result as a variant for strong lighting changes, conformed to the source frame rate.
+1. ~~Build the foreground lock into the job~~ and 2. ~~offer the unlocked Kling result as a variant~~: done, see [background-job.md](background-job.md).
 3. Repeat the evaluation on real camera footage and with a human reviewer before calling the envelope measured.
 4. Measure Router queue time under normal load and decide the execution route.
 5. Run Wan 2.7 on C2 and C4, which this evaluation skipped to limit queue load. The Router account ran out of credits after the evaluation finished, so no further runs were possible tonight; no planned run was lost to credits.

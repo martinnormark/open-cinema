@@ -16,6 +16,7 @@ import {
   type CommandResult,
   type Job,
   type JobOutput,
+  type AssetRef,
   type ResolvedMention,
   type WorkflowCommand,
   type WorkflowCommandInput,
@@ -35,14 +36,22 @@ import {
   createComfyClient,
   getWorkflowDefinition,
   submissionFailure,
+  workflowStage,
   type ComfyJobStatus,
+  type MediaStage,
   type ProviderRequest,
+  type StageContext,
   type WorkflowDefinition,
 } from "@open-cinema/comfy";
-import { AssetUnavailableError, createAssetResolver } from "./asset-resolver";
+import {
+  AssetUnavailableError,
+  createAssetResolver,
+  storedAsset,
+} from "./asset-resolver";
+import { MediaRejectedError, renderMedia } from "./media";
 import { MentionError, resolveMentions } from "./mentions";
 
-import { archiveOutput } from "@open-cinema/assets";
+import { archiveOutput, storeProducedOutput } from "@open-cinema/assets";
 
 const POLL_MS = 2000;
 const DEADLINE_MS = 30 * 60_000;
@@ -62,8 +71,50 @@ export function mediaLinkExpiry(createdAt: string, deadline: number) {
     LINK_GRACE_MS
   );
 }
+const stageOf = (execution: Execution) =>
+  workflowStage(execution.workflowKind, execution.stage);
 const deadlineFor = (execution: Execution) =>
-  getWorkflowDefinition(execution.workflowKind)?.deadlineMs ?? DEADLINE_MS;
+  stageOf(execution)?.deadlineMs ??
+  getWorkflowDefinition(execution.workflowKind)?.deadlineMs ??
+  DEADLINE_MS;
+/** Later stages store their outputs as `{stage}:{asset}` beside earlier ones. */
+const stagePrefix = (execution: Execution) => {
+  const stage = stageOf(execution);
+  return stage ? `${stage.id}:` : "";
+};
+/** Media steps retry on their own; past this many failures the creator decides. */
+const MEDIA_ATTEMPTS = 5;
+/**
+ * Moves a job whose current stage's outputs are all saved to its next stage,
+ * or to succeeded after the last one. Runs inside a coordinator mutation.
+ */
+function advanceStage(job: Job, execution: Execution) {
+  execution.assetsPending = false;
+  execution.cancelRequested = false;
+  execution.attempts = 0;
+  const next = workflowStage(execution.workflowKind, execution.stage + 1);
+  if (!next) {
+    job.state = "succeeded";
+    job.progress = 1;
+    job.stage = null;
+    return;
+  }
+  execution.stage++;
+  execution.nextAttemptAt = Date.now();
+  execution.deadline = Date.now() + next.deadlineMs;
+  job.stage = next.label;
+  job.progress = null;
+  job.error = null;
+  if (next.kind === "router") {
+    // A fresh Router request: new model, new receipt, new idempotency key.
+    execution.workflow = { model: next.model };
+    execution.submissionKey = crypto.randomUUID();
+    job.providerJobId = null;
+    job.state = "queued";
+  } else {
+    job.state = "running";
+  }
+}
 async function sha256(value: unknown) {
   const bytes = await crypto.subtle.digest(
     "SHA-256",
@@ -218,6 +269,7 @@ export class GenerationCoordinator
           seed: null,
 
           progress: null,
+          stage: definition.stages?.length ? (definition.label ?? null) : null,
           error: null,
           outputs: [],
         };
@@ -232,6 +284,7 @@ export class GenerationCoordinator
           assetsPending: false,
           workflow: { model },
           submissionKey: crypto.randomUUID(),
+          stage: 0,
           nextAttemptAt: Date.now(),
           deadline: Date.now() + definition.deadlineMs,
           attempts: 0,
@@ -295,6 +348,7 @@ export class GenerationCoordinator
           : record.executions[jobId]!.cancelRequested
             ? "cancelling"
             : "running";
+        // A media stage has no provider job to reconcile; it simply retries.
         current.error = null;
         Object.assign(record.executions[jobId]!, {
           nextAttemptAt: Date.now(),
@@ -336,7 +390,14 @@ export class GenerationCoordinator
       provider: execution.provider,
       workflow: execution.workflow,
       ...(execution.provider === "router"
-        ? { outputs: getWorkflowDefinition(execution.workflowKind)?.outputs }
+        ? {
+            outputs: (() => {
+              const stage = stageOf(execution);
+              return stage?.kind === "router"
+                ? stage.outputs
+                : getWorkflowDefinition(execution.workflowKind)?.outputs;
+            })(),
+          }
         : {}),
     });
   }
@@ -347,7 +408,7 @@ export class GenerationCoordinator
    */
   private async providerRequest(
     ownerId: string,
-    createdAt: string,
+    job: Job,
     execution: Execution,
   ): Promise<Record<string, unknown>> {
     if (execution.provider !== "router" || "input" in execution.workflow)
@@ -357,18 +418,38 @@ export class GenerationCoordinator
       request.workflowKind,
     ) as WorkflowDefinition | null;
     if (!definition) throw new AssetUnavailableError(request.workflowKind);
-    const built: ProviderRequest = await definition.build(
-      request.inputs as never,
-      {
-        mentions: execution.mentions,
-        asset: createAssetResolver(
-          this.env,
-          { ownerId },
-          mediaLinkExpiry(createdAt, execution.deadline),
-        ),
-      },
-    );
+    const stage = stageOf(execution);
+    const context = this.stageContext(ownerId, job, execution);
+    const built: ProviderRequest =
+      stage?.kind === "router"
+        ? await stage.build(request.inputs as never, context)
+        : await definition.build(request.inputs as never, context);
     return { model: built.model, input: built.input };
+  }
+
+  /** Request media and this job's saved outputs, as a stage builder sees them. */
+  private stageContext(
+    ownerId: string,
+    job: Job,
+    execution: Execution,
+  ): StageContext {
+    const saved = job.outputs.filter((o) => o.r2Key);
+    return {
+      mentions: execution.mentions,
+      asset: createAssetResolver(
+        this.env,
+        { ownerId },
+        mediaLinkExpiry(job.createdAt, execution.deadline),
+        saved,
+      ),
+      saved: saved.map((o) => o.providerAssetId),
+      output(providerAssetId): AssetRef | null {
+        const output = saved.find((o) => o.providerAssetId === providerAssetId);
+        return output
+          ? { type: "job-output", jobId: job.id, outputId: output.id }
+          : null;
+      },
+    };
   }
 
   private async change(
@@ -402,14 +483,22 @@ export class GenerationCoordinator
           : status.state;
       job.progress = status.progress ?? job.progress;
       job.error = status.error;
-      job.outputs = status.outputs.map((o) => ({
-        ...o,
-        id: `${id}:${o.providerAssetId}`,
-        jobId: id,
-        r2Key: null,
-        sizeBytes: null,
-        etag: null,
-      }));
+      const prefix = stagePrefix(execution);
+      // A later stage's poll replaces only its own outputs; earlier ones are saved.
+      job.outputs = [
+        ...(prefix
+          ? job.outputs.filter((o) => !o.providerAssetId.startsWith(prefix))
+          : []),
+        ...status.outputs.map((o) => ({
+          ...o,
+          providerAssetId: `${prefix}${o.providerAssetId}`,
+          id: `${id}:${prefix}${o.providerAssetId}`,
+          jobId: id,
+          r2Key: null,
+          sizeBytes: null,
+          etag: null,
+        })),
+      ];
       if (job.state === "succeeded") {
         job.state = "persisting";
         job.progress = null;
@@ -440,11 +529,12 @@ export class GenerationCoordinator
     try {
       const output = job.outputs.find((o) => !o.r2Key);
       if (!job.outputs.length) throw new Error("No output assets returned");
+      const prefix = stagePrefix(execution);
       const saved = output
         ? await archiveOutput(this.env.GENERATED_ASSETS, ownerId, output, () =>
             this.client(execution).getOutputUrl(
               job.providerJobId!,
-              output.providerAssetId,
+              output.providerAssetId.slice(prefix.length),
             ),
           )
         : null;
@@ -458,11 +548,7 @@ export class GenerationCoordinator
         e.attempts = 0;
         e.nextAttemptAt = Date.now() + 100;
         current.error = null;
-        if (current.outputs.every((o) => o.r2Key)) {
-          current.state = "succeeded";
-          current.progress = 1;
-          e.assetsPending = false;
-        }
+        if (current.outputs.every((o) => o.r2Key)) advanceStage(current, e);
       });
     } catch {
       console.warn(
@@ -480,6 +566,111 @@ export class GenerationCoordinator
           current.state === "needs_attention"
             ? "Generation finished, but its assets could not be saved. Check again to retry saving without generating again."
             : "Retrying asset storage. Your image is not saved yet.";
+      });
+    }
+  }
+
+  /**
+   * One media task per alarm, like asset archiving: each task's MP4 is saved
+   * under a deterministic key, so a repeated alarm never renders twice.
+   */
+  private async runMediaStage(ownerId: string, job: Job, execution: Execution) {
+    if (execution.cancelRequested) {
+      await this.change(ownerId, job.id, (j) => {
+        j.state = "cancelled";
+        j.stage = null;
+        j.progress = null;
+      });
+      return;
+    }
+    const stage = stageOf(execution) as MediaStage;
+    try {
+      const context = this.stageContext(ownerId, job, execution);
+      const tasks = stage.tasks(
+        execution.command.request.inputs as never,
+        context,
+      );
+      const done = (output: string) =>
+        context.saved.includes(`${stage.id}:${output}`);
+      const task = tasks.find((t) => !done(t.output));
+      if (!task) {
+        await this.change(ownerId, job.id, (j, r) =>
+          advanceStage(j, r.executions[j.id]!),
+        );
+        return;
+      }
+      const providerAssetId = `${stage.id}:${task.output}`;
+      const output: JobOutput = {
+        id: `${job.id}:${providerAssetId}`,
+        jobId: job.id,
+        providerAssetId,
+        mediaType: "video/mp4",
+        r2Key: null,
+        sizeBytes: null,
+        etag: null,
+      };
+      const db = createDatabase(this.env.DB);
+      const parts = await Promise.all(
+        task.parts.map(async (part) => {
+          const stored = await storedAsset(
+            db,
+            { ownerId },
+            part.ref,
+            job.outputs,
+          );
+          if (!stored) throw new AssetUnavailableError(part.name);
+          return { name: part.name, r2Key: stored.r2Key };
+        }),
+      );
+      const saved = await storeProducedOutput(
+        this.env.GENERATED_ASSETS,
+        ownerId,
+        output,
+        () =>
+          renderMedia(
+            this.env,
+            task.operation,
+            parts,
+            AbortSignal.timeout(10 * 60_000),
+          ),
+      );
+      await this.change(ownerId, job.id, (j, r) => {
+        const e = r.executions[j.id]!;
+        if (!j.outputs.some((o) => o.id === output.id))
+          j.outputs.push({ ...output, ...saved });
+        j.progress =
+          (tasks.filter((t) => done(t.output)).length + 1) / tasks.length;
+        j.error = null;
+        e.attempts = 0;
+        e.nextAttemptAt = Date.now() + 100;
+      });
+    } catch (error) {
+      console.warn(
+        JSON.stringify({
+          event: "media_retry",
+          jobId: job.id,
+          stage: stage.id,
+          message: error instanceof Error ? error.message.slice(0, 300) : null,
+        }),
+      );
+      await this.change(ownerId, job.id, (j, r) => {
+        const e = r.executions[j.id]!;
+        e.attempts++;
+        e.nextAttemptAt =
+          Date.now() + Math.min(30_000, 1000 * 2 ** Math.min(e.attempts, 5));
+        // A refusal is about the media itself; retrying the same bytes cannot help.
+        const definite =
+          error instanceof AssetUnavailableError ||
+          error instanceof MediaRejectedError;
+        if (e.attempts >= MEDIA_ATTEMPTS || definite) {
+          j.state = "needs_attention";
+          j.error =
+            error instanceof AssetUnavailableError
+              ? "Some media this result needs is no longer available."
+              : error instanceof MediaRejectedError
+                ? `${stage.label} could not process this clip. The generated parts are saved.`
+                : `${stage.label} did not finish. Check again to retry; the generated parts are saved.`;
+        }
       });
     }
   }
@@ -511,8 +702,12 @@ export class GenerationCoordinator
           j.state = "needs_attention";
           j.error = execution.assetsPending
             ? "Generation finished, but saving its assets timed out. Check again to retry saving without generating again."
-            : "Monitoring timed out. The provider may still be running. Check again to reconcile.";
+            : stageOf(execution)?.kind === "media"
+              ? "Finishing the result timed out. Check again to retry; the generated parts are saved."
+              : "Monitoring timed out. The provider may still be running. Check again to reconcile.";
         });
+      } else if (stageOf(execution)?.kind === "media") {
+        await this.runMediaStage(record.ownerId, job, execution);
       } else if (execution.assetsPending) {
         await this.archiveNextOutput(record.ownerId, job, execution);
       } else if (
@@ -551,7 +746,7 @@ export class GenerationCoordinator
         try {
           providerRequest = await this.providerRequest(
             record.ownerId,
-            job.createdAt,
+            job,
             execution,
           );
         } catch (error) {

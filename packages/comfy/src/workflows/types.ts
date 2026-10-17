@@ -34,6 +34,54 @@ export interface BuildContext {
   asset(ref: AssetRef): Promise<ResolvedAsset>;
 }
 
+/** What a later stage sees: the request's media plus the outputs saved so far. */
+export interface StageContext extends BuildContext {
+  /** A saved output of this job by its stored provider asset id, e.g. "matte:video". */
+  output(providerAssetId: string): AssetRef | null;
+  /** Provider asset ids of every saved output, in the order they were saved. */
+  saved: readonly string[];
+}
+
+/** Steps a media container performs; see apps/jobs/media/server.mjs. */
+export type MediaOperation = "lock" | "conform";
+/** One container call that produces one output from named media parts. */
+export interface MediaTask {
+  /** Stored as `{stage id}:{output}`. */
+  output: string;
+  operation: MediaOperation;
+  parts: readonly { name: string; ref: AssetRef }[];
+}
+
+interface StageBase {
+  /** Prefix of this stage's stored outputs; unique within the workflow. */
+  id: string;
+  /** Creator-facing, e.g. "Locking the performers". */
+  label: string;
+  /** Monitoring deadline for this stage, from when it starts. */
+  deadlineMs: number;
+}
+/** A further Router request built from the saved outputs. */
+export interface RouterStage<
+  K extends WorkflowKind = WorkflowKind,
+> extends StageBase {
+  kind: "router";
+  model: string;
+  build(
+    inputs: WorkflowInputs<K>,
+    context: StageContext,
+  ): Promise<ProviderRequest>;
+  outputs(result: unknown): ProviderOutput[];
+}
+/** Container work over saved media; each task saves one output. */
+export interface MediaStage<
+  K extends WorkflowKind = WorkflowKind,
+> extends StageBase {
+  kind: "media";
+  tasks(inputs: WorkflowInputs<K>, context: StageContext): MediaTask[];
+}
+export type WorkflowStage<K extends WorkflowKind = WorkflowKind> =
+  RouterStage<K> | MediaStage<K>;
+
 /** The Router call: `POST /v2/models/{model}` with this input document. */
 export interface ProviderRequest {
   model: string;
@@ -66,4 +114,11 @@ export interface WorkflowDefinition<K extends WorkflowKind = WorkflowKind> {
   ): Promise<ProviderRequest>;
   /** Maps the Router result document (`data`) to outputs; [] means unusable. */
   outputs(result: unknown): ProviderOutput[];
+  /**
+   * Steps that run in order once the first request's outputs are saved. The
+   * job succeeds after the last one; each stage's outputs are kept.
+   */
+  stages?: readonly WorkflowStage<K>[];
+  /** Creator-facing label of the first request while later stages follow. */
+  label?: string;
 }

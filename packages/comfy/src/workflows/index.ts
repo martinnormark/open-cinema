@@ -6,14 +6,20 @@ import {
   fluxReferenceWorkflow,
   ltxVideoWorkflow,
 } from "./definitions";
-import type { WorkflowDefinition } from "./types";
+import type { WorkflowDefinition, WorkflowStage } from "./types";
 
 export type {
   BuildContext,
+  MediaOperation,
+  MediaStage,
+  MediaTask,
   ProviderOutput,
   ProviderRequest,
   ResolvedAsset,
+  RouterStage,
+  StageContext,
   WorkflowDefinition,
+  WorkflowStage,
 } from "./types";
 export {
   expandMentions,
@@ -39,8 +45,14 @@ export {
   describeTarget,
 } from "./character-replace";
 export {
+  BACKGROUND_MATTE_MODEL,
   BACKGROUND_REPLACE_MODELS,
   DEFAULT_BACKGROUND_PIPELINE,
+  MATTE_STAGE,
+  backgroundLockStage,
+  backgroundMatteOutputs,
+  backgroundMatteRequest,
+  backgroundMatteStage,
   backgroundEditPrompt,
   backgroundReplaceOutputs,
   klingBackgroundRequest,
@@ -66,6 +78,15 @@ export function getWorkflowDefinition<K extends WorkflowKind>(
   kind: K,
 ): WorkflowDefinition<K> | null {
   return (registry[kind] as WorkflowDefinition<K> | undefined) ?? null;
+}
+
+/** Stage 0 is the definition's own request; stage n is `stages[n - 1]`. */
+export function workflowStage(
+  kind: WorkflowKind,
+  stage: number,
+): WorkflowStage | null {
+  if (stage <= 0) return null;
+  return (registry[kind]?.stages?.[stage - 1] as WorkflowStage) ?? null;
 }
 
 export function availableWorkflowKinds(): WorkflowKind[] {

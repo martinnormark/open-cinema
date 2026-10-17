@@ -41,7 +41,10 @@ function assetUrl(value: string): URL {
     !(
       host === "storage.googleapis.com" ||
       host.endsWith(".comfy.org") ||
-      host.endsWith(".bfl.ai")
+      host.endsWith(".bfl.ai") ||
+      // Kling's video results and Bria's mattes are served from their own CDNs.
+      host.endsWith(".klingai.com") ||
+      host.endsWith(".bria.ai")
     )
   ) {
     throw new Error("Untrusted provider asset location");
@@ -69,13 +72,8 @@ async function download(value: string, signal: AbortSignal) {
   throw new Error("Too many asset redirects");
 }
 
-/** Idempotent copy. Multipart keeps memory bounded even for chunked responses. */
-export async function archiveOutput(
-  bucket: R2Bucket,
-  ownerId: string,
-  output: JobOutput,
-  resolveUrl: () => Promise<string | null>,
-): Promise<StoredMetadata> {
+/** One deterministic key per output, so a retried copy lands on the same object. */
+async function outputKey(ownerId: string, output: JobOutput) {
   const digest = await crypto.subtle.digest(
     "SHA-256",
     new TextEncoder().encode(output.id),
@@ -83,16 +81,65 @@ export async function archiveOutput(
   const hash = Array.from(new Uint8Array(digest), (b) =>
     b.toString(16).padStart(2, "0"),
   ).join("");
-  const key = `generated/v1/${encodeURIComponent(ownerId)}/${encodeURIComponent(output.jobId)}/${hash}`;
+  return `generated/v1/${encodeURIComponent(ownerId)}/${encodeURIComponent(output.jobId)}/${hash}`;
+}
+async function existingOutput(
+  bucket: R2Bucket,
+  key: string,
+  ownerId: string,
+  output: JobOutput,
+) {
   const existing = await bucket.head(key);
-  if (existing) {
-    if (
-      existing.customMetadata?.ownerId !== ownerId ||
-      existing.customMetadata?.outputId !== output.id
-    )
-      throw new Error("Asset ownership metadata mismatch");
-    return metadata(existing);
+  if (!existing) return null;
+  if (
+    existing.customMetadata?.ownerId !== ownerId ||
+    existing.customMetadata?.outputId !== output.id
+  )
+    throw new Error("Asset ownership metadata mismatch");
+  return metadata(existing);
+}
+
+/**
+ * Idempotent save of an output the jobs Worker produced itself (the media
+ * container's MP4). `produce` runs only when the object is not already stored.
+ */
+export async function storeProducedOutput(
+  bucket: R2Bucket,
+  ownerId: string,
+  output: JobOutput,
+  produce: () => Promise<{ body: ReadableStream<Uint8Array>; size: number }>,
+): Promise<StoredMetadata> {
+  const key = await outputKey(ownerId, output);
+  const existing = await existingOutput(bucket, key, ownerId, output);
+  if (existing) return existing;
+  const { body, size } = await produce();
+  if (!mediaTypes.has(output.mediaType) || size <= 0 || size > MAX_BYTES) {
+    await body.cancel();
+    throw new Error("Invalid produced asset");
   }
+  // R2 needs a known length for a streamed put.
+  const { readable, writable } = new FixedLengthStream(size);
+  const piped = body.pipeTo(writable);
+  const [object] = await Promise.all([
+    bucket.put(key, readable, {
+      httpMetadata: { contentType: output.mediaType },
+      customMetadata: { ownerId, jobId: output.jobId, outputId: output.id },
+    }),
+    piped,
+  ]);
+  return metadata(object);
+}
+
+/** Idempotent copy. Multipart keeps memory bounded even for chunked responses. */
+export async function archiveOutput(
+  bucket: R2Bucket,
+  ownerId: string,
+  output: JobOutput,
+  resolveUrl: () => Promise<string | null>,
+): Promise<StoredMetadata> {
+  const key = await outputKey(ownerId, output);
+  const existing = await existingOutput(bucket, key, ownerId, output);
+  if (existing) return existing;
   const url = await resolveUrl();
   if (!url) throw new Error("Provider image is no longer available");
   const controller = new AbortController();

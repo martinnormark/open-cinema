@@ -3,7 +3,11 @@ import { env } from "cloudflare:workers";
 import { createDatabase } from "@open-cinema/database";
 import { listJobs, listMediaAssets } from "@open-cinema/database/queries";
 import { signMediaPath } from "@open-cinema/assets";
-import type { Job, MediaAsset } from "@open-cinema/contracts";
+import {
+  resultOutputs,
+  type Job,
+  type MediaAsset,
+} from "@open-cinema/contracts";
 import type { MediaItem } from "@/features/library/model";
 
 export function assetToItem(asset: MediaAsset): MediaItem {
@@ -29,8 +33,9 @@ export function assetToItem(asset: MediaAsset): MediaItem {
 
 export const GENERATED = "generated~";
 function generatedItems(jobs: readonly Job[]): MediaItem[] {
+  // Intermediates such as a matte stay with their job, out of the library.
   return jobs.flatMap((job) =>
-    job.outputs
+    resultOutputs(job.outputs)
       .filter(
         (output) =>
           output.r2Key &&
