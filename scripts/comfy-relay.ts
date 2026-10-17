@@ -7,11 +7,13 @@
  *   bun scripts/comfy-relay.ts            # listens on 127.0.0.1:8790
  *   COMFY_RELAY_PORT=9000 bun scripts/comfy-relay.ts
  *
- * The relay binds to loopback only, forwards to https://api.comfy.org through
- * HTTPS_PROXY, and drops the caller's Authorization header so only the proxy's
+ * The relay binds to loopback only, forwards to Comfy through HTTPS_PROXY (Comfy
+ * Cloud's `/api/...` paths to https://cloud.comfy.org, everything else to Router
+ * at https://api.comfy.org), and drops the caller's Authorization header so only the proxy's
  * credential is used. Never run it on a shared or public interface.
  */
-const UPSTREAM = "https://api.comfy.org";
+const ROUTER = "https://api.comfy.org";
+const CLOUD = "https://cloud.comfy.org";
 const port = Number(process.env.COMFY_RELAY_PORT ?? 8790);
 const proxy = process.env.HTTPS_PROXY ?? process.env.https_proxy;
 if (!proxy) {
@@ -31,7 +33,8 @@ Bun.serve({
   port,
   async fetch(request) {
     const url = new URL(request.url);
-    const target = `${UPSTREAM}${url.pathname}${url.search}`;
+    const upstream = url.pathname.startsWith("/api/") ? CLOUD : ROUTER;
+    const target = `${upstream}${url.pathname}${url.search}`;
     const headers = new Headers();
     for (const [name, value] of request.headers)
       if (!DROP.has(name.toLowerCase())) headers.set(name, value);
@@ -39,21 +42,23 @@ Bun.serve({
       request.method === "GET" || request.method === "HEAD"
         ? undefined
         : await request.arrayBuffer();
-    const upstream = await fetch(target, {
+    const response = await fetch(target, {
       method: request.method,
       headers,
       body,
       proxy,
       redirect: "manual",
     });
-    console.log(`${request.method} ${url.pathname} → ${upstream.status}`);
-    const responseHeaders = new Headers(upstream.headers);
+    console.log(`${request.method} ${target} → ${response.status}`);
+    const responseHeaders = new Headers(response.headers);
     responseHeaders.delete("content-encoding");
     responseHeaders.delete("content-length");
-    return new Response(upstream.body, {
-      status: upstream.status,
+    return new Response(response.body, {
+      status: response.status,
       headers: responseHeaders,
     });
   },
 });
-console.log(`Comfy relay on http://127.0.0.1:${port} → ${UPSTREAM} via proxy`);
+console.log(
+  `Comfy relay on http://127.0.0.1:${port} → ${ROUTER} and ${CLOUD} via proxy`,
+);

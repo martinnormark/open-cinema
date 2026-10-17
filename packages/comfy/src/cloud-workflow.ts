@@ -1,5 +1,6 @@
 import { Comfy, ComfyError, type Job as ProviderJob } from "@comfyorg/sdk";
 import type { JobState } from "@open-cinema/contracts";
+import { loopbackRelay } from "./relay";
 import type { CloudMediaInput, CloudWorkflowRequest } from "./workflows/types";
 
 const COMFY_CLOUD_BASE_URL = "https://cloud.comfy.org";
@@ -120,6 +121,7 @@ async function download(url: string, signal: AbortSignal) {
  * module, which Workers forbid; the hash is only a dedup hint, so it is skipped.
  */
 async function uploadAsset(
+  baseUrl: string,
   apiKey: string,
   media: CloudMediaInput,
   bytes: Uint8Array<ArrayBuffer>,
@@ -134,7 +136,7 @@ async function uploadAsset(
     new Blob([bytes], { type: media.contentType }),
     media.filename,
   );
-  const response = await fetch(`${COMFY_CLOUD_BASE_URL}/api/v2/assets`, {
+  const response = await fetch(`${baseUrl}/api/v2/assets`, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}` },
     body: form,
@@ -162,8 +164,14 @@ export function createComfyClient(options: {
   apiKey: string;
   /** Node ids whose saved files are listed first, in this order. */
   outputNodes?: readonly string[] | undefined;
+  /**
+   * Development-only loopback relay. The SDK itself reads COMFY_BASE_URL from
+   * the environment; uploads made here must follow it to the same place.
+   */
+  baseUrl?: string | undefined;
 }) {
   const order = options.outputNodes ?? [];
+  const baseUrl = loopbackRelay(options.baseUrl) ?? COMFY_CLOUD_BASE_URL;
   if (!options.apiKey.trim()) throw new Error("Comfy credentials are required");
   // The SDK stores fetch as an instance method; Workers requires the global receiver.
   const client = new Comfy({
@@ -189,6 +197,7 @@ export function createComfyClient(options: {
             media.node,
             media.field,
             await uploadAsset(
+              baseUrl,
               options.apiKey,
               media,
               await download(media.url, signal),

@@ -11,6 +11,7 @@ export * from "./workflows/ltx-video";
 export * from "./workflows/ltx-alpha-background";
 export * from "./estimates";
 export { uploadToComfyStorage } from "./storage";
+import { loopbackRelay } from "./relay";
 
 import { FLUX_IMAGE_MODEL } from "./workflows/flux-image";
 import {
@@ -58,31 +59,16 @@ export function submissionFailure(error: unknown, provider = "router") {
   };
 }
 export const ROUTER_BASE_URL = "https://api.comfy.org";
-/**
- * Development override for a loopback relay (scripts/comfy-relay.ts). Anything
- * that is not plain http on 127.0.0.1 or localhost is ignored, so a deployed
- * Worker always sends its key to Router itself.
- */
+/** Router's origin, or a development relay; see loopbackRelay. */
 export function routerBaseUrl(override: string | undefined): string {
-  if (!override) return ROUTER_BASE_URL;
-  try {
-    const url = new URL(override);
-    return url.protocol === "http:" &&
-      (url.hostname === "127.0.0.1" || url.hostname === "localhost") &&
-      url.pathname === "/" &&
-      !url.search
-      ? url.origin
-      : ROUTER_BASE_URL;
-  } catch {
-    return ROUTER_BASE_URL;
-  }
+  return loopbackRelay(override) ?? ROUTER_BASE_URL;
 }
 /** SDK calls stay bounded; durable alarms own retries and polling. */
 export function createComfyClient(options: {
   apiKey: string;
   provider?: "router" | "cloud-workflow";
   workflow?: Record<string, unknown> | ProviderRequest;
-  /** Development-only loopback relay; see routerBaseUrl. */
+  /** Development-only loopback relay; see loopbackRelay. */
   baseUrl?: string | undefined;
   /** Maps a Router result document to outputs; defaults to `sample` or `video_url`. */
   outputs?: ((data: unknown) => ProviderOutput[]) | undefined;
