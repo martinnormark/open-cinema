@@ -262,7 +262,9 @@ export async function readZip(file: Blob): Promise<ZipEntry[]> {
           method === 0
             ? raw
             : await new Response(
-                raw.stream().pipeThrough(new DecompressionStream("deflate-raw")),
+                raw
+                  .stream()
+                  .pipeThrough(new DecompressionStream("deflate-raw")),
               ).blob();
         if (data.size !== size)
           throw new ZipError(`${name} is damaged in this archive.`);

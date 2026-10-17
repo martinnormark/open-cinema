@@ -193,7 +193,10 @@ export async function importWorld(
               t.asset.assetId === ref.assetId,
           );
           if (added)
-            await setTakeStatus(db, scope, { id: added.id, status: "rejected" });
+            await setTakeStatus(db, scope, {
+              id: added.id,
+              status: "rejected",
+            });
         }
       }
     }

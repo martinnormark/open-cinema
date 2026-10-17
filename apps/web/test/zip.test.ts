@@ -41,13 +41,15 @@ describe("world zip", () => {
       "media/clip.mp4",
     ]);
     expect(await (await entries[0]!.blob()).text()).toContain("open-cinema");
-    expect(new Uint8Array(await (await entries[1]!.blob()).arrayBuffer())).toEqual(
-      video,
-    );
+    expect(
+      new Uint8Array(await (await entries[1]!.blob()).arrayBuffer()),
+    ).toEqual(video);
   });
 
   it("reports a damaged entry and a file that is not a zip", async () => {
-    const { blob } = await archive({ "a.txt": new TextEncoder().encode("hello world") });
+    const { blob } = await archive({
+      "a.txt": new TextEncoder().encode("hello world"),
+    });
     const bytes = new Uint8Array(await blob.arrayBuffer());
     // Flip a byte of the stored data (after the 30-byte header and name).
     bytes[30 + "a.txt".length + 2]! ^= 0xff;

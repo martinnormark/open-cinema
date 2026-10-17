@@ -21,7 +21,7 @@ Rules that keep this consistent:
 
 ## Database (`packages/database`)
 
-Migration `0005_elements_media.sql` adds `Project`, `Element`, `ElementState`, `ElementReference`, `MediaAsset` and `Revision`. It also adds `workflowKind` and `projectId` to `GenerationJob`. It was generated with the pinned `prisma migrate diff`, and the table rebuild for `GenerationJob` was replaced with additive `ALTER`s. Applying 0001 through 0005 gives the same schema as `schema.prisma`.
+Migration `0005_elements_media.sql` adds `Project`, `Element`, `ElementState`, `ElementReference`, `MediaAsset` and `Revision`. It also adds `workflowKind` and `projectId` to `GenerationJob`. It was generated with the pinned `prisma migrate diff`, and the table rebuild for `GenerationJob` was replaced with additive `ALTER`s. Later migrations add media pixel aspect and audio (0006), video posters and output dimensions (0007), the project `look`, state kinds and `Recipe` (0008), and `Sequence`, `Shot` and `ShotTake` (0009). Applying 0001 through 0009 gives the same schema as `schema.prisma`.
 
 Asset refs are stored as typed columns (`assetType`, `mediaAssetId`, `jobId`, `outputId`), not as foreign keys, because job outputs reach D1 asynchronously. Every query and mutation takes an `OwnerScope` and filters on it. `resolveAssetRef(db, scope, ref)` is the single ownership check for any media ref: an upload must be owned and `ready`, and a job output must belong to a job the caller owns and have an `r2Key`.
 
@@ -31,6 +31,10 @@ Asset refs are stored as typed columns (`assetType`, `mediaAssetId`, `jobId`, `o
 | Media     | `listMediaAssets` (ready only), `getMediaAsset`, `resolveAssetRef`         | `createPendingMediaAsset`, `markMediaAssetReady`, `markMediaAssetFailed`, `updateMediaAssetMetadata`                                                                                                                                     |
 | Elements  | `listElements`, `getElement`, `getElementsByHandles`, `getElementsByIds`   | `createElement` (suffixes the handle on collision), `updateElement`, `deleteElement`, `addElementReference` (images only, owner-checked), `updateElementReference`, `removeElementReference`, `createElementState`, `deleteElementState` |
 | Revisions | `listRevisions` (by source or project), `getRevision`, `getRevisionForJob` | `createRevision`, `settleRevisionForJob`, `setRevisionStatus` (only after a result exists)                                                                                                                                               |
+| Direction | `getProject` (its `direction` and `look`)                                  | `createProject`, `updateProject` (`direction`, `look`)                                                                                                                                                                                   |
+| Recipes   | `listRecipes`, `getRecipe`                                                 | `createRecipe`, `updateRecipe`, `deleteRecipe`, `recordRecipeUse`                                                                                                                                                                        |
+| Sequences | `listSequences`, `getSequence`, `getSequenceForShot`                       | `createSequence`, `updateSequence`, `deleteSequence`, `addShot`, `updateShot`, `deleteShot`, `moveShot`, `addTake`, `setTakeStatus`                                                                                                      |
+| World     | `collectWorld`                                                             | `importWorld`                                                                                                                                                                                                                            |
 
 A revision made through `WorkflowCommand.revision` has the same ID as its job. `applyJobSnapshot` creates it on the job's first D1 projection and settles it to `proposed`, with the first saved output, or to `failed`. It only ever moves forward from `pending`.
 
@@ -40,7 +44,8 @@ A revision made through `WorkflowCommand.revision` has the same ID as its job. `
 web server fn ──submit(WorkflowCommand | PromptCommand)──▶ GenerationCoordinator (DO)
   accept: validate, look up the definition, resolve @mentions to Element snapshots,
           owner-check media refs, persist { command, mentions, workflow: { model } }
-  alarm:  definition.build(inputs, { mentions, asset }) ──▶ Router queue submit
+  alarm:  definition.build(inputs, { mentions, asset })
+            ──▶ Router queue submit, or a ComfyUI graph to Comfy Cloud
           poll status ──▶ definition.outputs(result) ──▶ archive each output to R2
 ```
 
@@ -56,8 +61,8 @@ web server fn ──submit(WorkflowCommand | PromptCommand)──▶ GenerationC
 ## Adding a workflow kind
 
 1. If the kind is new, add it to `workflowKindSchema`, give it an inputs schema in `workflows.ts`, and add a branch to `generationRequestSchema`, `requestAssetRefs` and `WORKFLOW_DESCRIPTORS`.
-2. Write the Router request builder in its own file under `packages/comfy/src/workflows/`, for example `ltx-video.ts`. Read the model's schema in the catalog first. Builders are pure functions of typed inputs.
-3. Wrap the builder in a `WorkflowDefinition` that provides `displayModel`, `deadlineMs`, `model(inputs)`, `build(inputs, context)` and `outputs(result)`. Then register it in `workflows/index.ts`. Existing definitions are in `workflows/definitions.ts`. Result shapes differ by model: BFL uses `result.sample` and LTX uses `result.video_url`.
+2. Write the builder in its own file under `packages/comfy/src/workflows/`. A Router builder returns a model request (for example `ltx-video.ts`; read the model's schema in the catalog first). A Cloud builder returns an API-format ComfyUI graph and the media its loaders read (for example `ltx-alpha-background.ts`). Builders are pure functions of typed inputs.
+3. Wrap the builder in a `WorkflowDefinition` that provides `displayModel`, `deadlineMs`, `model(inputs)`, `build(inputs, context)` and `outputs(result)`. A Cloud graph also sets `provider(inputs)` to `"cloud-workflow"` and `cloudOutputNodes`; later steps go in `stages`. Then register it in `workflows/index.ts`. Existing definitions are in `workflows/definitions.ts`. Result shapes differ by model: BFL uses `result.sample` and LTX uses `result.video_url`.
 4. Add the estimate to `packages/comfy/src/estimates.ts`. Router queue responses report no cost, so estimates come from published pricing.
 5. Test against HTTP fixtures in `apps/jobs/test`. `dispatch.test.ts` shows how to drive submission with mentions and inline references.
 
@@ -71,7 +76,7 @@ Each domain gets its own `apps/web/src/server/<domain>.ts`, such as `elements.ts
 
 workerd connects directly, not through `HTTPS_PROXY`. In an environment whose proxy injects Comfy credentials, such as a Claude Code cloud container with no `COMFY_API_KEY` value, the local jobs Worker gets 401s from Router. For development:
 
-1. Run `bun scripts/comfy-relay.ts`. It listens on `127.0.0.1:8790` only, forwards Comfy Cloud's `/api/...` paths to `https://cloud.comfy.org` and everything else to `https://api.comfy.org` through `HTTPS_PROXY`, and drops the caller's `Authorization` header.
+1. Run `bun scripts/comfy-relay.ts`. It listens on `127.0.0.1:8790` only, forwards Comfy Cloud's `/api/...` paths to `https://cloud.comfy.org` and everything else to `https://api.comfy.org` through `HTTPS_PROXY`, and drops the caller's `Authorization` and `X-API-Key` headers. Set `COMFY_RELAY_PORT` to listen on another port.
 2. In `apps/jobs/.dev.vars`, set `COMFY_BASE_URL="http://127.0.0.1:8790"` and set `COMFY_API_KEY` to any non-empty placeholder.
 
 `apps/jobs/wrangler.jsonc` declares `COMFY_BASE_URL` and `MEDIA_PUBLIC_ORIGIN` as empty `vars`. When `secrets.required` is set, Wrangler loads only declared keys from `.dev.vars`, so without that declaration both `wrangler dev` and `bun run dev` silently drop the override. `MEDIA_SIGNING_SECRET` is not declared. It is a production secret (`wrangler secret put`), and local development has no public origin for it to sign links for anyway.

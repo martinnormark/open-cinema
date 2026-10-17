@@ -1,6 +1,6 @@
 # Re-stage IC-LoRA: a training plan
 
-Re-stage today re-projects the take through its own depth and lets Lightricks' In-Outpainting IC-LoRA fill what the original camera could not see ([revision-modes.md](revision-modes.md#re-stage)). That holds for moves of a few tens of centimetres. Bigger moves, orbits and reverse shots need a model that has learned what the other side of a scene looks like. This is the plan for training that model ourselves, so it stays our own IP ([third-party-ip.md](third-party-ip.md)). Nothing here has been started.
+Re-stage today re-projects the take through its own depth and lets Lightricks' In-Outpainting IC-LoRA fill what the original camera could not see ([revision-modes.md](revision-modes.md#how-each-mode-works)). That holds for moves of a few tens of centimetres. Bigger moves, orbits and reverse shots need a model that has learned what the other side of a scene looks like. This is the plan for training that model ourselves, so it stays our own IP ([third-party-ip.md](third-party-ip.md)). Nothing here has been started.
 
 ## What the adapter learns
 

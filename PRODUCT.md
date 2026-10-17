@@ -2,7 +2,7 @@
 
 <!-- impeccable:product-schema 1 -->
 
-Confirmed on 2026-10-16 from [GOALS.md](GOALS.md) and [ARCHITECTURE.md](ARCHITECTURE.md). This record summarizes durable product context; GOALS.md contains the full vision and ARCHITECTURE.md owns implementation decisions. The repository contains an initial application scaffold with a sidebar and shallow studio pages. Capabilities below describe the intended product, not shipped functionality.
+Confirmed on 2026-10-16 from [GOALS.md](GOALS.md) and [ARCHITECTURE.md](ARCHITECTURE.md). This record summarizes durable product context; GOALS.md contains the full vision and ARCHITECTURE.md owns implementation decisions. As of 2026-10-17 the studio ships image and video generation, Elements, the media library, selective revision, project direction, recipes, sequences and world bundles; [README.md](README.md) lists what works today. Capabilities below describe the intended product, which goes further than what has shipped.
 
 ## Platform
 
@@ -12,7 +12,7 @@ web
 
 The agreed target is a strict TypeScript monorepo using Bun workspaces, TanStack Start with React and TanStack Router, Tailwind CSS, and shadcn/ui. Cloudflare Workers host the application; Durable Objects coordinate generation and stream job updates over WebSockets. Cloudflare D1 and Prisma provide application persistence through a dedicated database package. The official Comfy TypeScript SDK connects to external GPU workflow execution. Bun is the development toolchain, not the production runtime.
 
-The initial scaffold implements these workspace boundaries. Live Comfy execution, authentication, and production readiness gates remain in ARCHITECTURE.md and README.md.
+These workspace boundaries are implemented, with live Comfy execution through Router and Comfy Cloud and sign-in through Cloudflare Access ([docs/auth.md](docs/auth.md)). Remaining production readiness gates are in ARCHITECTURE.md and README.md.
 
 ## Users
 
@@ -45,7 +45,7 @@ Generation is asynchronous and must continue across navigation, closed tabs, and
 - **Elements:** named reusable entities with identity, curated reference sheets, and optional states. Foundational types are Characters, Locations, and Things; Things include props, vehicles, clothing, and products. `@` mentions carry selected identity and references, not merely a name inserted into a prompt.
 - **Reference authoring:** guidance depends on Element type. Creators approve consistent views and details and can identify missing or contradictory references.
 - **Identity, state, and portrayal:** keep these separate. A temporary shot direction must not silently change an Element, approved references, or project defaults. Project direction carries a shared visual treatment across shots with deliberate overrides.
-- **Creative building blocks:** named LoRA adapters and other capabilities should explain their contribution, influence, and compatibility. Saved recipes retain useful combinations of direction, references, workflows, and adapters. Supported controls must produce a visible, tested difference.
+- **Creative building blocks:** named LoRA adapters (only Lightricks' official ones or our own; see [docs/third-party-ip.md](docs/third-party-ip.md)) and other capabilities should explain their contribution, influence, and compatibility. Saved recipes retain useful combinations of direction, references, workflows, and adapters. Supported controls must produce a visible, tested difference.
 - **Initial model focus:** Flux for images and LTX for video. Model independence is a longer-term goal; additional support must earn its place through proven creative outcomes and preserve the conceptual Element library.
 - **Selective revision:** video background replacement and whole-character replacement are explicit early priorities for uploaded and generated footage. Preserve performance, timing, camera movement, and everything outside the intended change; keep originals available for comparison, branching, and reversal. Prove replacement quality and preservation separately, including moving cameras, multiple people, and occlusion.
 - **Durable creative history:** preserve input and Element versions, references, recipes, project direction, shot overrides, capabilities, workflows, models, settings, and revision sources. Reproducibility means retaining creative context; exact pixel replay is not guaranteed.
@@ -64,7 +64,7 @@ Generation is asynchronous and must continue across navigation, closed tabs, and
 
 The product name is **Open Cinema**. Use the established vocabulary: Elements, Characters, Locations, Things, states, reference sheets, creative recipes, and project direction. Keep creator-facing language about ideas, taste, direction, and outcomes; technical controls should become available as needed without becoming prerequisites.
 
-No visual identity, palette, typography, or additional voice rules were selected during initialization.
+The visual identity, palette, typography and motion rules are in [docs/design.md](docs/design.md).
 
 ## Evidence on Hand
 
@@ -72,7 +72,7 @@ No visual identity, palette, typography, or additional voice rules were selected
 - [ARCHITECTURE.md](ARCHITECTURE.md): selected technology, target package boundaries, execution lifecycle, reliability requirements, accessibility requirements for job activity, and unresolved implementation gates.
 - [docs/README.md](docs/README.md) and linked local research: Comfy developer capabilities and competition context, researched on 2026-10-16. Verify changing external details before implementation or submission.
 
-The repository has a navigable studio shell but no implemented creative workflows, verified generation demonstrations, customer testimonials, benchmarks, or shipped product imagery. Do not invent these. The intended decisive demonstration is a short film with recognizable Elements across shots, followed by background replacement and character recasting that preserve the remaining approved work. Competition participation is an opportunity to demonstrate the product, not its enduring purpose.
+The repository has working creative workflows and real generation examples ([README.md](README.md#example-outputs), [docs/media/examples](docs/media/examples)), but no customer testimonials or benchmarks. Do not invent these. The intended decisive demonstration is a short film with recognizable Elements across shots, followed by background replacement and character recasting that preserve the remaining approved work. Competition participation is an opportunity to demonstrate the product, not its enduring purpose.
 
 ## Product Principles
 

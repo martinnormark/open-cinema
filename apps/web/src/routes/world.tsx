@@ -23,8 +23,8 @@ function World() {
         </h1>
         <EmptyState icon={PackageOpen} title="Start a session first">
           <p>
-            A world is saved from, and brought into, your session. Start a
-            local session in the Studio, then come back.
+            A world is saved from, and brought into, your session. Start a local
+            session in the Studio, then come back.
           </p>
         </EmptyState>
       </section>

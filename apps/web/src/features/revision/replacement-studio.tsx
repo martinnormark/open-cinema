@@ -50,7 +50,10 @@ import {
   type ElementState,
 } from "@/features/elements/model";
 import { submitRevision } from "@/server/revisions";
-import { useCostPreferences } from "@/features/settings/preferences";
+import {
+  shouldShowEstimate,
+  useCostPreferences,
+} from "@/features/settings/preferences";
 import { estimateReplacement } from "./estimate";
 import { preflight, type Preflight } from "./shot-checks";
 import { requestScan, useShotScan, type ScanState } from "./shot-checks-client";
@@ -294,10 +297,10 @@ export function ReplacementStudio({
     [kind, target, scanState],
   );
 
-  const { unit } = useCostPreferences();
+  const preferences = useCostPreferences();
   const estimate = formatEstimate(
     estimateReplacement(kind, clipSeconds, pipeline),
-    unit,
+    preferences.unit,
   );
 
   const problems: string[] = [];
@@ -454,6 +457,17 @@ export function ReplacementStudio({
       const mention = element
         ? { elementId: element.id, ...(state ? { stateId: state.id } : {}) }
         : undefined;
+      // Keeping the source wardrobe or the Character's own look is already
+      // worded by the request builder from `preservation`; an empty note
+      // leaves the prompt out, as the other kinds do.
+      const recastPrompt = [
+        wardrobe === "describe"
+          ? `Wardrobe for this shot: ${wardrobeNote.trim()}.`
+          : "",
+        direction.trim(),
+      ]
+        .filter(Boolean)
+        .join(" ");
       const request: GenerationRequestInput =
         kind === "object"
           ? {
@@ -538,16 +552,9 @@ export function ReplacementStudio({
                           ? { description: targetNote.trim() }
                           : {}),
                       },
-                      // Keeping the source wardrobe or the Character's own look is
-                      // already worded by the request builder from `preservation`.
-                      prompt: [
-                        wardrobe === "describe"
-                          ? `Wardrobe for this shot: ${wardrobeNote.trim()}.`
-                          : "",
-                        direction.trim(),
-                      ]
-                        .filter(Boolean)
-                        .join(" "),
+                      ...(recastPrompt.length >= 3
+                        ? { prompt: recastPrompt }
+                        : {}),
                       preservation: {
                         ...preservation,
                         preserve:
@@ -1039,8 +1046,12 @@ export function ReplacementStudio({
                 )
                 .join(", ")}
             </dd>
-            <dt className="text-muted-foreground">Cost</dt>
-            <dd className="tabular">{estimate.cost}</dd>
+            {shouldShowEstimate(preferences, "video") && (
+              <>
+                <dt className="text-muted-foreground">Cost</dt>
+                <dd className="tabular">{estimate.cost}</dd>
+              </>
+            )}
             <dt className="text-muted-foreground">Time</dt>
             <dd className="tabular">
               {estimate.time} · {estimate.basis.toLowerCase()}

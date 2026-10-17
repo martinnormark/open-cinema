@@ -1,12 +1,12 @@
 # Architecture
 
-Status: agreed technology choices and implementation design. The repository now contains the initial Bun workspace scaffold, a TanStack Start studio shell, a private jobs Worker, and shared contracts/database/Comfy packages. The local generation MVP now implements durable acceptance, SDK polling, cancellation, versioned D1 projections, permanent R2 output storage, WebSocket snapshots, and the floating Orb. See [generation implementation](docs/generation-mvp.md) for current limits, local-only session behavior, and Router model support. The broader production lifecycle below remains the target architecture. See [README.md](README.md) for implemented boundaries, local commands, and outstanding integration work. Documentation references were checked on 2026-10-16.
+Status: agreed technology choices and implementation design. The repository now contains the initial Bun workspace scaffold, a TanStack Start studio shell, a private jobs Worker, and shared contracts/database/Comfy packages. The local generation MVP now implements durable acceptance, SDK polling, cancellation, versioned D1 projections, permanent R2 output storage, WebSocket snapshots, and the floating Orb. Jobs run as Router model requests or as ComfyUI graph submissions to Comfy Cloud (LTX graphs, revision modes, and media steps such as the background lock). The browser measures clips, draws posters, and converts non-square pixels with Mediabunny (WebCodecs) in a Web Worker. See [generation implementation](docs/generation-mvp.md) for current limits, local-only session behavior, and Router model support. The broader production lifecycle below remains the target architecture. See [README.md](README.md) for implemented boundaries, local commands, and outstanding integration work. Documentation references were checked on 2026-10-16.
 
 ## System overview
 
 The application is a TypeScript, Bun-workspace monorepo. A TanStack Start web application runs on Cloudflare Workers. Cloudflare R2 stores generated asset bytes. Cloudflare D1 stores application records and R2 object references, with Prisma providing typed database access through a dedicated database package. Cloudflare Durable Objects own generation job orchestration and publish live job updates to the browser over WebSockets.
 
-Comfy Router executes the MVP model requests on external GPU infrastructure; the broader architecture also supports Comfy workflows. Durable Objects submit, monitor, reconcile, and cancel those executions through the official TypeScript SDK. Generation must continue independently of the initiating HTTP request, browser tab, and WebSocket connection.
+Comfy Router executes hosted model requests, and Comfy Cloud executes the app's own ComfyUI graphs, both on external GPU infrastructure. Durable Objects submit, monitor, reconcile, and cancel those executions through the official TypeScript SDK. Generation must continue independently of the initiating HTTP request, browser tab, and WebSocket connection.
 
 ```mermaid
 flowchart LR
@@ -65,8 +65,10 @@ Bun is the development toolchain, not the production server runtime. Deployed co
 │   └── jobs/
 │       ├── src/
 │       │   ├── index.ts                # Worker exports and DO registration
-│       │   ├── generation-coordinator.ts
-│       │   └── orchestration/          # State transitions, scheduling, recovery
+│       │   ├── generation-coordinator.ts  # State transitions, scheduling, recovery
+│       │   ├── asset-resolver.ts       # Provider inputs from R2, signed media links
+│       │   ├── media.ts                # Cloud media steps (lock, conform, square)
+│       │   └── mentions.ts             # @mention resolution at acceptance
 │       └── wrangler.jsonc
 ├── packages/
 │   ├── database/
@@ -196,7 +198,7 @@ Prefer submit-then-monitor SDK operations over a single uncheckpointed call that
 
 Use bounded retries with backoff and jitter for safe reads and definitive retryable failures. Persist attempt counts, next-attempt times, and deadlines. A monitoring timeout must not falsely claim provider execution stopped; unresolved submissions move to `needs_attention`.
 
-The MVP uses Router queued model requests (`comfy.models.submit` / `comfy.models.handle`). Persist the exact model/input and idempotency key before submission, then persist the request ID before polling. Router replays acceptance for the same key: bounded retries recover a lost receipt using identical input and key. Never mint a replacement key during recovery. A provider discriminator preserves the separate Cloud workflow policy for old checkpoints: workflow submission keys reject duplicates, so ambiguous workflow submissions without receipts remain suspended. See the [Comfy SDK submission contract](https://docs.comfy.org/development/api-development/sdks#retrying-a-submit-the-idempotency-key).
+The MVP uses Router queued model requests (`comfy.models.submit` / `comfy.models.handle`). Persist the exact model/input and idempotency key before submission, then persist the request ID before polling. Router replays acceptance for the same key: bounded retries recover a lost receipt using identical input and key. Never mint a replacement key during recovery. A provider discriminator keeps the separate policy for Cloud graph submissions: workflow submission keys reject duplicates, so ambiguous workflow submissions without receipts remain suspended. See the [Comfy SDK submission contract](https://docs.comfy.org/development/api-development/sdks#retrying-a-submit-the-idempotency-key).
 
 ### Comfy runtime boundary
 
@@ -246,7 +248,7 @@ Hibernation applies to accepted browser sockets. Active upstream I/O may keep th
 Mount one floating `GenerationOrb` in the authenticated application shell so it survives route changes. Wrap [shadercn Orb 29](https://www.shadercn.run/docs/components/orbs/orb-29) and derive its state from the shared job subscription:
 
 ```ts
-const thinkingStates = new Set(['queued', 'submitting', 'running', 'cancelling']);
+const thinkingStates = new Set(['queued', 'submitting', 'running', 'persisting', 'cancelling']);
 const orbState = jobs.some((job) => thinkingStates.has(job.state))
   ? 'thinking'
   : 'idle';

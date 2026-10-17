@@ -82,7 +82,9 @@ function ExportWorld({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={EVERYTHING}>Everything in this studio</SelectItem>
+              <SelectItem value={EVERYTHING}>
+                Everything in this studio
+              </SelectItem>
               {projects.map((project) => (
                 <SelectItem key={project.id} value={project.id}>
                   {project.name}
@@ -216,7 +218,9 @@ function ImportWorld() {
           <div className="grid max-w-xl gap-3 rounded-xl border border-border p-5">
             <p className="text-sm font-medium">{phase.step}…</p>
             <Progress
-              value={phase.world.bytes ? (phase.sent / phase.world.bytes) * 100 : 100}
+              value={
+                phase.world.bytes ? (phase.sent / phase.world.bytes) * 100 : 100
+              }
               aria-label="Upload progress"
             />
             <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
@@ -337,8 +341,7 @@ function WorldResult({
           <ul className="mt-1 grid gap-2 text-muted-foreground">
             {result.adaptations.map((a) => (
               <li key={a.subject}>
-                <span className="text-foreground">{a.subject}.</span>{" "}
-                {a.change}
+                <span className="text-foreground">{a.subject}.</span> {a.change}
               </li>
             ))}
           </ul>
