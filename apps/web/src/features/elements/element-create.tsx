@@ -10,6 +10,7 @@ import {
   assetUrl,
   elementTypeOrder,
   elementTypes,
+  guessView,
   toHandle,
   type ElementType,
 } from "./model";
@@ -124,19 +125,24 @@ export function ElementCreate({
           "Some images could not be uploaded. Retry them from your Library.",
         );
       const refs = [
-        ...drafts.flatMap((d) => (d.kind === "stored" ? [d.ref] : [])),
-        ...uploaded.flatMap((item) => (item ? [item.ref] : [])),
+        ...drafts.flatMap((d) =>
+          d.kind === "stored" ? [{ ref: d.ref, title: d.label }] : [],
+        ),
+        ...uploaded.flatMap((item) => (item ? [item] : [])),
       ];
-      for (const asset of refs)
+      for (const { ref, title } of refs) {
+        const view = guessView(type, title);
         await addReference({
           elementId: element.id,
-          asset,
+          asset: ref,
           status: "experiment",
+          ...(view ? { view } : {}),
         }).catch((e: unknown) =>
           problems.push(
             e instanceof Error ? e.message : "An image was not added.",
           ),
         );
+      }
       if (willExplore) {
         setProgress("Starting explorations…");
         await generateViews(element, firstViews, null, ready).catch(

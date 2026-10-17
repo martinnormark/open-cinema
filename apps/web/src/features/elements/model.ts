@@ -309,3 +309,30 @@ export function viewPrompt(
     .replace(/\.\./g, ".")
     .slice(0, 2000);
 }
+
+const viewHints: [RegExp, ReferenceView][] = [
+  [/face|close-?up|portrait|headshot/, "face-closeup"],
+  [/expression|smil|laugh|angry|sad|cry/, "expression"],
+  [/three-?quarter|3-?4|34|3q/, "three-quarter"],
+  [/profile/, "profile"],
+  [/back|rear|behind/, "rear"],
+  [/establish|wide|overview/, "establishing"],
+  [/landmark/, "landmark"],
+  [/reverse|alternate|other-?side|angle/, "alternate-angle"],
+  [/detail|material|texture|macro/, "detail"],
+  [/side/, "side"],
+  [/top|above/, "top"],
+  [/front|full/, "front"],
+];
+
+/** Best guess at what an uploaded file shows from its name, e.g. `mara-profile.jpg`. */
+export function guessView(
+  type: ElementType,
+  fileName: string,
+): ReferenceView | null {
+  const name = fileName.toLowerCase().replace(/\.[a-z0-9]+$/, "");
+  const allowed = new Set(elementTypes[type].slots.map((s) => s.id));
+  for (const [pattern, view] of viewHints)
+    if (pattern.test(name) && allowed.has(view)) return view;
+  return null;
+}

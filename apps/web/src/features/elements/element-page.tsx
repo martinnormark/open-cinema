@@ -29,6 +29,7 @@ import {
 import {
   assetUrl,
   elementTypes,
+  guessView,
   reviewSheet,
   stateHandle,
   type Element,
@@ -48,6 +49,7 @@ import {
   useElement,
 } from "./store";
 import { MediaPicker, uploadFiles, type AssetRef } from "@/features/library";
+import { ConfirmDelete } from "./confirm-delete";
 import { SessionRequired, typeIcons } from "./visuals";
 
 export function ElementPage({
@@ -585,7 +587,6 @@ function StateHeader({
   state: ElementState;
 }) {
   const navigate = useNavigate();
-  const [confirm, setConfirm] = useState(false);
   return (
     <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
       <div className="max-w-2xl">
@@ -597,24 +598,24 @@ function StateHeader({
             `How ${element.name} looks when ${state.name.toLowerCase()}.`}
         </p>
       </div>
-      <Button
-        variant={confirm ? "destructive" : "ghost"}
-        size="sm"
-        onBlur={() => setConfirm(false)}
-        onClick={() => {
-          if (!confirm) return setConfirm(true);
-          void removeState(state.id).then(() =>
+      <ConfirmDelete
+        label="Remove state"
+        title={`Remove ${state.name}?`}
+        confirmLabel="Remove state"
+        onConfirm={() =>
+          removeState(state.id).then(() =>
             navigate({
               to: "/elements/$elementId",
               params: { elementId: element.id },
               search: {},
             }),
-          );
-        }}
+          )
+        }
       >
-        <Trash2 aria-hidden="true" />
-        {confirm ? "Remove state and its references" : "Remove state"}
-      </Button>
+        Its own references leave the sheet and @{element.handle}:
+        {stateHandle(state)} stops resolving. {element.name}&rsquo;s identity is
+        unchanged.
+      </ConfirmDelete>
     </div>
   );
 }
@@ -641,18 +642,21 @@ function ReferenceSheet({
   const reviewCount = experiments.length + pending.length;
 
   const [picking, setPicking] = useState(false);
-  async function attach(assets: AssetRef[]) {
-    for (const asset of assets)
+  async function attach(items: { ref: AssetRef; title: string }[]) {
+    for (const item of items) {
+      const view = guessView(element.type, item.title);
       await addReference({
         elementId: element.id,
         ...(stateId ? { stateId } : {}),
-        asset,
+        asset: item.ref,
         status: "experiment",
+        ...(view ? { view } : {}),
       }).catch((e: unknown) =>
         onError(
           e instanceof Error ? e.message : "The image could not be added.",
         ),
       );
+    }
   }
   async function upload(files: FileList | null) {
     if (!files?.length) return;
@@ -664,7 +668,7 @@ function ReferenceSheet({
         onError(
           "Some images could not be uploaded. Retry them from your Library.",
         );
-      await attach(items.flatMap((item) => (item ? [item.ref] : [])));
+      await attach(items.flatMap((item) => (item ? [item] : [])));
     } finally {
       setUploading((n) => n - list.length);
     }
@@ -737,7 +741,7 @@ function ReferenceSheet({
             kind="image"
             title={`Add to ${element.name}${state ? ` · ${state.name}` : ""}`}
             description="Pick an image you uploaded or generated. It joins the explorations for you to review."
-            onSelect={(item) => void attach([item.ref])}
+            onSelect={(item) => void attach([item])}
           />
         </div>
         <p className="mt-1 text-sm leading-6 text-muted-foreground">
@@ -1078,31 +1082,20 @@ function PendingReference({
 
 function DeleteElement({ element }: { element: Element }) {
   const navigate = useNavigate();
-  const [confirm, setConfirm] = useState(false);
   return (
     <div className="mt-20 border-t border-border pt-6">
-      <Button
-        variant={confirm ? "destructive" : "ghost"}
-        size="sm"
-        onBlur={() => setConfirm(false)}
-        onClick={() => {
-          if (!confirm) return setConfirm(true);
-          void deleteElement(element.id).then(() =>
-            navigate({ to: "/elements" }),
-          );
-        }}
+      <ConfirmDelete
+        label={`Delete ${element.name}`}
+        title={`Delete ${element.name}?`}
+        confirmLabel="Delete Element"
+        onConfirm={() =>
+          deleteElement(element.id).then(() => navigate({ to: "/elements" }))
+        }
       >
-        <Trash2 aria-hidden="true" />
-        {confirm
-          ? `Delete ${element.name} and its references`
-          : `Delete ${element.name}`}
-      </Button>
-      {confirm && (
-        <p className="mt-2 text-xs text-muted-foreground">
-          Mentions of @{element.handle} will stop resolving. Generated images
-          stay in your Library.
-        </p>
-      )}
+        Its reference sheet and states are removed and mentions of @
+        {element.handle} stop resolving. Uploaded and generated images stay in
+        your Library.
+      </ConfirmDelete>
     </div>
   );
 }
