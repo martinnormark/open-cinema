@@ -90,16 +90,24 @@ def result(model: str, request_id: str):
 def run(model: str, inputs: dict, record: Path, poll: float = 10) -> dict:
     """Submit, wait, collect; write a JSON record. Returns the record."""
     record.parent.mkdir(parents=True, exist_ok=True)
-    t0 = time.time()
-    sub = submit(model, inputs)
-    t1 = time.time()
-    rec = {
-        "model": model,
-        "input": _redact(inputs),
-        "submit": sub,
-        "submitted_at": t0,
-    }
-    record.write_text(json.dumps(rec, indent=2))
+    prior = json.loads(record.read_text()) if record.exists() else None
+    if prior and prior.get("model") == model and prior.get("result_http") == 200:
+        return prior  # already collected; output URLs stay valid for about 24 h
+    if prior and prior.get("model") == model and prior.get("submit") and not prior.get("result_http"):
+        # Resume a request this machine submitted before it restarted: never resubmit.
+        rec, sub = prior, prior["submit"]
+        t0 = t1 = prior["submitted_at"]
+    else:
+        t0 = time.time()
+        sub = submit(model, inputs)
+        t1 = time.time()
+        rec = {
+            "model": model,
+            "input": _redact(inputs),
+            "submit": sub,
+            "submitted_at": t0,
+        }
+        record.write_text(json.dumps(rec, indent=2))
     final = wait(model, sub["request_id"], poll=poll)
     status, headers, body = result(model, sub["request_id"])
     t2 = time.time()
