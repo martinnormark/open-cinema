@@ -1,0 +1,154 @@
+{
+  "1": {
+    "class_type": "LoadVideo",
+    "_meta": {
+      "title": "Source take"
+    },
+    "inputs": {
+      "file": "source.mp4"
+    }
+  },
+  "2": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Character reference 1 (full body)"
+    },
+    "inputs": {
+      "image": "character-1.jpg"
+    }
+  },
+  "5": {
+    "class_type": "ResizeAndPadImage",
+    "_meta": {
+      "title": "Fit reference 1 to 832x1248"
+    },
+    "inputs": {
+      "image": [
+        "2",
+        0
+      ],
+      "target_width": 832,
+      "target_height": 1248,
+      "padding_color": "white",
+      "interpolation": "lanczos"
+    }
+  },
+  "3": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Character reference 2 (face)"
+    },
+    "inputs": {
+      "image": "character-2.jpg"
+    }
+  },
+  "6": {
+    "class_type": "ResizeAndPadImage",
+    "_meta": {
+      "title": "Fit reference 2 to 832x1248"
+    },
+    "inputs": {
+      "image": [
+        "3",
+        0
+      ],
+      "target_width": 832,
+      "target_height": 1248,
+      "padding_color": "white",
+      "interpolation": "lanczos"
+    }
+  },
+  "4": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Character reference 3 (three-quarter)"
+    },
+    "inputs": {
+      "image": "character-3.jpg"
+    }
+  },
+  "7": {
+    "class_type": "ResizeAndPadImage",
+    "_meta": {
+      "title": "Fit reference 3 to 832x1248"
+    },
+    "inputs": {
+      "image": [
+        "4",
+        0
+      ],
+      "target_width": 832,
+      "target_height": 1248,
+      "padding_color": "white",
+      "interpolation": "lanczos"
+    }
+  },
+  "8": {
+    "class_type": "ImageBatch",
+    "_meta": {
+      "title": "References 1-2"
+    },
+    "inputs": {
+      "image1": [
+        "5",
+        0
+      ],
+      "image2": [
+        "6",
+        0
+      ]
+    }
+  },
+  "9": {
+    "class_type": "ImageBatch",
+    "_meta": {
+      "title": "Character references"
+    },
+    "inputs": {
+      "image1": [
+        "8",
+        0
+      ],
+      "image2": [
+        "7",
+        0
+      ]
+    }
+  },
+  "10": {
+    "class_type": "KlingOmniProEditVideoNode",
+    "_meta": {
+      "title": "Recast person"
+    },
+    "inputs": {
+      "model_name": "kling-v3-omni",
+      "prompt": "In <<<video_1>>>, replace the woman with long red-brown hair (on the right of the frame) with the person shown in <<<image_1>>>, <<<image_2>>>, <<<image_3>>>: Mara, a woman in her early thirties with a short platinum silver-white blunt bob haircut with a fringe, light freckles, dark brows, grey-green eyes and a slim athletic build. Dress the new person in their reference outfit from the reference images. Keep the replaced person's exact performance: body movement, pose, gestures, facial expression, gaze, head turns, lip movement and timing. Keep every other person, the background, all objects, the framing, the lighting and the camera movement exactly as in the original video. Photorealistic, same film look.",
+      "video": [
+        "1",
+        0
+      ],
+      "keep_original_sound": false,
+      "reference_images": [
+        "9",
+        0
+      ],
+      "resolution": "1080p",
+      "seed": 7
+    }
+  },
+  "11": {
+    "class_type": "SaveVideo",
+    "_meta": {
+      "title": "Result"
+    },
+    "inputs": {
+      "video": [
+        "10",
+        0
+      ],
+      "filename_prefix": "open-cinema/character-replace",
+      "format": "auto",
+      "format.codec": "auto"
+    }
+  }
+}

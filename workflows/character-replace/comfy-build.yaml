@@ -1,0 +1,15 @@
+schema: comfy-build/1
+id: null
+name: open-cinema-character-replace
+description: "Open Cinema character recast: Kling 3.0 Omni video edit replaces one selected person with a Character from up to four reference views, keeping performance, other people, background and camera. Partner node only; no custom nodes or local weights."
+syncedRevision: null
+definition:
+  schema: distribution-definition/0
+  baseComfyVersion: v0.41.2
+  models: []
+  customNodes: []
+  modelPolicy: { mode: allowlist, list: [] }
+  partnerNodePolicy:
+    mode: allowlist
+    list: [KlingOmniProEditVideoNode]
+  customNodePolicy: { mode: allowlist, list: [] }
