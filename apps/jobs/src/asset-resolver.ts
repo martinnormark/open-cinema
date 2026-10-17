@@ -59,6 +59,9 @@ export async function storedAsset(
         r2Key: own.r2Key!,
         mediaType: own.mediaType,
         sizeBytes: own.sizeBytes,
+        // Outputs the media container wrote have square pixels.
+        pixelAspect: null,
+        posterKey: own.posterKey ?? null,
       };
   }
   return resolveAssetRef(db, scope, ref);

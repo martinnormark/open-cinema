@@ -8,7 +8,9 @@ import {
   verifyMediaPath,
 } from "@open-cinema/assets";
 import { createDatabase } from "@open-cinema/database";
+import { recordPoster } from "@open-cinema/database/mutations";
 import { getMediaAsset } from "@open-cinema/database/queries";
+import { getCoordinator } from "@/server/jobs";
 import { requireSameOrigin, requireSession } from "@/server/session";
 
 async function owner(request: Request, id: string) {
@@ -34,13 +36,25 @@ async function stream(request: Request, id: string) {
     if (asset?.status !== "ready")
       return new Response("Media not found", { status: 404 });
     if (new URL(request.url).searchParams.get("variant") === "poster") {
+      if (asset.kind === "video") {
+        // Made at upload; an older clip gets its poster on first view.
+        const made = asset.posterKey
+          ? { posterKey: asset.posterKey }
+          : await getCoordinator(ownerId).ensurePoster(
+              { ownerId },
+              { type: "media-asset", assetId: id },
+            );
+        return made
+          ? await serveObject(env.GENERATED_ASSETS, made.posterKey, request)
+          : new Response("Poster not available", { status: 404 });
+      }
       const poster = await serveObject(
         env.GENERATED_ASSETS,
-        uploadObjectKey(ownerId, id, "poster"),
+        asset.posterKey ?? uploadObjectKey(ownerId, id, "poster"),
         request,
       );
       // Small images have no separate poster; they are their own thumbnail.
-      if (poster.status !== 404 || asset.kind === "video") return poster;
+      if (poster.status !== 404) return poster;
     }
     const response = await serveObject(
       env.GENERATED_ASSETS,
@@ -61,7 +75,7 @@ async function stream(request: Request, id: string) {
   }
 }
 
-/** Browser-rendered thumbnail or poster frame for an existing upload. */
+/** Browser-rendered thumbnail for an existing image upload. */
 async function putPoster(request: Request, id: string) {
   requireSameOrigin();
   const session = await requireSession();
@@ -76,12 +90,21 @@ async function putPoster(request: Request, id: string) {
     const length = Number(request.headers.get("Content-Length"));
     if (!(length > 0 && length <= 2 * 1024 * 1024))
       throw new UploadError("The poster is missing or too large.", 413);
-    await storePoster(
+    // Videos get their poster from ffmpeg (see media/server.mjs), not the browser.
+    if (asset.kind === "video")
+      throw new UploadError("Video posters are made by the studio.", 415);
+    const stored = await storePoster(
       env.GENERATED_ASSETS,
       session.userId,
       id,
       await request.arrayBuffer(),
       request.headers.get("Content-Type") ?? "",
+    );
+    await recordPoster(
+      createDatabase(env.DB),
+      { ownerId: session.userId },
+      { type: "media-asset", assetId: id },
+      { posterKey: stored.r2Key },
     );
     return new Response(null, { status: 204 });
   } catch (error) {

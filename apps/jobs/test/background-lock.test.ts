@@ -5,7 +5,15 @@ import {
   runDurableObjectAlarm,
   runInDurableObject,
 } from "cloudflare:test";
-import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { setupNetwork } from "@msw/cloudflare";
 import { http, HttpResponse } from "msw";
 import { resultOutputs, type CommandResult } from "@open-cinema/contracts";
@@ -45,6 +53,7 @@ const matte = bytes(26, 69, 223, 163, 3, 3, 3, 3);
 const rendered = {
   lock: bytes(0, 0, 0, 24, 102, 116, 121, 112, 4),
   conform: bytes(0, 0, 0, 24, 102, 116, 121, 112, 5, 5),
+  poster: bytes(82, 73, 70, 70, 4, 0, 0, 0, 87, 69, 66, 80),
 };
 
 /** A Router model that accepts one submission and completes it with `result`. */
@@ -148,7 +157,7 @@ it("locks the source performers over Kling's edit, conforms both variants, and p
     http.post(
       "http://127.0.0.1:8791/:operation",
       async ({ request, params }) => {
-        const operation = String(params.operation) as "lock" | "conform";
+        const operation = String(params.operation) as keyof typeof rendered;
         media.push({
           operation,
           parts: request.headers.get("x-media-parts") ?? "",
@@ -210,10 +219,23 @@ it("locks the source performers over Kling's edit, conforms both variants, and p
     },
   ]);
   // Each part streams from R2 in the order the header names it.
-  expect(media.map((m) => [m.operation, m.parts])).toEqual([
+  expect(media.slice(0, 2).map((m) => [m.operation, m.parts])).toEqual([
     ["lock", `source=${take.length},edit=${edit.length},matte=${matte.length}`],
     ["conform", `source=${take.length},edit=${edit.length}`],
   ]);
+  // Saving the result makes each variant's poster, so it shows at once.
+  await vi.waitFor(() => expect(media).toHaveLength(4));
+  expect(
+    media
+      .slice(2)
+      .map((m) => `${m.operation}:${m.parts}`)
+      .sort(),
+  ).toEqual(
+    [
+      `poster:source=${rendered.lock.length}`,
+      `poster:source=${rendered.conform.length}`,
+    ].sort(),
+  );
   expect(media[0]!.body).toEqual(new Uint8Array([...take, ...edit, ...matte]));
 
   expect(done.outputs.map((o) => o.providerAssetId)).toEqual([

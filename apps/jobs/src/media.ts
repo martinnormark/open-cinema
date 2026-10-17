@@ -25,14 +25,19 @@ export class MediaRejectedError extends Error {}
 
 /**
  * Streams the parts from R2 into the media container in one body and returns its
- * MP4. Nothing is buffered in the Worker: R2 knows each part's exact length.
+ * MP4 (or a poster's WebP). Nothing is buffered in the Worker: R2 knows each
+ * part's exact length. `headers` carries the container's measurements.
  */
 export async function renderMedia(
   env: JobsEnv,
-  operation: MediaOperation,
+  operation: MediaOperation | "poster",
   parts: readonly MediaPart[],
   signal: AbortSignal,
-): Promise<{ body: ReadableStream<Uint8Array>; size: number }> {
+): Promise<{
+  body: ReadableStream<Uint8Array>;
+  size: number;
+  headers: Headers;
+}> {
   const objects = await Promise.all(
     parts.map(async (part) => {
       const object = await env.GENERATED_ASSETS.get(part.r2Key);
@@ -74,5 +79,5 @@ export async function renderMedia(
     await response.body?.cancel();
     throw new Error(`Media container returned ${response.status}`);
   }
-  return { body: response.body, size };
+  return { body: response.body, size, headers: response.headers };
 }

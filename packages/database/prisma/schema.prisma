@@ -68,6 +68,11 @@ model JobOutput {
   r2Key           String?       @unique
   sizeBytes       Int?
   etag            String?
+  /// Videos: the poster still and the size and length ffmpeg measured making it.
+  posterKey       String?
+  width           Int?
+  height          Int?
+  durationMs      Int?
 
   @@index([jobId])
 }
@@ -164,6 +169,8 @@ model MediaAsset {
   /// Sample aspect ratio measured at upload; 1 is square pixels.
   pixelAspect Float?
   hasAudio    Boolean?
+  /// The poster still; null until one is stored.
+  posterKey   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

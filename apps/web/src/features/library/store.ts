@@ -238,8 +238,14 @@ async function run(entry: UploadEntry) {
             : "The upload did not finish. Try again.";
       throw new Error(message);
     }
-    const item = mediaItemSchema.parse(response.body);
-    if (probe.poster) {
+    const uploaded = mediaItemSchema.parse(response.body);
+    // The server makes a video's poster with ffmpeg; until this page reloads,
+    // the frame the browser already drew stands in for it.
+    const keepPreview = entry.kind === "video" && previewUrl !== null;
+    const item = keepPreview
+      ? { ...uploaded, thumbnailUrl: previewUrl }
+      : uploaded;
+    if (probe.poster && entry.kind === "image") {
       await fetch(`${item.url}?variant=poster`, {
         method: "PUT",
         headers: { "Content-Type": probe.poster.type },
@@ -248,7 +254,7 @@ async function run(entry: UploadEntry) {
       }).catch(() => null);
     }
     requests.delete(entry.key);
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    if (previewUrl && !keepPreview) URL.revokeObjectURL(previewUrl);
     update({
       items: [item, ...state.items],
       uploads: state.uploads.filter((u) => u.key !== entry.key),

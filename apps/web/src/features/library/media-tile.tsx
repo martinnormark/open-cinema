@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, type SyntheticEvent } from "react";
 import { Film, ImageIcon, RotateCcw, X } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
@@ -10,11 +10,6 @@ import {
   useLibrary,
   type UploadEntry,
 } from "./store";
-import {
-  loadWhenVisible,
-  recordVideoDuration,
-  useVideoDuration,
-} from "./video-meta";
 
 /** Marks cached images loaded at attach time; `onLoad` covers the rest. */
 function revealWhenLoaded(img: HTMLImageElement | null) {
@@ -22,18 +17,29 @@ function revealWhenLoaded(img: HTMLImageElement | null) {
 }
 
 /**
- * Fades in over a placeholder icon; a failed load leaves the icon visible. A
- * video with no poster image shows its own first frame instead (`videoSrc`).
+ * A video's poster can take a moment on first view (the media container may be
+ * starting); one quiet retry covers that before the icon is left in place.
+ */
+function retryOnce(event: SyntheticEvent<HTMLImageElement>) {
+  const img = event.currentTarget;
+  if (img.dataset.retried || img.src.startsWith("blob:")) return;
+  img.dataset.retried = "true";
+  const url = new URL(img.src);
+  url.searchParams.set("retry", "1");
+  setTimeout(() => (img.src = url.href), 2000);
+}
+
+/**
+ * Fades in over a placeholder icon, which stays while a video's poster is
+ * still being made and when a load fails.
  */
 export function Thumbnail({
   src,
   kind,
-  videoSrc,
   className,
 }: {
   src: string | null;
   kind: MediaItem["kind"];
-  videoSrc?: string | null | undefined;
   className?: string;
 }) {
   const Icon = kind === "video" ? Film : ImageIcon;
@@ -53,39 +59,12 @@ export function Thumbnail({
           decoding="async"
           draggable={false}
           onLoad={(event) => (event.currentTarget.dataset.loaded = "true")}
+          onError={retryOnce}
           className="library-thumb absolute inset-0 size-full object-cover"
-        />
-      )}
-      {!src && kind === "video" && videoSrc && (
-        <video
-          ref={loadWhenVisible}
-          // A frame slightly in avoids a black first frame.
-          data-src={`${videoSrc}#t=0.1`}
-          muted
-          playsInline
-          preload="metadata"
-          tabIndex={-1}
-          aria-hidden="true"
-          disablePictureInPicture
-          onLoadedMetadata={(event) =>
-            recordVideoDuration(videoSrc, event.currentTarget.duration)
-          }
-          onLoadedData={(event) =>
-            (event.currentTarget.dataset.loaded = "true")
-          }
-          className="library-thumb pointer-events-none absolute inset-0 size-full object-cover"
         />
       )}
     </div>
   );
-}
-
-/** The clip's length: measured at upload, or read from its poster frame. */
-export function useItemDuration(item: MediaItem) {
-  const measured = useVideoDuration(
-    item.kind === "video" && item.durationSeconds === null ? item.url : null,
-  );
-  return item.durationSeconds ?? measured;
 }
 
 /** A clip's length over its thumbnail; nothing until the length is known. */
@@ -96,7 +75,7 @@ export function DurationBadge({
   item: MediaItem;
   className?: string;
 }) {
-  const seconds = useItemDuration(item);
+  const seconds = item.durationSeconds;
   if (!seconds) return null;
   return (
     <span
@@ -131,7 +110,7 @@ export const MediaTile = memo(function MediaTile({
   selected?: boolean | undefined;
   hidden?: boolean | undefined;
 }) {
-  const seconds = useItemDuration(item);
+  const seconds = item.durationSeconds;
   return (
     <li className="library-tile" hidden={hidden}>
       <button
@@ -144,7 +123,6 @@ export const MediaTile = memo(function MediaTile({
           <Thumbnail
             src={item.thumbnailUrl}
             kind={item.kind}
-            videoSrc={item.url}
             className={cn(
               "aspect-square rounded-lg",
               selected && "ring-2 ring-tungsten",

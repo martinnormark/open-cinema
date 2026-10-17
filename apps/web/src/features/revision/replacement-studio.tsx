@@ -926,6 +926,7 @@ function SourceStage({
           key={source.id}
           ref={video}
           src={source.url}
+          poster={source.thumbnailUrl ?? undefined}
           controls={!markTarget}
           playsInline
           preload="metadata"
@@ -1190,7 +1191,6 @@ function ClipStrip({
                   <Thumbnail
                     src={item.thumbnailUrl}
                     kind="video"
-                    videoSrc={item.url}
                     className="aspect-video"
                   />
                   <DurationBadge item={item} className="right-1 bottom-1" />
@@ -1277,7 +1277,6 @@ function BackgroundMethod({
             <Thumbnail
               src={plate.thumbnailUrl}
               kind={plate.kind}
-              videoSrc={plate.url}
               className="aspect-video w-20 shrink-0 rounded-md"
             />
           ) : (

@@ -2,6 +2,7 @@ import {
   createMediaAssetInputSchema,
   mediaKindFor,
   MAX_UPLOAD_BYTES,
+  type AssetRef,
   type CreateMediaAssetInput,
   type MediaAsset,
   type OwnerScope,
@@ -110,4 +111,50 @@ export async function deleteMediaAsset(
   if (!row) return null;
   await client.mediaAsset.deleteMany({ where: { id, ownerId: scope.ownerId } });
   return toMediaAsset(row);
+}
+
+/**
+ * Records a stored poster still with its upload or job output. Measurements
+ * fill only what is unknown: an upload keeps what the browser measured.
+ */
+export async function recordPoster(
+  db: DatabaseContext,
+  scope: OwnerScope,
+  ref: AssetRef,
+  poster: {
+    posterKey: string;
+    width?: number | undefined;
+    height?: number | undefined;
+    durationMs?: number | undefined;
+  },
+): Promise<void> {
+  const client = getClient(db);
+  const measured = {
+    width: poster.width ?? null,
+    height: poster.height ?? null,
+    durationMs: poster.durationMs ?? null,
+  };
+  if (ref.type === "media-asset") {
+    const where = { id: ref.assetId, ownerId: scope.ownerId };
+    const row = await client.mediaAsset.findFirst({ where });
+    if (!row) return;
+    await client.mediaAsset.updateMany({
+      where,
+      data: {
+        posterKey: poster.posterKey,
+        width: row.width ?? measured.width,
+        height: row.height ?? measured.height,
+        durationMs: row.durationMs ?? measured.durationMs,
+      },
+    });
+    return;
+  }
+  await client.jobOutput.updateMany({
+    where: {
+      id: ref.outputId,
+      jobId: ref.jobId,
+      job: { ownerId: scope.ownerId },
+    },
+    data: { posterKey: poster.posterKey, ...measured },
+  });
 }

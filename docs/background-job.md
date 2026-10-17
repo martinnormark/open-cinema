@@ -46,7 +46,7 @@ node apps/jobs/media/server.mjs   # needs ffmpeg with libvpx on PATH; listens on
 
 In `apps/jobs/.dev.vars` set `MEDIA_ORIGIN="http://127.0.0.1:8080"`. Like `COMFY_BASE_URL`, only plain http on loopback is honored. Without it, the lock stage fails and the job waits in **needs attention** with its edit and matte saved.
 
-The server also runs the steps directly: `node apps/jobs/media/server.mjs lock out.mp4 source.mp4 edit.mp4 matte.webm` or `… conform out.mp4 source.mp4 edit.mp4`.
+The server also runs the steps directly: `node apps/jobs/media/server.mjs lock out.mp4 source.mp4 edit.mp4 matte.webm`, `… conform out.mp4 source.mp4 edit.mp4` or `… poster out.webp source.mp4`. The same container makes video posters for the Library ([library.md](library.md#video-posters)).
 
 ## Deploying
 

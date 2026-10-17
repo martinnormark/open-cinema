@@ -38,6 +38,7 @@ import { requestResultChecks } from "./shot-checks-client";
 import type { ResultChecks } from "./shot-checks";
 import {
   assetUrl,
+  posterUrl,
   phaseLabels,
   preservedLabels,
   replacementKinds,
@@ -242,6 +243,8 @@ export function RevisionView({
                 key={revision.id}
                 sourceUrl={assetUrl(revision.source)}
                 resultUrl={assetUrl(result)}
+                sourcePoster={posterUrl(revision.source)}
+                resultPoster={posterUrl(result)}
                 footer={
                   variants.length > 1 && resultVariant ? (
                     <div className="mt-4 flex flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:items-center sm:gap-4">
@@ -389,11 +392,10 @@ function PendingStage({
   return (
     <div>
       <div className="relative aspect-video overflow-hidden rounded-xl bg-black">
-        <video
-          src={`${assetUrl(revision.source)}#t=0.1`}
-          muted
-          playsInline
-          preload="metadata"
+        <img
+          src={posterUrl(revision.source)}
+          alt=""
+          decoding="async"
           className={cn(
             "absolute inset-0 size-full object-contain transition-opacity duration-(--duration-slow)",
             failed ? "opacity-40" : "opacity-55",

@@ -12,16 +12,16 @@ Import from `@/features/library`:
 | `uploadFiles(files)` | Uploads from code (your own drop zone or file input). Resolves with a `MediaItem` per file, or `null` where one failed; failed tiles keep the error and offer Retry in the Library. |
 | `useLibrary(select)` | Subscribes to the shared store (`items`, `uploads`, `status`). |
 | `parseAssetRefKey(value)` / `mediaUseHref(item, role)` | The Library's "Use as source" link goes to `/?source=asset:<id>` and "Use as reference" to `/elements/new?reference=asset:<id>`. Generated outputs use `output:<jobId>:<outputId>`. Destinations parse the param with `parseAssetRefKey`. |
-| `Thumbnail` | Fading thumbnail with a placeholder icon. |
+| `Thumbnail` | Fading thumbnail over a placeholder icon, which stays while a video's poster is made. |
 
 Server-side, resolve a ref with `resolveAssetRef` from `@open-cinema/database/queries`. That function checks ownership and readiness. To give a provider a URL it can fetch without the session cookie, call `signedUploadUrl(origin, ownerId, assetId)` from `apps/web/src/server/media-items.ts`. It returns an HMAC-signed link to `/api/media/<id>` that is valid for an hour. Signed links cover upload originals only. Job outputs have no signed link yet.
 
 ## Upload path
 
-1. The browser checks the type and size, then measures the file. Images go through `createImageBitmap`. Videos are decoded through a `<video>` element. When the codec can't be decoded (H.264 or HEVC in Chromium builds without proprietary codecs), duration and frame size come from the MP4/MOV `moov` box instead. The browser also renders a WebP poster at most 640 px wide, for videos and for images larger than 640 px or 512 KB.
+1. The browser checks the type and size, then measures the file. Images go through `createImageBitmap`. Videos are decoded through a `<video>` element. When the codec can't be decoded (H.264 or HEVC in Chromium builds without proprietary codecs), duration and frame size come from the MP4/MOV `moov` box instead. The browser also renders a WebP poster at most 640 px wide for images larger than 640 px or 512 KB. For a video it draws a frame only to show on the uploading tile; the stored poster comes from ffmpeg (see [Video posters](#video-posters)).
 2. `POST /api/media/upload` takes the file as the raw request body. The type comes from `Content-Type`, the name from `X-Media-Filename`, and the measurements from the `X-Media-Width`, `X-Media-Height` and `X-Media-Duration` headers. The route checks the session and same-origin, then records a pending `MediaAsset` (`createPendingMediaAsset`). It streams the body into R2 as a bounded multipart upload (`storeUpload` in `packages/assets/src/uploads.ts`) and marks the asset ready using the size and ETag R2 reports. On failure the asset is marked failed and the partial upload is aborted. The browser uses XHR so it can show upload progress. Up to two uploads run at once.
-3. `PUT /api/media/<id>?variant=poster` stores the poster at a fixed key next to the original.
-4. `GET`/`HEAD /api/media/<id>` streams the original with ETag and byte-range support. Adding `?variant=poster` returns the poster, falling back to the original for small images. The original is served `immutable` because its bytes never change under an ID.
+3. `PUT /api/media/<id>?variant=poster` stores an image's poster at a fixed key next to the original and records it as the asset's `posterKey`. Videos refuse it.
+4. `GET`/`HEAD /api/media/<id>` streams the original with ETag and byte-range support. Adding `?variant=poster` returns the poster: a video's ffmpeg still, an image's browser poster, or the original for small images. The original is served `immutable` because its bytes never change under an ID.
 
 Checks the server enforces:
 
@@ -32,6 +32,16 @@ Checks the server enforces:
 Video length (two minutes at most) is checked from the browser's measurement, which is advisory. Dimensions and duration are display metadata, not trusted facts.
 
 R2 keys are `uploads/v1/<owner>/<id>/original` and `uploads/v1/<owner>/<id>/poster`, in the private `GENERATED_ASSETS` bucket. `deleteMedia` removes the D1 row (`deleteMediaAsset`) and both objects. Element references and revisions hold typed refs rather than foreign keys, so a deleted upload resolves to `null` and consumers must handle that.
+
+## Video posters
+
+Every video shows a real frame wherever it appears, whatever codecs the viewer's browser can decode: Library and picker tiles, project sources and revision cards, the revision's generating state, the compare viewer and replacement studio (as `<video poster>`), the Library inspector, and Activity.
+
+- **What:** a WebP at most 640 px wide, taken a tenth of the way in (at most one second) at the clip's display aspect with square pixels. The media container's `POST /poster` makes it with ffmpeg (`apps/jobs/media/server.mjs`) and reports the clip's display size and length in `x-media-width`, `x-media-height` and `x-media-duration`.
+- **When:** an upload's poster is started right after `POST /api/media/upload` answers (`waitUntil`). A job's video results get theirs when the job succeeds. Anything older gets its poster the first time it is viewed.
+- **How:** `GenerationCoordinator.ensurePoster(scope, ref)` resolves the upload or output, renders once (concurrent requests for the same ref share the render, and at most two renders run per creator), stores the still at `uploads/v1/<owner>/<id>/poster` or `<output key>/poster`, and records it with `recordPoster`: `MediaAsset.posterKey`, or `JobOutput.posterKey` plus `width`, `height` and `durationMs`. An upload keeps what the browser measured; ffmpeg fills only what is unknown. A poster stored before its record is reused, never rendered twice.
+- **Serving:** `/api/media/<id>?variant=poster` and `/api/jobs/output?job=…&output=…&variant=poster` serve the recorded poster or wait for `ensurePoster`. `posterUrl(ref)` in `features/revision/model.ts` builds either URL.
+- **While it is made:** `Thumbnail` shows its film icon until the still loads and retries a failed load once after two seconds. A clip just uploaded from a browser that can decode it keeps the frame the browser drew until the page reloads.
 
 ## Library UI
 

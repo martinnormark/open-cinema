@@ -1,6 +1,8 @@
 import { DurableObject } from "cloudflare:workers";
 import {
+  assetRefKey,
   isActiveJob,
+  resultOutputs,
   ownerScopeSchema,
   parseMentionHandles,
   requestMentions,
@@ -52,7 +54,15 @@ import {
 import { MediaRejectedError, renderMedia } from "./media";
 import { MentionError, resolveMentions } from "./mentions";
 
-import { archiveOutput, storeProducedOutput } from "@open-cinema/assets";
+import {
+  archiveOutput,
+  posterObjectKey,
+  storedPoster,
+  storeProducedOutput,
+  storeRenderedPoster,
+  type PosterFacts,
+} from "@open-cinema/assets";
+import { recordPoster } from "@open-cinema/database/mutations";
 
 const POLL_MS = 2000;
 const DEADLINE_MS = 30 * 60_000;
@@ -98,6 +108,20 @@ const stagePrefix = (execution: Execution) => {
   const stage = stageOf(execution);
   return stage ? `${stage.id}:` : "";
 };
+/** Posters the container makes at once for one creator; the rest wait their turn. */
+const POSTER_CONCURRENCY = 2;
+function measured(headers: Headers): PosterFacts {
+  const read = (name: string) => {
+    const n = Number(headers.get(name));
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+  };
+  const seconds = read("x-media-duration");
+  return {
+    width: read("x-media-width"),
+    height: read("x-media-height"),
+    durationMs: seconds === undefined ? undefined : Math.round(seconds * 1000),
+  };
+}
 /** Media steps retry on their own; past this many failures the creator decides. */
 const MEDIA_ATTEMPTS = 5;
 /**
@@ -164,6 +188,11 @@ export class GenerationCoordinator
   extends DurableObject<JobsEnv>
   implements GenerationCoordinatorApi
 {
+  /** Posters being made, by ref, so concurrent requests share one render. */
+  private posters = new Map<string, Promise<{ posterKey: string } | null>>();
+  private posterSlots = POSTER_CONCURRENCY;
+  private posterQueue: (() => void)[] = [];
+
   async getSnapshot(scope: OwnerScope): Promise<JobSnapshot | null> {
     const record = await initializeCoordinator(
       this.ctx.storage,
@@ -422,6 +451,94 @@ export class GenerationCoordinator
         ?.outputs.find((o) => o.id === outputId) ?? null
     );
   }
+  async ensurePoster(
+    scope: OwnerScope,
+    ref: AssetRef,
+  ): Promise<{ posterKey: string } | null> {
+    const { ownerId } = ownerScopeSchema.parse(scope);
+    const key = assetRefKey(ref);
+    let pending = this.posters.get(key);
+    if (!pending) {
+      pending = this.makePoster(ownerId, ref)
+        .catch((error: unknown) => {
+          // No poster leaves the placeholder; the next view tries again.
+          console.warn(
+            JSON.stringify({
+              event: "poster_failed",
+              ref: key,
+              message:
+                error instanceof Error ? error.message.slice(0, 300) : null,
+            }),
+          );
+          return null;
+        })
+        .finally(() => this.posters.delete(key));
+      this.posters.set(key, pending);
+    }
+    return pending;
+  }
+
+  private async makePoster(ownerId: string, ref: AssetRef) {
+    const db = createDatabase(this.env.DB);
+    const record = await readCoordinator(this.ctx.storage);
+    const own =
+      ref.type === "job-output" && record?.ownerId === ownerId
+        ? (record.jobs.find((j) => j.id === ref.jobId)?.outputs ?? [])
+        : [];
+    const stored = await storedAsset(db, { ownerId }, ref, own);
+    if (!stored?.mediaType.startsWith("video/")) return null;
+    if (stored.posterKey) return { posterKey: stored.posterKey };
+    const posterKey = posterObjectKey(ownerId, ref, stored.r2Key);
+    // A poster saved before its record was written (or for an output D1 had
+    // not projected yet) is reused, never rendered twice.
+    let facts = await storedPoster(this.env.GENERATED_ASSETS, posterKey);
+    if (!facts) {
+      await this.posterSlot();
+      try {
+        const rendered = await renderMedia(
+          this.env,
+          "poster",
+          [{ name: "source", r2Key: stored.r2Key }],
+          AbortSignal.timeout(2 * 60_000),
+        );
+        facts = await storeRenderedPoster(
+          this.env.GENERATED_ASSETS,
+          posterKey,
+          ownerId,
+          rendered,
+          measured(rendered.headers),
+        );
+      } finally {
+        this.posterSlots++;
+        this.posterQueue.shift()?.();
+      }
+    }
+    await recordPoster(db, { ownerId }, ref, { posterKey, ...facts });
+    return { posterKey };
+  }
+
+  private async posterSlot() {
+    if (this.posterSlots > 0) {
+      this.posterSlots--;
+      return;
+    }
+    // A finishing render hands its slot straight to the next in line.
+    await new Promise<void>((resolve) => this.posterQueue.push(resolve));
+  }
+
+  /** Posters for a finished job's video results, so they show at once. */
+  private postersFor(ownerId: string, job: Job | undefined) {
+    if (job?.state !== "succeeded") return;
+    for (const output of resultOutputs(job.outputs))
+      if (output.r2Key && output.mediaType.startsWith("video/"))
+        this.ctx.waitUntil(
+          this.ensurePoster(
+            { ownerId },
+            { type: "job-output", jobId: job.id, outputId: output.id },
+          ),
+        );
+  }
+
   private client(execution: Execution) {
     return createComfyClient({
       apiKey: this.env.COMFY_API_KEY ?? "",
@@ -526,17 +643,21 @@ export class GenerationCoordinator
     id: string,
     update: (job: Job, record: CoordinatorRecord) => void,
   ) {
+    let finished: Job | undefined;
     const record = await mutateCoordinator(
       this.ctx.storage,
       { ownerId },
       (record) => {
         const job = record.jobs.find((j) => j.id === id);
         if (!job) return;
+        const before = job.state;
         update(job, record);
         touch(record, job);
+        if (before !== "succeeded" && job.state === "succeeded") finished = job;
       },
     );
     if (record) this.broadcast(record);
+    this.postersFor(ownerId, finished);
   }
   private async acceptStatus(
     ownerId: string,

@@ -38,6 +38,8 @@ type FrameVideo = HTMLVideoElement & {
 export function CompareViewer({
   sourceUrl,
   resultUrl,
+  sourcePoster,
+  resultPoster,
   sourceLabel = "Original",
   resultLabel = "Revision",
   aspectRatio = 16 / 9,
@@ -46,6 +48,9 @@ export function CompareViewer({
 }: {
   sourceUrl: string;
   resultUrl: string;
+  /** Stills shown until each clip has a frame to paint. */
+  sourcePoster?: string | undefined;
+  resultPoster?: string | undefined;
   /** Fires once the result's metadata is in, e.g. to start post-run checks. */
   onResultLoaded?: () => void;
   sourceLabel?: string;
@@ -275,6 +280,7 @@ export function CompareViewer({
           <video
             ref={source}
             src={sourceUrl}
+            poster={sourcePoster}
             className={videoClass}
             playsInline
             preload="auto"
@@ -326,6 +332,7 @@ export function CompareViewer({
             <video
               ref={result}
               src={resultUrl}
+              poster={resultPoster}
               className={videoClass}
               playsInline
               preload="auto"

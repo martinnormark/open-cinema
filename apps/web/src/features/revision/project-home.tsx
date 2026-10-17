@@ -21,7 +21,7 @@ import {
   assetUrl as elementAssetUrl,
 } from "@/features/elements/model";
 import {
-  assetUrl,
+  posterUrl,
   phaseLabels,
   replacementKinds,
   revisionPhase,
@@ -117,13 +117,11 @@ function Revisions({
                   className="group block no-underline"
                 >
                   <span className="relative block aspect-video overflow-hidden rounded-lg bg-black">
-                    <video
-                      src={`${assetUrl(result ?? revision.source)}#t=0.5`}
-                      preload="metadata"
-                      muted
-                      playsInline
+                    <Thumbnail
+                      src={posterUrl(result ?? revision.source)}
+                      kind="video"
                       className={cn(
-                        "size-full object-cover transition-opacity duration-(--duration-fast)",
+                        "size-full transition-opacity duration-(--duration-fast)",
                         result ? "opacity-100" : "opacity-45",
                       )}
                     />
@@ -189,7 +187,6 @@ function Sources({
                 <Thumbnail
                   src={item.thumbnailUrl}
                   kind="video"
-                  videoSrc={item.url}
                   className="aspect-video"
                 />
                 <DurationBadge item={item} className="right-1.5 bottom-1.5" />
