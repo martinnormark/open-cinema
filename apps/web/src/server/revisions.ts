@@ -268,3 +268,16 @@ export const submitRevision = createServerFn({ method: "POST" })
     );
     return { ok: true, revisionId: revision.id, result };
   });
+
+/** Studio generations as typed requests, so mentions carry Elements and references. */
+export const submitStudioRequest = createServerFn({ method: "POST" })
+  .validator(workflowCommandSchema)
+  .handler(async ({ data }) => {
+    requireSameOrigin();
+    const session = await requireSession();
+    using result = await getCoordinator(session.userId).submit(
+      { ownerId: session.userId },
+      data,
+    );
+    return commandResultSchema.parse(result);
+  });
