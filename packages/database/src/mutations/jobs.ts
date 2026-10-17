@@ -50,9 +50,11 @@ export async function applyJobSnapshot(
   });
   // Output IDs are immutable provider asset IDs scoped to this job. Repeated writes are safe.
   for (const output of job.outputs) {
+    // Poster facts are written by recordPoster alone, never by a projection.
+    const { posterKey, width, height, durationMs, ...stored } = output;
     await client.jobOutput.upsert({
       where: { id: output.id },
-      create: output,
+      create: stored,
       update: {},
     });
     // Storage references only advance from absent to present. A delayed pre-copy

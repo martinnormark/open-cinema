@@ -24,6 +24,13 @@ export type {
   WorkflowStage,
 } from "./types";
 export {
+  MEDIA_GRAPH_INPUTS,
+  MEDIA_GRAPH_OUTPUT,
+  MEDIA_GRAPH_PARTS,
+  mediaGraph,
+} from "./media-graphs";
+export type { MediaGraphOptions, MediaPartName } from "./media-graphs";
+export {
   expandMentions,
   httpsUrl,
   mediaTypeFromUrl,

@@ -81,6 +81,7 @@ function JobRow({ job }: { job: Job }) {
             {output.mediaType.startsWith("video/") && (
               <video
                 src={`/api/jobs/output?job=${encodeURIComponent(job.id)}&output=${encodeURIComponent(output.id)}`}
+                poster={`/api/jobs/output?job=${encodeURIComponent(job.id)}&output=${encodeURIComponent(output.id)}&variant=poster`}
                 controls
                 playsInline
                 preload="metadata"

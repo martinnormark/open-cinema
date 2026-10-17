@@ -178,3 +178,36 @@ test("a bystander the result loses is not matched to the recast face beside them
   expect(checks.bystanders).toEqual([]);
   expect(checks.wrongPerson).toBe(false);
 });
+
+test("flags a bystander who took the Character's face while still resembling themselves", () => {
+  // Live U2 run: the woman beside the target became Mara (0.61) yet still
+  // matched herself at 0.53, above the changed threshold.
+  const blend = BYSTANDER.map((v, i) => v + CHARACTER[i]! * 1.2);
+  const checks = checkResult(source, resultWith(SOURCE_TARGET, blend), mark, [
+    CHARACTER,
+  ]);
+  expect(checks.targetChanged).toBe("no");
+  expect(checks.bystanders[0]!.similarity).toBeGreaterThan(0.5);
+  expect(checks.bystanders[0]!.changed).toBe(true);
+  expect(checks.wrongPerson).toBe(true);
+});
+
+test("does not count the target as a bystander on frames where tracking lost them", () => {
+  // G3: the target re-emerges from behind a pillar away from their last box.
+  const frames = Array.from({ length: 10 }, (_, i) =>
+    i < 5
+      ? {
+          people: [person(0.2, "front")],
+          faces: [face(0.2, 0.25, SOURCE_TARGET)],
+        }
+      : { people: [], faces: [face(0.7, 0.25, SOURCE_TARGET)] },
+  );
+  const recast = Array.from({ length: 10 }, (_, i) =>
+    i < 5
+      ? { people: [person(0.2, "front")], faces: [face(0.2, 0.25, CHARACTER)] }
+      : { people: [], faces: [face(0.7, 0.25, CHARACTER)] },
+  );
+  const checks = checkResult(scan(frames), scan(recast), mark, [CHARACTER]);
+  expect(checks.bystanders).toEqual([]);
+  expect(checks.wrongPerson).toBe(false);
+});

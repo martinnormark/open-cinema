@@ -162,10 +162,11 @@ export function assetUrl(ref: AssetRef): string {
     : `/api/jobs/output?job=${encodeURIComponent(ref.jobId)}&output=${encodeURIComponent(ref.outputId)}`;
 }
 
-export function posterUrl(ref: AssetRef): string | null {
+/** A still for any upload or output: a video's ffmpeg poster, or the image. */
+export function posterUrl(ref: AssetRef): string {
   return ref.type === "media-asset"
-    ? `/api/media/${encodeURIComponent(ref.assetId)}?variant=poster`
-    : null;
+    ? `${assetUrl(ref)}?variant=poster`
+    : `${assetUrl(ref)}&variant=poster`;
 }
 
 /** The result a revision shows: its stored result, or the finished job's first video. */

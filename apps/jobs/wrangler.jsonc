@@ -38,8 +38,8 @@
       },
     ],
   },
-  // ffmpeg steps no Router model offers: the background foreground lock and
-  // frame-rate conform (media/server.mjs, docs/background-job.md).
+  // ffmpeg steps no Router model offers: the background foreground lock,
+  // frame-rate conform and video posters (media/server.mjs, docs/background-job.md).
   "containers": [
     {
       "class_name": "MediaContainer",

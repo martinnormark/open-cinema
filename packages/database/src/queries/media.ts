@@ -58,6 +58,7 @@ export async function resolveAssetRef(
   sizeBytes: number | null;
   /** Uploads only: the measured pixel aspect, null when square or unknown. */
   pixelAspect?: number | null;
+  posterKey: string | null;
 } | null> {
   const client = getClient(db);
   if (ref.type === "media-asset") {
@@ -70,6 +71,7 @@ export async function resolveAssetRef(
           mediaType: row.mediaType,
           sizeBytes: row.sizeBytes,
           pixelAspect: row.pixelAspect,
+          posterKey: row.posterKey,
         }
       : null;
   }
@@ -85,6 +87,7 @@ export async function resolveAssetRef(
         r2Key: output.r2Key,
         mediaType: output.mediaType,
         sizeBytes: output.sizeBytes,
+        posterKey: output.posterKey,
       }
     : null;
 }

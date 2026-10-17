@@ -1,5 +1,10 @@
 import { getContainer } from "@cloudflare/containers";
-import type { MediaOperation } from "@open-cinema/comfy";
+import {
+  CloudMediaRejectedError,
+  runCloudMedia,
+  type MediaOperation,
+  type MediaPartName,
+} from "@open-cinema/comfy";
 
 /** Development override: a loopback media server (`node apps/jobs/media/server.mjs`). */
 export function mediaOrigin(override: string | undefined): string | null {
@@ -25,14 +30,19 @@ export class MediaRejectedError extends Error {}
 
 /**
  * Streams the parts from R2 into the media container in one body and returns its
- * MP4. Nothing is buffered in the Worker: R2 knows each part's exact length.
+ * MP4 (or a poster's WebP). Nothing is buffered in the Worker: R2 knows each
+ * part's exact length. `headers` carries the container's measurements.
  */
 export async function renderMedia(
   env: JobsEnv,
-  operation: MediaOperation,
+  operation: MediaOperation | "poster",
   parts: readonly MediaPart[],
   signal: AbortSignal,
-): Promise<{ body: ReadableStream<Uint8Array>; size: number }> {
+): Promise<{
+  body: ReadableStream<Uint8Array>;
+  size: number;
+  headers: Headers;
+}> {
   const objects = await Promise.all(
     parts.map(async (part) => {
       const object = await env.GENERATED_ASSETS.get(part.r2Key);
@@ -74,5 +84,50 @@ export async function renderMedia(
     await response.body?.cancel();
     throw new Error(`Media container returned ${response.status}`);
   }
-  return { body: response.body, size };
+  return { body: response.body, size, headers: response.headers };
+}
+
+export interface CloudMediaPart {
+  name: MediaPartName;
+  r2Key: string;
+  mediaType: string;
+}
+
+/**
+ * Runs a job's lock or conform as a ComfyUI graph on Comfy Cloud (see
+ * packages/comfy/src/workflows/media-graphs.ts) and returns its MP4. The parts
+ * stream from R2 into Cloud's uploads one at a time; nothing is buffered.
+ */
+export async function renderCloudMedia(
+  env: JobsEnv,
+  operation: MediaOperation,
+  parts: readonly CloudMediaPart[],
+  signal: AbortSignal,
+  /** The source's sample aspect, when its pixels are not square. */
+  pixelAspect?: number | null,
+): Promise<{ body: ReadableStream<Uint8Array>; size: number }> {
+  try {
+    return await runCloudMedia({
+      apiKey: env.COMFY_API_KEY ?? "",
+      baseUrl: (env as { COMFY_BASE_URL?: string }).COMFY_BASE_URL,
+      operation,
+      parts: parts.map((part) => ({
+        name: part.name,
+        contentType: part.mediaType,
+        async open() {
+          const object = await env.GENERATED_ASSETS.get(part.r2Key);
+          if (!object)
+            throw new Error(`Media part "${part.name}" is not stored`);
+          return { body: object.body, size: object.size };
+        },
+      })),
+      pixelAspect,
+      signal,
+    });
+  } catch (error) {
+    // Cloud refused the graph or the run failed on this media: retrying cannot help.
+    if (error instanceof CloudMediaRejectedError)
+      throw new MediaRejectedError(error.message);
+    throw error;
+  }
 }

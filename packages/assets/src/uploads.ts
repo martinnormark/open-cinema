@@ -1,6 +1,7 @@
 import {
   MAX_UPLOAD_BYTES,
   mediaKindFor,
+  type AssetRef,
   type MediaKind,
 } from "@open-cinema/contracts";
 
@@ -80,6 +81,70 @@ export function uploadObjectKey(
   variant: "original" | "poster",
 ) {
   return `uploads/v1/${encodeURIComponent(ownerId)}/${encodeURIComponent(uploadId)}/${variant}`;
+}
+
+/**
+ * Where a video's poster still lives: beside an upload's original, or beside a
+ * generated output's object.
+ */
+export function posterObjectKey(ownerId: string, ref: AssetRef, r2Key: string) {
+  return ref.type === "media-asset"
+    ? uploadObjectKey(ownerId, ref.assetId, "poster")
+    : `${r2Key}/poster`;
+}
+
+/** Facts the media container measured while making a poster, kept on the object. */
+export interface PosterFacts {
+  width?: number | undefined;
+  height?: number | undefined;
+  durationMs?: number | undefined;
+}
+function posterFacts(object: R2Object): PosterFacts {
+  const read = (name: string) => {
+    const n = Number(object.customMetadata?.[name]);
+    return Number.isSafeInteger(n) && n > 0 ? n : undefined;
+  };
+  return {
+    width: read("width"),
+    height: read("height"),
+    durationMs: read("durationMs"),
+  };
+}
+
+/** A poster already stored for this video, with what was measured making it. */
+export async function storedPoster(bucket: R2Bucket, key: string) {
+  const object = await bucket.head(key);
+  return object ? posterFacts(object) : null;
+}
+
+/** Saves the media container's poster still under `key`. */
+export async function storeRenderedPoster(
+  bucket: R2Bucket,
+  key: string,
+  ownerId: string,
+  rendered: { body: ReadableStream<Uint8Array>; size: number },
+  facts: PosterFacts,
+): Promise<PosterFacts> {
+  if (rendered.size <= 0 || rendered.size > UPLOAD_LIMITS.poster) {
+    await rendered.body.cancel();
+    throw new Error("Invalid poster");
+  }
+  const { readable, writable } = new FixedLengthStream(rendered.size);
+  const [object] = await Promise.all([
+    bucket.put(key, readable, {
+      httpMetadata: { contentType: "image/webp" },
+      customMetadata: {
+        ownerId,
+        ...Object.fromEntries(
+          Object.entries(facts)
+            .filter(([, value]) => value !== undefined)
+            .map(([name, value]) => [name, String(value)]),
+        ),
+      },
+    }),
+    rendered.body.pipeTo(writable),
+  ]);
+  return posterFacts(object);
 }
 
 function metadata(object: R2Object, kind: UploadKind): StoredUpload {

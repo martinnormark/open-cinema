@@ -49,7 +49,7 @@ export const executionSchema = z.object({
     .default({}),
   /**
    * 0 is the definition's own request; n > 0 runs the definition's `stages[n-1]`
-   * (a further Router request or media container work) once earlier outputs are saved.
+   * (a further Router request or a media step on Comfy Cloud) once earlier outputs are saved.
    */
   stage: z.number().int().nonnegative().default(0),
   nextAttemptAt: z.number(),

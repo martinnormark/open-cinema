@@ -246,7 +246,7 @@ export function trackTarget(
 
 /** Calibrated on the Phase 0 clips; see evaluation/recast/guardrails.md. */
 export const PREFLIGHT_THRESHOLDS = {
-  /** Largest face height (share of frame height) below which likeness suffers. */
+  /** Typical (median) face height, as a share of frame height, below which likeness suffers. */
   smallFace: 0.15,
   /** Share of tracked frames seen from behind, with no face, that means back-view-only. */
   backShare: 0.6,
@@ -262,6 +262,8 @@ export const preflightSchema = z.object({
   backFrames: z.number().int().nonnegative(),
   /** Largest face height seen, as a share of frame height. */
   largestFace: z.number().nullable(),
+  /** Median face height over the frames their face was found on. */
+  typicalFace: z.number().nullable(),
   /** The person's box on the marked frame. */
   box: boxSchema.nullable(),
 });
@@ -283,6 +285,7 @@ export function preflight(
       faceFrames: 0,
       backFrames: 0,
       largestFace: null,
+      typicalFace: null,
       box: null,
     };
   const found = track.filter((t) => t.person);
@@ -302,6 +305,11 @@ export function preflight(
     )
     .filter((s): s is number => s !== null);
   const largestFace = sizes.length ? Math.max(...sizes) : null;
+  // The median, not the largest: one close frame on a spin (G5) does not
+  // carry the likeness through the rest of the shot.
+  // Pose-estimated head sizes are a fallback; they run small on turns.
+  const detected = found.flatMap((t) => (t.face ? [t.face.box.h] : []));
+  const typicalFace = median(detected.length ? detected : sizes);
 
   const reasons: Preflight["reasons"] = [];
   let verdict: Preflight["verdict"] = "ok";
@@ -313,7 +321,7 @@ export function preflight(
     verdict = "refuse";
     reasons.push("back-view");
   } else {
-    if (largestFace !== null && largestFace < thresholds.smallFace)
+    if (typicalFace !== null && typicalFace < thresholds.smallFace)
       reasons.push("small-face");
     if (found.length && backFrames / found.length >= 0.5)
       reasons.push("partly-away");
@@ -329,6 +337,7 @@ export function preflight(
     faceFrames,
     backFrames,
     largestFace,
+    typicalFace,
     box: marked?.person?.box ?? null,
   };
 }
@@ -343,6 +352,10 @@ export const RESULT_THRESHOLDS = {
   unchanged: 0.62,
   /** Below this a bystander no longer matches themselves. */
   bystanderChanged: 0.5,
+  /** At or above this, and above their own match, a bystander now reads as the Character. */
+  tookCharacter: 0.55,
+  /** At or above this a source face is the target again, e.g. after an occlusion. */
+  samePerson: 0.6,
 };
 
 export const resultChecksSchema = z.object({
@@ -358,12 +371,14 @@ export const resultChecksSchema = z.object({
     z.object({
       similarity: z.number(),
       changed: z.boolean(),
+      /** Median match of their result face to the Character's references. */
+      characterSimilarity: z.number().nullable().default(null),
       /** Their face in the source, for pointing at them. */
       box: boxSchema,
       timeMs: z.number(),
     }),
   ),
-  /** A bystander whose face moved toward the Character: the wrong person recast. */
+  /** A bystander who now reads as the Character more than as themselves: the wrong person recast. */
   wrongPerson: z.boolean(),
   framesCompared: z.number().int().nonnegative(),
 });
@@ -408,6 +423,13 @@ export function checkResult(
     sims: number[];
     towardCharacter: number[];
   }[] = [];
+  // The target's own faces, so they are not mistaken for a bystander on
+  // frames where tracking lost them (G3, behind a pillar).
+  const targetFaces = (track ?? []).flatMap((t) =>
+    t.face?.embedding ? [t.face.embedding] : [],
+  );
+  const isTarget = (e: readonly number[]) =>
+    targetFaces.some((t) => cosine(e, t) >= thresholds.samePerson);
   const pairs = Math.min(source.frames.length, result.frames.length);
   let framesCompared = 0;
   for (let i = 0; i < pairs; i++) {
@@ -432,7 +454,8 @@ export function checkResult(
     }
 
     for (const face of s.faces) {
-      if (!face.embedding || face === targetFace) continue;
+      if (!face.embedding || face === targetFace || isTarget(face.embedding))
+        continue;
       if (targetPerson && faceOf(targetPerson, [face]) === face) continue;
       // The recast face is never a bystander's match, even when nearby.
       const match = sameSpotFace(
@@ -471,21 +494,23 @@ export function checkResult(
     .filter((b) => b.sims.length >= minFrames)
     .map((b) => {
       const similarity = median(b.sims)!;
+      const toward = median(b.towardCharacter);
+      // Kling recast the wrong woman on a live U2 run; she still matched
+      // herself at 0.53 but matched Mara better.
+      const tookCharacter =
+        toward !== null &&
+        toward >= thresholds.tookCharacter &&
+        toward > similarity;
       return {
         similarity,
-        changed: similarity < thresholds.bystanderChanged,
+        changed: similarity < thresholds.bystanderChanged || tookCharacter,
         box: b.box,
         timeMs: b.timeMs,
-        toward: median(b.towardCharacter),
+        toward,
+        tookCharacter,
       };
     });
-  const wrongPerson = others.some(
-    (b) =>
-      b.changed &&
-      b.toward !== null &&
-      b.toward >= thresholds.weakLikeness &&
-      (like === null || b.toward > like),
-  );
+  const wrongPerson = others.some((b) => b.tookCharacter);
   return {
     version: 1,
     checkedAt: now.toISOString(),
@@ -501,7 +526,10 @@ export function checkResult(
             : "strong",
     targetChanged:
       src === null ? "unmeasured" : src >= thresholds.unchanged ? "no" : "yes",
-    bystanders: others.map(({ toward: _toward, ...rest }) => rest),
+    bystanders: others.map(({ toward, tookCharacter: _took, ...rest }) => ({
+      ...rest,
+      characterSimilarity: toward,
+    })),
     wrongPerson,
     framesCompared,
   };

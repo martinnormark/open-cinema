@@ -3,13 +3,17 @@
 //   POST /lock     parts source, edit, matte -> the source foreground over the edit
 //   POST /conform  parts source, edit        -> the edit on the source's frame grid
 //   POST /square   parts source              -> the source with square pixels
+//   POST /poster   parts source              -> a WebP still of the source
 //
-// All return an MP4 on the source's exact frame rate and frame count, at its
+// The video operations return an MP4 on the source's exact frame rate and frame count, at its
 // display size with square pixels, carrying the source's audio. The request body is the parts concatenated in the order
 // the `x-media-parts` header lists them (`source=123,edit=456`), so the Worker
 // can stream R2 objects in without buffering.
 //
-// Offline: node server.mjs lock|conform|square <out.mp4> <source> [edit] [matte]
+// /poster returns a WebP at most 640 px wide, taken a moment in so it is not a
+// black first frame, with the clip's display size and length in headers.
+//
+// Offline: node server.mjs lock|conform|square|poster <out> <source> [edit] [matte]
 import { spawn } from "node:child_process";
 import { createReadStream, createWriteStream } from "node:fs";
 import { mkdtemp, rm, stat } from "node:fs/promises";
@@ -22,7 +26,9 @@ const OPERATIONS = {
   lock: ["source", "edit", "matte"],
   conform: ["source", "edit"],
   square: ["source"],
+  poster: ["source"],
 };
+const POSTER_WIDTH = 640;
 const MAX_PART_BYTES = 512 * 1024 * 1024;
 
 function run(command, args) {
@@ -47,11 +53,14 @@ async function probe(path) {
     "error",
     "-count_packets",
     "-show_streams",
+    "-show_entries",
+    "format=duration",
     "-of",
     "json",
     path,
   ]);
-  const streams = JSON.parse(out).streams ?? [];
+  const parsed = JSON.parse(out);
+  const streams = parsed.streams ?? [];
   const video = streams.find((s) => s.codec_type === "video");
   if (!video) throw new Error(`${path} has no video stream`);
   const audio = streams.find((s) => s.codec_type === "audio") ?? null;
@@ -70,6 +79,7 @@ async function probe(path) {
     // r_frame_rate is the container's nominal grid, e.g. 30000/1001.
     fps: video.r_frame_rate,
     frames: Number(video.nb_read_packets),
+    seconds: Number(video.duration ?? parsed.format?.duration) || null,
     codec: video.codec_name,
     alpha: video.tags?.ALPHA_MODE === "1" || video.tags?.alpha_mode === "1",
     audio: audio && { codec: audio.codec_name },
@@ -92,6 +102,44 @@ const matteFilter = (source, matte) =>
   // Phase 0's lock softened the matte by about one pixel to hide stair-stepping.
   `gblur=sigma=1,format=gbrp`;
 
+/**
+ * One still a tenth of the way in (at most a second), at the source's display
+ * aspect with square pixels. A clip shorter than that gives its first frame.
+ */
+async function poster(out, sourcePath, source) {
+  const at = Math.min(1, (source.seconds ?? 0) / 10);
+  const width = Math.min(POSTER_WIDTH, source.width);
+  const height = Math.max(
+    2,
+    Math.round((width * source.height) / source.width),
+  );
+  await run("ffmpeg", [
+    "-v",
+    "error",
+    "-y",
+    "-ss",
+    String(at),
+    "-i",
+    sourcePath,
+    "-frames:v",
+    "1",
+    "-vf",
+    `scale=${width}:${height}:flags=bicubic,setsar=1`,
+    "-c:v",
+    "libwebp",
+    "-quality",
+    "80",
+    "-f",
+    "webp",
+    out,
+  ]);
+  return {
+    width: source.width,
+    height: source.height,
+    seconds: source.seconds,
+  };
+}
+
 export async function render(
   operation,
   out,
@@ -99,6 +147,7 @@ export async function render(
 ) {
   const source = await probe(sourcePath);
   if (!source.frames) throw new Error("The source has no frames");
+  if (operation === "poster") return poster(out, sourcePath, source);
   const square = operation === "square";
   const inputs = square
     ? ["-i", sourcePath]
@@ -226,14 +275,23 @@ async function handle(request, response) {
   const dir = await mkdtemp(join(tmpdir(), "media-"));
   try {
     const paths = await readParts(request, dir, names);
-    const out = join(dir, "out.mp4");
+    const still = operation === "poster";
+    const out = join(dir, still ? "out.webp" : "out.mp4");
     const result = await render(operation, out, paths);
     const { size } = await stat(out);
     response.writeHead(200, {
-      "content-type": "video/mp4",
+      "content-type": still ? "image/webp" : "video/mp4",
       "content-length": String(size),
-      "x-media-fps": result.fps,
-      "x-media-frames": String(result.frames),
+      "x-media-width": String(result.width),
+      "x-media-height": String(result.height),
+      ...(still
+        ? result.seconds
+          ? { "x-media-duration": String(result.seconds) }
+          : {}
+        : {
+            "x-media-fps": result.fps,
+            "x-media-frames": String(result.frames),
+          }),
     });
     await pipeline(createReadStream(out), response);
   } catch (error) {

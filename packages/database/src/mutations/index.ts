@@ -8,6 +8,7 @@ export {
   deleteMediaAsset,
   markMediaAssetFailed,
   markMediaAssetReady,
+  recordPoster,
   updateMediaAssetMetadata,
 } from "./media";
 export {

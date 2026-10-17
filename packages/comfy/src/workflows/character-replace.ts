@@ -221,8 +221,8 @@ export async function characterReplaceRequest(
 
 /**
  * Kling returns 24 fps at the source length within a frame, so 25 and 29.97
- * fps takes drift against their own audio and frame-exact review. The media
- * container retimes the edit onto the source's frame grid with the source
+ * fps takes drift against their own audio and frame-exact review. A Comfy
+ * Cloud graph retimes the edit onto the source's frame grid with the source
  * audio (docs/background-job.md); `conform:video` is then the result.
  */
 export const characterConformStage: MediaStage<"video.character-replace"> = {

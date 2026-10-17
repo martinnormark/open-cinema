@@ -5,7 +5,15 @@ import {
   runDurableObjectAlarm,
   runInDurableObject,
 } from "cloudflare:test";
-import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { setupNetwork } from "@msw/cloudflare";
 import { http, HttpResponse } from "msw";
 import { resultOutputs, type CommandResult } from "@open-cinema/contracts";
@@ -19,6 +27,7 @@ import {
   markMediaAssetReady,
 } from "@open-cinema/database/mutations";
 import { getRevisionForJob } from "@open-cinema/database/queries";
+import { cloudMedia } from "./cloud-media";
 import { setRevisionStatus } from "@open-cinema/database/mutations";
 
 const network = setupNetwork();
@@ -45,6 +54,7 @@ const matte = bytes(26, 69, 223, 163, 3, 3, 3, 3);
 const rendered = {
   lock: bytes(0, 0, 0, 24, 102, 116, 121, 112, 4),
   conform: bytes(0, 0, 0, 24, 102, 116, 121, 112, 5, 5),
+  poster: bytes(82, 73, 70, 70, 4, 0, 0, 0, 87, 69, 66, 80),
 };
 
 /** A Router model that accepts one submission and completes it with `result`. */
@@ -143,12 +153,13 @@ it("locks the source performers over Kling's edit, conforms both variants, and p
   });
   asset(editUrl, edit, "video/mp4");
   asset(matteUrl, matte, "video/webm");
+  // Posters come from the media container; the lock and conform from Cloud.
   const media: { operation: string; parts: string; body: Uint8Array }[] = [];
   network.use(
     http.post(
       "http://127.0.0.1:8791/:operation",
       async ({ request, params }) => {
-        const operation = String(params.operation) as "lock" | "conform";
+        const operation = String(params.operation) as keyof typeof rendered;
         media.push({
           operation,
           parts: request.headers.get("x-media-parts") ?? "",
@@ -163,6 +174,8 @@ it("locks the source performers over Kling's edit, conforms both variants, and p
       },
     ),
   );
+  const cloud = cloudMedia(rendered);
+  network.use(...cloud.handlers);
 
   const result: CommandResult = await stub.submit(scope, {
     idempotencyKey: crypto.randomUUID(),
@@ -209,12 +222,23 @@ it("locks the source performers over Kling's edit, conforms both variants, and p
       preserve_audio: false,
     },
   ]);
-  // Each part streams from R2 in the order the header names it.
-  expect(media.map((m) => [m.operation, m.parts])).toEqual([
-    ["lock", `source=${take.length},edit=${edit.length},matte=${matte.length}`],
-    ["conform", `source=${take.length},edit=${edit.length}`],
+  // Each step ran as a Comfy Cloud graph over the stored parts.
+  expect(
+    cloud.runs.map((r) => [r.operation, Object.keys(r.parts).sort()]),
+  ).toEqual([
+    ["lock", ["edit", "matte", "source"]],
+    ["conform", ["edit", "source"]],
   ]);
-  expect(media[0]!.body).toEqual(new Uint8Array([...take, ...edit, ...matte]));
+  expect(cloud.runs[0]!.parts).toEqual({ source: take, edit, matte });
+  expect(cloud.runs[0]!.graph.result!.class_type).toBe("ImageCompositeMasked");
+  // Saving the result makes each variant's poster, so it shows at once.
+  await vi.waitFor(() => expect(media).toHaveLength(2));
+  expect(media.map((m) => `${m.operation}:${m.parts}`).sort()).toEqual(
+    [
+      `poster:source=${rendered.lock.length}`,
+      `poster:source=${rendered.conform.length}`,
+    ].sort(),
+  );
 
   expect(done.outputs.map((o) => o.providerAssetId)).toEqual([
     "v1",
@@ -255,7 +279,7 @@ it("locks the source performers over Kling's edit, conforms both variants, and p
   });
 }, 30_000);
 
-it("stops for the creator when the media container keeps failing, then resumes on Check again", async () => {
+it("stops for the creator when Comfy Cloud keeps failing the lock, then resumes on Check again", async () => {
   const ownerId = crypto.randomUUID();
   const stub = env.GENERATION_COORDINATORS.getByName(ownerId);
   const db = createDatabase(env.DB);
@@ -301,13 +325,14 @@ it("stops for the creator when the media container keeps failing, then resumes o
   asset(matteUrl, matte, "video/webm");
   let up = false;
   network.use(
-    http.post("http://127.0.0.1:8791/:operation", ({ params }) => {
-      if (!up) return new HttpResponse("starting", { status: 503 });
-      const body = rendered[String(params.operation) as "lock" | "conform"];
-      return new HttpResponse(body, {
-        headers: { "Content-Length": String(body.length) },
-      });
-    }),
+    ...cloudMedia(rendered, () => up).handlers,
+    http.post(
+      "http://127.0.0.1:8791/poster",
+      () =>
+        new HttpResponse(rendered.poster, {
+          headers: { "Content-Length": String(rendered.poster.length) },
+        }),
+    ),
   );
   const accepted = await stub.submit(
     { ownerId },

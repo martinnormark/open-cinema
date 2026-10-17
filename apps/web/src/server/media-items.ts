@@ -28,7 +28,7 @@ export function assetToItem(asset: MediaAsset): MediaItem {
     hasAudio: asset.hasAudio,
     createdAt: asset.createdAt,
     url,
-    // Falls back to the original image when no poster was rendered.
+    // A video's poster is made with ffmpeg; a small image is its own poster.
     thumbnailUrl: `${url}?variant=poster`,
     prompt: null,
   };
@@ -56,16 +56,16 @@ function generatedItems(jobs: readonly Job[]): MediaItem[] {
           mediaType: output.mediaType,
           title: job.prompt || "Generated image",
           sizeBytes: output.sizeBytes,
-          // The MVP Router image workflow renders 1K squares.
-          width: kind === "image" ? 1024 : null,
-          height: kind === "image" ? 1024 : null,
-          durationSeconds: null,
+          // Measured with the poster; the MVP Router image workflow renders 1K squares.
+          width: output.width ?? (kind === "image" ? 1024 : null),
+          height: output.height ?? (kind === "image" ? 1024 : null),
+          durationSeconds: output.durationMs ? output.durationMs / 1000 : null,
           fps: null,
           pixelAspect: null,
           hasAudio: null,
           createdAt: job.updatedAt,
           url,
-          thumbnailUrl: kind === "image" ? url : null,
+          thumbnailUrl: kind === "image" ? url : `${url}&variant=poster`,
           prompt: job.prompt || null,
         };
       }),

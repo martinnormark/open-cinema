@@ -60,7 +60,11 @@ export function describeChecks(
     lines.push({
       tone: "warn",
       title: "Someone else may have been recast",
-      detail: `Another person’s face moved toward ${characterName}. Compare everyone in the shot before keeping it.`,
+      detail: `Another person now looks more like ${characterName} than like themselves.${
+        checks.targetChanged === "no"
+          ? " The model likely recast the wrong person."
+          : ""
+      } Compare everyone in the shot before keeping it.`,
     });
   else if (changed.length)
     lines.push({
