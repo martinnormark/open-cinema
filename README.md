@@ -12,6 +12,38 @@ Open Cinema is an early preview and our entry to Comfy's [Open Source Higgsfield
 
 Elements authoring, the media library, LTX video and selective video revision (background replacement and character recasting) are being built on `main`; see the roadmap for status.
 
+## Example outputs
+
+Every result below is a real Comfy generation from this repository's workflows, made on 2026-10-17; nothing is retouched. Watch the [two-minute demo](docs/media/open-cinema-demo.mp4) for the same journey in motion.
+
+![The source take, the same take moved to Keeper's Cottage, and the same take recast as Theo](docs/media/examples/revisions-source-background-recast.webp)
+
+**One take, two revisions.** The source clip, its background replaced with the @KeepersCottage Location, and the young man recast as @Theo. Performance, timing and camera move stay as shot. Both revisions by Kling 3.0 Omni through Comfy Router.
+
+![Source take, the Alpha Gen matte, and the take composited over a new plate](docs/media/examples/alpha-gen-before-matte-after.webp)
+
+**Background replacement that never repaints the actors.** LTX 2.5 with the Alpha Gen IC-LoRA, run as a ComfyUI graph on Comfy Cloud, pulls a frame-aligned matte from the take and composites the original pixels over a new plate made with FLUX 3.
+
+![The comparison viewer with a wipe between original and revision](docs/media/examples/compare-viewer-wipe.jpg)
+
+**Compare before you keep.** The revision viewer plays original and result in sync with a wipe or side by side, lists the decisions behind the result, and keeps the original one click away.
+
+![Cal's reference sheets, one row per state](docs/media/examples/character-sheets-by-state.jpg)
+
+**One character, every state.** @Cal, @Cal:wet and @Cal:injured each carry their own sheet of full-body views, close portrait and smile, so a scene can ask for exactly the look it needs. Generated with FLUX 3 Image.
+
+[![Theo inside Keeper's Cottage](docs/media/examples/elements-theo-in-cottage.jpg)](docs/media/examples/elements-theo-in-cottage.jpg)
+
+**Elements by mention.** "@Theo at @KeepersCottage" renders from the two Elements' four approved references, not from a description. FLUX 3 Image.
+
+[![A lighthouse on a cliff at dusk, from an LTX clip](docs/media/examples/ltx-2-5-text-to-video.jpg)](docs/media/examples/ltx-2-5-text-to-video.mp4)
+
+**Video from the Studio.** A six-second, 720p clip with sound from the Studio's Video mode (click to play). LTX 2.5 Fast through Comfy Router.
+
+![Source dancer, the pose control, and a new character performing the same motion](docs/media/examples/performance-transfer.webp)
+
+**Performance transfer (experimental).** A FLUX 3 keyframe of a new character driven by the source's pose, with LTX 2.3 Union Control on Comfy Cloud. The graph ran on its own; the composer for it is not built yet. See [docs/performance-transfer.md](docs/performance-transfer.md).
+
 ## Run it locally
 
 You need:
