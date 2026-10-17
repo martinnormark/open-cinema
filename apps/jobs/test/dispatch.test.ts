@@ -20,6 +20,7 @@ import {
   addElementReference,
   applyJobSnapshot,
   createElement,
+  createElementState,
   createPendingMediaAsset,
   markMediaAssetReady,
 } from "@open-cinema/database/mutations";
@@ -125,7 +126,9 @@ it("dispatches a typed image.flux command, snapshotting mentioned Elements witho
   await due(stub);
   expect(bodies).toEqual([
     {
-      prompt: "Mara waits at the harbor before sunrise, @Unknown nearby",
+      // No references reach FLUX here, so the mention says who Mara is.
+      prompt:
+        "Mara (Tall courier with a scar over her left brow) waits at the harbor before sunrise, @Unknown nearby",
       aspect_ratio: "16:9",
       resolution: "1k",
       grounding: false,
@@ -542,4 +545,97 @@ it("runs LTX 2.5 Alpha Gen on Comfy Cloud with uploaded media and lists the comp
     "composite",
     "matte",
   ]);
+});
+
+it("combines one state per kind in a mention and writes the shot's direction into the prompt", async () => {
+  const { scope, stub } = fixture();
+  const db = createDatabase(env.DB);
+  const cal = await createElement(db, scope, {
+    type: "character",
+    name: "Cal",
+    description: "Wiry fisherman in his fifties with a grey beard",
+  });
+  await createElementState(db, scope, {
+    elementId: cal.id,
+    name: "Wet",
+    description: "soaked hair and dripping oilskin",
+    kind: "condition",
+  });
+  await createElementState(db, scope, {
+    elementId: cal.id,
+    name: "Frightened",
+    description: "wide eyes, jaw clenched",
+    kind: "emotion",
+  });
+  await createElementState(db, scope, {
+    elementId: cal.id,
+    name: "Dry",
+    kind: "condition",
+  });
+  const withStates = (await import("@open-cinema/database/queries")).getElement;
+  const element = (await withStates(db, scope, cal.id))!;
+  const id = (name: string) => element.states.find((s) => s.name === name)!.id;
+  const bodies = captureSubmissions();
+  const job = accepted(
+    await stub.submit(scope, {
+      idempotencyKey: crypto.randomUUID(),
+      request: {
+        workflowKind: "image.flux",
+        inputs: {
+          prompt: "@Cal:wet+frightened grips the rail of the boat",
+          aspectRatio: "16:9",
+          mentions: [
+            {
+              elementId: cal.id,
+              stateId: id("Wet"),
+              stateIds: [id("Frightened")],
+            },
+          ],
+          direction: {
+            project: {
+              id: "p1",
+              name: "Storm",
+              look: { palette: "cool-muted", lighting: "golden-hour" },
+            },
+            overrides: { lighting: "low-key" },
+            shot: { framing: "close-up" },
+          },
+        },
+      },
+    }),
+  );
+  const stored = await runInDurableObject(stub, (_, state) =>
+    readCoordinator(state.storage),
+  );
+  expect(stored!.executions[job.id]!.mentions[0]).toMatchObject({
+    stateName: "Wet, Frightened",
+    states: [
+      expect.objectContaining({ name: "Wet", kind: "condition" }),
+      expect.objectContaining({ name: "Frightened", kind: "emotion" }),
+    ],
+  });
+  await due(stub);
+  expect(bodies).toHaveLength(1);
+  expect((bodies[0] as { prompt: string }).prompt).toBe(
+    "Cal (Wiry fisherman in his fifties with a grey beard; wet, frightened: soaked hair and dripping oilskin; wide eyes, jaw clenched) grips the rail of the boat. " +
+      "Close-up shot, the face filling the frame; a desaturated, cool blue-grey palette; low-key chiaroscuro lighting, one motivated source, deep shadows.",
+  );
+
+  // Two states of the same kind cannot combine.
+  const clash = await stub.submit(scope, {
+    idempotencyKey: crypto.randomUUID(),
+    request: {
+      workflowKind: "image.flux",
+      inputs: {
+        prompt: "@Cal on the quay",
+        mentions: [
+          { elementId: cal.id, stateId: id("Wet"), stateIds: [id("Dry")] },
+        ],
+      },
+    },
+  });
+  expect(clash).toMatchObject({
+    ok: false,
+    error: expect.stringContaining("both condition states"),
+  });
 });

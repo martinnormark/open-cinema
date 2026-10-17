@@ -6,6 +6,7 @@ import {
   referenceViewSchema,
 } from "./elements";
 import { assetRefSchema, type AssetRef } from "./media";
+import { directionSnapshotSchema } from "./direction";
 import { preservationIntentSchema, targetSelectionSchema } from "./replacement";
 import { workflowKindSchema, type WorkflowKind } from "./workflow-kinds";
 
@@ -13,6 +14,8 @@ export { workflowKindSchema, type WorkflowKind } from "./workflow-kinds";
 
 const prompt = z.string().trim().min(3).max(2000);
 const mentions = z.array(elementMentionSchema).max(8).default([]);
+/** The project look, shot overrides and recipe this generation was directed with. */
+const direction = directionSnapshotSchema.optional();
 
 export const imageAspectRatioSchema = z.enum([
   "auto",
@@ -34,6 +37,7 @@ export const fluxImageInputsSchema = z.object({
   aspectRatio: imageAspectRatioSchema.default("1:1"),
   resolution: imageResolutionSchema.default("1k"),
   mentions,
+  direction,
 });
 export type FluxImageInputs = z.infer<typeof fluxImageInputsSchema>;
 
@@ -62,6 +66,7 @@ export const ltxVideoInputsSchema = z.object({
   /** Animates this image. Router's LTX is text-only, so this runs on FLUX 3 Video. */
   firstFrame: assetRefSchema.optional(),
   mentions,
+  direction,
 });
 export type LtxVideoInputs = z.infer<typeof ltxVideoInputsSchema>;
 
@@ -84,6 +89,8 @@ export const backgroundReplaceInputsSchema = z.object({
    * background image or clip, or the Location's best reference.
    */
   pipeline: backgroundPipelineSchema.default("kling"),
+  /** The project look the new setting should follow (palette, light, texture). */
+  direction,
 });
 export type BackgroundReplaceInputs = z.infer<
   typeof backgroundReplaceInputsSchema
@@ -187,6 +194,10 @@ export function requestPrompt(request: GenerationRequest): string {
   return request.inputs.prompt ?? "";
 }
 
+export function requestDirection(request: GenerationRequest) {
+  return "direction" in request.inputs ? request.inputs.direction : undefined;
+}
+
 export function requestMentions(request: GenerationRequest) {
   switch (request.workflowKind) {
     case "video.background-replace":
@@ -275,6 +286,18 @@ export const resolvedMentionSchema = z.object({
   stateId: z.string().nullable(),
   stateName: z.string().nullable(),
   stateDescription: z.string().nullable(),
+  /** Every combined state, primary first; older records have none. */
+  states: z
+    .array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        description: z.string(),
+        kind: z.string(),
+      }),
+    )
+    .max(3)
+    .default([]),
   references: z
     .array(
       z.object({

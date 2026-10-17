@@ -17,6 +17,7 @@ model User {
   elements  Element[]
   media     MediaAsset[]
   revisions Revision[]
+  recipes   Recipe[]
 }
 
 model Workflow {
@@ -83,6 +84,8 @@ model Project {
   owner     User         @relation(fields: [ownerId], references: [id])
   name      String
   direction String       @default("")
+  /// The shared look (palette, lighting, lens, texture, pacing) as JSON.
+  look      Json         @default("{}")
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
   elements  Element[]
@@ -118,6 +121,8 @@ model ElementState {
   element     Element            @relation(fields: [elementId], references: [id], onDelete: Cascade)
   name        String
   description String             @default("")
+  /// What the state changes (emotion, wardrobe, weather, ...); one per kind combines.
+  kind        String             @default("other")
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
   references  ElementReference[]
@@ -201,4 +206,27 @@ model Revision {
   @@index([jobId])
   @@index([sourceAssetId])
   @@index([sourceJobId, sourceOutputId])
+}
+
+/// A saved creative recipe. `spec` is the current template, slots, look and
+/// capabilities; `history` keeps earlier versions, newest first.
+model Recipe {
+  id            String   @id
+  ownerId       String
+  owner         User     @relation(fields: [ownerId], references: [id])
+  name          String
+  summary       String   @default("")
+  spec          Json
+  version       Int      @default(1)
+  parentId      String?
+  coverType     String?
+  coverAssetId  String?
+  coverJobId    String?
+  coverOutputId String?
+  history       Json     @default("[]")
+  uses          Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([ownerId, updatedAt])
 }

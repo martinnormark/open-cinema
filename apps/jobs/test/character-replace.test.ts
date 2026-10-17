@@ -17,6 +17,7 @@ const mara: ResolvedMention = {
   stateId: null,
   stateName: null,
   stateDescription: null,
+  states: [],
   references: [
     {
       asset: { type: "media-asset", assetId: "mara-face" },

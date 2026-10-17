@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { lookSchema } from "./direction";
 
 export const mediaKindSchema = z.enum(["image", "video"]);
 export type MediaKind = z.infer<typeof mediaKindSchema>;
@@ -97,6 +98,8 @@ export const projectSchema = z.object({
   name: z.string(),
   /** Persistent creative direction: palette, lighting, lens, texture, pacing. */
   direction: z.string().default(""),
+  /** The shared look every shot in the project inherits. */
+  look: lookSchema.default({}),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -105,6 +108,7 @@ export type Project = z.infer<typeof projectSchema>;
 export const createProjectInputSchema = z.object({
   name: z.string().trim().min(1).max(120),
   direction: z.string().trim().max(4000).optional(),
+  look: lookSchema.optional(),
 });
 export type CreateProjectInput = z.infer<typeof createProjectInputSchema>;
 
@@ -112,5 +116,6 @@ export const updateProjectInputSchema = z.object({
   id: z.string().min(1),
   name: z.string().trim().min(1).max(120).optional(),
   direction: z.string().trim().max(4000).optional(),
+  look: lookSchema.optional(),
 });
 export type UpdateProjectInput = z.infer<typeof updateProjectInputSchema>;

@@ -3,6 +3,7 @@ import type {
   AddElementReferenceInput,
   CreateElementInput,
   Element,
+  StateKind,
   UpdateElementReferenceInput,
 } from "@open-cinema/contracts";
 import {
@@ -15,6 +16,7 @@ import {
   removeMyElementReference,
   updateMyElement,
   updateMyElementReference,
+  updateMyElementState,
 } from "@/server/elements";
 import { toHandle } from "./model";
 
@@ -147,10 +149,21 @@ export function addState(input: {
   elementId: string;
   name: string;
   description: string;
+  kind?: StateKind;
 }) {
   return write(
     () => createMyElementState({ data: input }),
     "The state could not be added.",
+  );
+}
+export function updateState(input: {
+  id: string;
+  description?: string;
+  kind?: StateKind;
+}) {
+  return write(
+    () => updateMyElementState({ data: input }),
+    "The state could not be saved.",
   );
 }
 export function removeState(id: string) {
