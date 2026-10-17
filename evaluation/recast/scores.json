@@ -274,6 +274,94 @@
    ],
    "gates": [],
    "notes": "Cup to lips, gestures, laugh and gaze all land on the source frames; the man is untouched (face 0.98, protected PSNR 37.4). Mara reads ten or more years older than her sheet, a pattern also seen on U4."
+  },
+  "kling-v3-omni/U3-poppy-dance": {
+   "A": [
+    3,
+    4,
+    4,
+    3,
+    4
+   ],
+   "A1w": 4,
+   "B": [
+    4,
+    4,
+    3,
+    4,
+    3,
+    4,
+    4,
+    4
+   ],
+   "gates": [],
+   "notes": "Fast dance with spins and raised arms follows the source; foreground poppies stay in front. Bob and jacket hold through the turns, but the face is small and soft, so likeness is weakest in the turned-away frames. 29.97 to 24 fps."
+  },
+  "kling-v3-omni/G5-spin-park": {
+   "A": [
+    2,
+    4,
+    4,
+    4,
+    4
+   ],
+   "A1w": 4,
+   "B": [
+    4,
+    4,
+    4,
+    4,
+    3,
+    4,
+    4,
+    4
+   ],
+   "gates": [],
+   "notes": "Full-body wide shot: the 360\u00b0 turn and the jump match the source and the park is untouched (protected PSNR 36.0). Outfit and bob are right, but the small face reads as an older woman, not Mara (ref_sim 0.16)."
+  },
+  "kling-v3-omni/G1-walk-tracking": {
+   "A": [
+    4,
+    4,
+    4,
+    4,
+    4
+   ],
+   "A1w": 4,
+   "B": [
+    4,
+    4,
+    4,
+    4,
+    4,
+    4,
+    3,
+    4
+   ],
+   "gates": [],
+   "notes": "Clean recast to Theo (ref_sim 0.70): beanie, glasses, beard, peacoat and roll-neck, walking step for step with the dolly; street and pedestrians unchanged. The source backpack went with the old outfit, so the strap grab becomes a lapel grab."
+  },
+  "kling-v3-omni/G4-handoff-workshop": {
+   "A": [
+    2,
+    4,
+    4,
+    4,
+    4
+   ],
+   "A1w": 0,
+   "B": [
+    4,
+    4,
+    4,
+    4,
+    4,
+    4,
+    4,
+    4
+   ],
+   "gates": [],
+   "notes": "Wrong wardrobe intent: asked to keep the source denim shirt, it dressed Theo in his reference peacoat and beanie (A1 capped at 2). Otherwise excellent: the box hand-off, the old man and the light are untouched (face 0.98, protected PSNR 37.2)."
   }
  }
 }

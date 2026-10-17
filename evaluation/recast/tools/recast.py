@@ -127,9 +127,20 @@ def keyframe(clip: dict, run_dir: Path) -> Path:
     return out
 
 
-def kling(model: str):
+FACE_VIEWS = ["face", "face-34"]
+
+
+def face_refs(char_id: str) -> list[str]:
+    views = CHARS[char_id]["views"]
+    return [staged(HERE / "references" / char_id / views[v]) for v in FACE_VIEWS if v in views]
+
+
+def kling(model: str, faces_for_source_wardrobe: bool = False):
     def build(clip: dict, run_dir: Path) -> tuple[str, dict]:
         images = refs(clip["character"], 3)
+        if faces_for_source_wardrobe and clip["wardrobe"] == "source":
+            # Full-body views carry the reference outfit, which Kling wears regardless of the prompt.
+            images = face_refs(clip["character"])
         tags = ", ".join(f"<<<image_{i + 1}>>>" for i in range(len(images)))
         prompt = recast_prompt(clip, f"the person shown in {tags}")
         prompt = prompt.replace(f"Replace {clip['target']}", f"In <<<video_1>>>, replace {clip['target']}", 1)
@@ -197,6 +208,7 @@ def source_path_frame(clip: dict, run_dir: Path) -> Path:
 PIPELINES = {
     "kling-o1": kling("kling/kling-video-o1"),
     "kling-v3-omni": kling("kling/kling-v3-omni"),
+    "kling-v3-omni-faceref": kling("kling/kling-v3-omni", faces_for_source_wardrobe=True),
     "aleph2-keyframe": aleph_keyframe,
     "aleph2-text": aleph_text,
     "wan27-edit": wan_edit("wan/wan2.7-videoedit", False),
