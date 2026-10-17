@@ -16,11 +16,11 @@ and what the light does come from the shot's wording.
 A Location's sheet has three moving views (`LOCATION_MOVES` in
 `packages/contracts/src/elements.ts`):
 
-| View      | Label           | Move                                         |
-| --------- | --------------- | -------------------------------------------- |
+| View      | Label            | Move                                            |
+| --------- | ---------------- | ----------------------------------------------- |
 | `push-in` | Moving reference | Glides forward into the space at walking height |
-| `drift`   | Lateral drift   | Slides sideways, so near and far separate    |
-| `rise`    | Rising view     | Rises, showing the layout from above         |
+| `drift`   | Lateral drift    | Slides sideways, so near and far separate       |
+| `rise`    | Rising view      | Rises, showing the layout from above            |
 
 `push-in` is required and comes first in the guidance; the other two are
 optional. The establishing view is still required, as a still.
