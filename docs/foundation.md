@@ -73,6 +73,8 @@ workerd connects directly, not through `HTTPS_PROXY`. In an environment whose pr
 1. Run `bun scripts/comfy-relay.ts`. It listens on `127.0.0.1:8790` only, forwards to `https://api.comfy.org` through `HTTPS_PROXY`, and drops the caller's `Authorization` header.
 2. In `apps/jobs/.dev.vars`, set `COMFY_BASE_URL="http://127.0.0.1:8790"` and set `COMFY_API_KEY` to any non-empty placeholder.
 
+`apps/jobs/wrangler.jsonc` declares `COMFY_BASE_URL` and `MEDIA_PUBLIC_ORIGIN` as empty `vars`. When `secrets.required` is set, Wrangler loads only declared keys from `.dev.vars`, so without that declaration both `wrangler dev` and `bun run dev` silently drop the override. `MEDIA_SIGNING_SECRET` is not declared. It is a production secret (`wrangler secret put`), and local development has no public origin for it to sign links for anyway.
+
 `routerBaseUrl` ignores any override that is not plain http on loopback, so a deployed Worker always sends its own secret to Router directly. I verified on 2026-10-17 that a queued FLUX 3 Image submission and its status polling succeed through the relay with a placeholder key.
 
 ## Known gaps

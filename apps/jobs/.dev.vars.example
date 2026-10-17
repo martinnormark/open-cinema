@@ -10,4 +10,5 @@ COMFY_API_KEY=""
 
 # Optional: provider-fetchable links for uploaded media (see docs/foundation.md).
 # MEDIA_PUBLIC_ORIGIN="https://studio.example.com"
-# MEDIA_SIGNING_SECRET="same value as the web Worker's LOCAL_SESSION_SECRET"
+# The signing secret is production-only: `wrangler secret put MEDIA_SIGNING_SECRET`
+# with the web Worker's LOCAL_SESSION_SECRET. .dev.vars does not load it.
