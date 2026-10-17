@@ -293,6 +293,11 @@ export class GenerationCoordinator
     return { ok: true, snapshot: snapshot(record) };
   }
 
+  async getProviderStatus(): Promise<{ comfyConfigured: boolean }> {
+    // Reads no storage, so probing a throwaway DO name creates no coordinator.
+    return { comfyConfigured: Boolean(this.env.COMFY_API_KEY?.trim()) };
+  }
+
   async getStoredOutput(
     scope: OwnerScope,
     jobId: string,

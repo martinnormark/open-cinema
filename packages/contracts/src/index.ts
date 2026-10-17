@@ -138,6 +138,8 @@ export interface GenerationCoordinatorApi {
   ): Promise<CommandResult>;
   cancel(scope: OwnerScope, jobId: string): Promise<CommandResult>;
   reconcile(scope: OwnerScope, jobId: string): Promise<CommandResult>;
+  /** Display-safe: whether the jobs Worker holds Comfy credentials. Never the key. */
+  getProviderStatus(): Promise<{ comfyConfigured: boolean }>;
   getStoredOutput(
     scope: OwnerScope,
     jobId: string,

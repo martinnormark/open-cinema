@@ -360,3 +360,8 @@ it("projects a selective revision with its job and settles it once the result is
     result: { type: "job-output", jobId: "job-1", outputId: "job-1:video" },
   });
 });
+
+it("reports whether Comfy credentials are configured without revealing them", async () => {
+  const status = await fixture().stub.getProviderStatus();
+  expect(status).toEqual({ comfyConfigured: true });
+});
