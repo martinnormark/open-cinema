@@ -19,6 +19,7 @@ import {
   createSequence,
   importWorld,
   markMediaAssetReady,
+  updateRecipe,
 } from "@open-cinema/database/mutations";
 import {
   collectWorld,
@@ -92,8 +93,18 @@ it("carries a project's world to another studio and adapts what does not fit", a
   // A studio-wide Element only comes along when the project's shots use it.
   await createElement(db, source, { type: "thing", name: "Lantern" });
   await createElement(db, source, { type: "thing", name: "Unrelated" });
-  await createRecipe(db, source, {
+  const rain = await createRecipe(db, source, {
     name: "Rain portrait",
+    spec: {
+      medium: "image",
+      template: "{character} in the rain",
+      slots: [{ key: "character", type: "character", label: "Character" }],
+    },
+  });
+  // A second version, so the history has something to carry.
+  await updateRecipe(db, source, {
+    id: rain.id,
+    note: "Add the lantern",
     spec: {
       medium: "image",
       template: "{character} in the rain, by @Lantern light",
@@ -189,6 +200,15 @@ it("carries a project's world to another studio and adapts what does not fit", a
     (await listRecipes(db, target)).find((r) => r.name === "Hologram")!.spec
       .capabilities,
   ).toEqual(["flux-image"]);
+  // A recipe's earlier versions travel, so it can still be compared or restored.
+  const rainCopy = (await listRecipes(db, target)).find(
+    (r) => r.name === "Rain portrait",
+  )!;
+  expect(rainCopy.version).toBe(2);
+  expect(rainCopy.history.map((h) => [h.version, h.note])).toEqual([
+    [1, "Add the lantern"],
+  ]);
+  expect(rainCopy.history[0]!.spec.template).toBe("{character} in the rain");
 
   const copy = await getSequence(db, target, result.sequences[0]!.id);
   expect(copy!.projectId).toBe(result.projectId);

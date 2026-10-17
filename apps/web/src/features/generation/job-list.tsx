@@ -47,9 +47,7 @@ function JobRow({ job }: { job: Job }) {
   return (
     <article className="py-6">
       <div className="flex items-start justify-between gap-4">
-        <p className="min-w-0 max-w-2xl flex-1 text-sm leading-6 break-words">
-          {job.prompt}
-        </p>
+        <JobPrompt prompt={job.prompt} />
         <span className="shrink-0 text-xs font-medium" role="status">
           {labels[job.state]}
           {job.progress !== null && isActiveJob(job.state)
@@ -179,5 +177,34 @@ function JobRow({ job }: { job: Job }) {
         </>
       )}
     </article>
+  );
+}
+
+/**
+ * Element sheets, Location views and revisions send long built prompts; the
+ * list shows their opening lines and keeps the rest one click away.
+ */
+const LONG_PROMPT = 240;
+function JobPrompt({ prompt }: { prompt: string }) {
+  const [open, setOpen] = useState(false);
+  const long = prompt.length > LONG_PROMPT;
+  return (
+    <div className="min-w-0 max-w-2xl flex-1">
+      <p
+        className={`text-sm leading-6 break-words ${long && !open ? "line-clamp-3" : ""}`}
+      >
+        {prompt}
+      </p>
+      {long && (
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+          className="mt-1 text-xs text-muted-foreground underline underline-offset-4 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {open ? "Show less" : "Show full prompt"}
+        </button>
+      )}
+    </div>
   );
 }

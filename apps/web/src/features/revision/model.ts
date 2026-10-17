@@ -34,7 +34,8 @@ export const replacementKinds = {
     workflowKind: "video.character-replace",
     label: "Recast a character",
     verb: "Recast this shot",
-    changes: "One person, face and body, with the wardrobe you choose.",
+    changes:
+      "Experimental. One person, face and body, with the wardrobe you choose; holds only while their face stays clear and medium or larger.",
   },
   object: {
     kind: "object",

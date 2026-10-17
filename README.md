@@ -9,7 +9,7 @@ Open Cinema is an early preview and our entry to Comfy's [Open Source Higgsfield
 - **Generate images and video** from a written idea: FLUX 3 images, LTX 2.5 text-to-video and FLUX 3 image-to-video through Comfy Router, and LTX-2 camera moves on Comfy Cloud. Live progress survives reloads, closed tabs and dropped connections.
 - **Build Elements**: Characters, Locations and Things with approved references, Character sheets, and states such as `@Cal:wet` that a prompt can mention.
 - **Keep a media library** of uploads and results, all copied into your own R2 storage before a job is marked ready.
-- **Revise a take** in the revision studio: replace its background, recast a person as a Character, swap an object (Object Swap), restyle it, or re-stage the camera, then compare original and result before keeping it.
+- **Revise a take** in the revision studio: replace its background, recast a person as a Character (experimental and outside the MVP; see [known limitations](docs/known-limitations.md)), swap an object (Object Swap), restyle it, or re-stage the camera, then compare original and result before keeping it.
 - **Direct a project** with a persistent look and per-shot direction, and save what works as **Recipes**.
 - **Plan Sequences** of shots from a rough idea, and move Elements, Recipes, a project's look and Sequences between projects or installations as a **World** bundle.
 - **Follow every job** in Activity or from the floating Orb, cancel work in flight and recover jobs that need attention.

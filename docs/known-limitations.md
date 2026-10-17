@@ -9,6 +9,11 @@ new work on them waits until a better model, node set or workflow is found.
 
 Decided by the project owner on 2026-10-17: the results are not good enough.
 Finding a better model, node set or workflow is deferred to later.
+On the same evening the owner also took character replacement out of the MVP
+release gate (roadmap #2, issue #6): the MVP ships with Elements and
+background replacement, and recast stays in the app as an experimental mode
+with its guardrails. The adapter that could change this is issue #15
+(identity IC-LoRA), together with #12 (recast IC-LoRA).
 
 Both features put a saved Character into someone else's performance:
 
