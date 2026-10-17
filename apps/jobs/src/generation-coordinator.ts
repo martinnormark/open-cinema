@@ -3,6 +3,10 @@ import {
   isActiveJob,
   ownerScopeSchema,
   promptCommandSchema,
+  promptToRequest,
+  requestAssetRefs,
+  requestPrompt,
+  workflowCommandSchema,
   type GenerationCoordinatorApi,
   type JobSnapshot,
   type OwnerScope,
@@ -10,6 +14,9 @@ import {
   type CommandResult,
   type Job,
   type JobOutput,
+  type ResolvedMention,
+  type WorkflowCommand,
+  type WorkflowCommandInput,
 } from "@open-cinema/contracts";
 import {
   initializeCoordinator,
@@ -21,18 +28,36 @@ import {
 } from "@open-cinema/database/durable";
 import { createDatabase } from "@open-cinema/database";
 import { applyJobSnapshot } from "@open-cinema/database/mutations";
+import { resolveAssetRef } from "@open-cinema/database/queries";
 import {
   createComfyClient,
-  fluxRouterRequest,
-  ROUTER_MODEL,
+  getWorkflowDefinition,
   submissionFailure,
   type ComfyJobStatus,
+  type ProviderRequest,
+  type WorkflowDefinition,
 } from "@open-cinema/comfy";
+import { AssetUnavailableError, createAssetResolver } from "./asset-resolver";
+import { MentionError, resolveMentions } from "./mentions";
 
 import { archiveOutput } from "@open-cinema/assets";
 
 const POLL_MS = 2000;
 const DEADLINE_MS = 30 * 60_000;
+// Provider fetch links outlive monitoring so a recovered submission can still read them.
+const LINK_GRACE_MS = 60 * 60_000;
+type Execution = CoordinatorRecord["executions"][string];
+const deadlineFor = (execution: Execution) =>
+  getWorkflowDefinition(execution.workflowKind)?.deadlineMs ?? DEADLINE_MS;
+async function sha256(value: unknown) {
+  const bytes = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(JSON.stringify(value)),
+  );
+  return Array.from(new Uint8Array(bytes), (b) =>
+    b.toString(16).padStart(2, "0"),
+  ).join("");
+}
 const terminal = (job: Job) => !isActiveJob(job.state);
 const snapshot = (record: CoordinatorRecord): JobSnapshot => ({
   protocolVersion: 1,
@@ -63,32 +88,58 @@ export class GenerationCoordinator
 
   async submit(
     scope: OwnerScope,
-    input: PromptCommand,
+    input: PromptCommand | WorkflowCommandInput,
   ): Promise<CommandResult> {
     scope = ownerScopeSchema.parse(scope);
-    const parsed = promptCommandSchema.safeParse(input);
-    if (!parsed.success)
-      return failure("Enter a prompt between 3 and 2,000 characters.");
-    const command = parsed.data;
-    if (command.seed !== undefined)
-      return failure(
-        "FLUX 3 Image does not accept a seed. Reload the studio and try again.",
-      );
+    let command: WorkflowCommand;
+    let requestHash: string;
+    if (input && typeof input === "object" && "request" in input) {
+      const parsed = workflowCommandSchema.safeParse(input);
+      if (!parsed.success)
+        return failure(
+          "This request is incomplete. Check its inputs and try again.",
+        );
+      command = parsed.data;
+    } else {
+      const parsed = promptCommandSchema.safeParse(input);
+      if (!parsed.success)
+        return failure("Enter a prompt between 3 and 2,000 characters.");
+      if (parsed.data.seed !== undefined)
+        return failure(
+          "FLUX 3 Image does not accept a seed. Reload the studio and try again.",
+        );
+      command = {
+        idempotencyKey: parsed.data.idempotencyKey,
+        request: promptToRequest(parsed.data.prompt),
+      };
+    }
+    const definition = getWorkflowDefinition(
+      command.request.workflowKind,
+    ) as WorkflowDefinition | null;
+    if (!definition)
+      return failure("That kind of generation is not available yet.");
     if (!this.env.COMFY_API_KEY?.trim())
       return failure("Comfy Router credentials are not configured.");
-    const bytes = await crypto.subtle.digest(
-      "SHA-256",
-      new TextEncoder().encode(
-        JSON.stringify({
-          prompt: command.prompt,
-
-          model: ROUTER_MODEL,
-        }),
-      ),
-    );
-    const requestHash = Array.from(new Uint8Array(bytes), (b) =>
-      b.toString(16).padStart(2, "0"),
-    ).join("");
+    const model = definition.model(command.request.inputs as never);
+    // Prompt-only commands keep their pre-v5 hash so retries across a deploy still match.
+    requestHash =
+      "request" in input
+        ? await sha256({ request: command.request, model })
+        : await sha256({ prompt: requestPrompt(command.request), model });
+    let mentions: ResolvedMention[] = [];
+    const assets = requestAssetRefs(command.request);
+    try {
+      const db = createDatabase(this.env.DB);
+      mentions = await resolveMentions(db, scope, command.request);
+      for (const ref of assets)
+        if (!(await resolveAssetRef(db, scope, ref)))
+          return failure(
+            "Some media in this request is no longer available. Choose it again.",
+          );
+    } catch (error) {
+      if (error instanceof MentionError) return failure(error.message);
+      return failure("Your Elements and media could not be loaded. Try again.");
+    }
     let error: string | null = null;
     const record = await mutateCoordinator(
       this.ctx.storage,
@@ -100,7 +151,8 @@ export class GenerationCoordinator
         );
         if (existing) {
           if (existing.requestHash !== requestHash)
-            error = "This request key was already used for a different prompt.";
+            error =
+              "This request key was already used for a different request.";
           return;
         }
         if (record.jobs.some((j) => j.state === "needs_attention")) {
@@ -126,8 +178,11 @@ export class GenerationCoordinator
           providerJobId: null,
           createdAt: now,
           updatedAt: now,
-          prompt: command.prompt,
-          model: "FLUX 3 Image",
+          prompt:
+            requestPrompt(command.request) || command.revision?.intent || "",
+          model: definition.displayModel,
+          workflowKind: command.request.workflowKind,
+          projectId: command.projectId ?? null,
           seed: null,
 
           progress: null,
@@ -139,11 +194,13 @@ export class GenerationCoordinator
           command,
           requestHash,
           provider: "router",
+          workflowKind: command.request.workflowKind,
+          mentions,
           assetsPending: false,
-          workflow: fluxRouterRequest(command.prompt),
+          workflow: { model },
           submissionKey: crypto.randomUUID(),
           nextAttemptAt: Date.now(),
-          deadline: Date.now() + DEADLINE_MS,
+          deadline: Date.now() + definition.deadlineMs,
           attempts: 0,
           pendingProjection: true,
           cancelRequested: false,
@@ -204,7 +261,7 @@ export class GenerationCoordinator
         current.error = null;
         Object.assign(record.executions[jobId]!, {
           nextAttemptAt: Date.now(),
-          deadline: Date.now() + DEADLINE_MS,
+          deadline: Date.now() + deadlineFor(record.executions[jobId]!),
           attempts: 0,
         });
         touch(record, current);
@@ -230,12 +287,44 @@ export class GenerationCoordinator
         ?.outputs.find((o) => o.id === outputId) ?? null
     );
   }
-  private client(execution: CoordinatorRecord["executions"][string]) {
+  private client(execution: Execution) {
     return createComfyClient({
       apiKey: this.env.COMFY_API_KEY ?? "",
       provider: execution.provider,
       workflow: execution.workflow,
+      ...(execution.provider === "router"
+        ? { outputs: getWorkflowDefinition(execution.workflowKind)?.outputs }
+        : {}),
     });
+  }
+
+  /**
+   * v4 Router checkpoints persisted the full request. v5 rebuilds it from the
+   * typed command so media links are created fresh and never stored.
+   */
+  private async providerRequest(
+    ownerId: string,
+    execution: Execution,
+  ): Promise<Record<string, unknown>> {
+    if (execution.provider !== "router" || "input" in execution.workflow)
+      return execution.workflow;
+    const { request } = execution.command;
+    const definition = getWorkflowDefinition(
+      request.workflowKind,
+    ) as WorkflowDefinition | null;
+    if (!definition) throw new AssetUnavailableError(request.workflowKind);
+    const built: ProviderRequest = await definition.build(
+      request.inputs as never,
+      {
+        mentions: execution.mentions,
+        asset: createAssetResolver(
+          this.env,
+          { ownerId },
+          execution.deadline + LINK_GRACE_MS,
+        ),
+      },
+    );
+    return { model: built.model, input: built.input };
   }
 
   private async change(
@@ -407,60 +496,84 @@ export class GenerationCoordinator
           return;
         }
         this.broadcast(claimed);
+        let providerRequest: Record<string, unknown> | null = null;
         try {
-          const result = await this.client(execution).submit(
-            execution.workflow,
-            execution.submissionKey,
-            AbortSignal.timeout(20_000),
+          providerRequest = await this.providerRequest(
+            record.ownerId,
+            execution,
           );
-          await this.acceptStatus(record.ownerId, job.id, result);
         } catch (error) {
-          console.warn(
-            JSON.stringify({
-              event: "submission_error",
-              jobId: job.id,
-              name: error instanceof Error ? error.name : "unknown",
-              code:
-                typeof error === "object" && error !== null && "code" in error
-                  ? error.code
-                  : null,
-              httpStatus:
-                typeof error === "object" &&
-                error !== null &&
-                "httpStatus" in error
-                  ? error.httpStatus
-                  : null,
-            }),
-          );
-          const reason = submissionFailure(error, execution.provider);
+          // Nothing reached the provider, so failing or retrying here is safe.
+          const unavailable = error instanceof AssetUnavailableError;
           await this.change(record.ownerId, job.id, (j, r) => {
             const e = r.executions[j.id]!;
-            // A rejection while recovering a lost receipt cannot prove that the
-            // earlier call was rejected (credentials may have changed meanwhile).
-            const rejectedRecovery =
-              execution.provider === "router" &&
-              job.state !== "queued" &&
-              !reason.ambiguous;
             e.attempts++;
             e.nextAttemptAt =
               Date.now() +
-              Math.min(30_000, 1000 * 2 ** Math.min(e.attempts, 5)) +
-              Math.random() * 500;
-            j.state = rejectedRecovery
-              ? "needs_attention"
-              : !reason.ambiguous
-                ? "failed"
-                : execution.provider === "router" && e.attempts < 8
-                  ? e.cancelRequested
-                    ? "cancelling"
-                    : "submitting"
-                  : "needs_attention";
-            j.error =
-              j.state === "needs_attention"
-                ? "The submission receipt could not be recovered. Check Comfy before starting another generation."
-                : reason.message;
+              Math.min(30_000, 1000 * 2 ** Math.min(e.attempts, 5));
+            if (unavailable || e.attempts >= 8) {
+              j.state = "failed";
+              j.error = unavailable
+                ? "Some media in this request is no longer available. Choose it again."
+                : "This generation's media could not be prepared. Try again.";
+            }
           });
         }
+        if (providerRequest)
+          try {
+            const result = await this.client(execution).submit(
+              providerRequest,
+              execution.submissionKey,
+              AbortSignal.timeout(20_000),
+            );
+            await this.acceptStatus(record.ownerId, job.id, result);
+          } catch (error) {
+            console.warn(
+              JSON.stringify({
+                event: "submission_error",
+                jobId: job.id,
+                name: error instanceof Error ? error.name : "unknown",
+                code:
+                  typeof error === "object" && error !== null && "code" in error
+                    ? error.code
+                    : null,
+                httpStatus:
+                  typeof error === "object" &&
+                  error !== null &&
+                  "httpStatus" in error
+                    ? error.httpStatus
+                    : null,
+              }),
+            );
+            const reason = submissionFailure(error, execution.provider);
+            await this.change(record.ownerId, job.id, (j, r) => {
+              const e = r.executions[j.id]!;
+              // A rejection while recovering a lost receipt cannot prove that the
+              // earlier call was rejected (credentials may have changed meanwhile).
+              const rejectedRecovery =
+                execution.provider === "router" &&
+                job.state !== "queued" &&
+                !reason.ambiguous;
+              e.attempts++;
+              e.nextAttemptAt =
+                Date.now() +
+                Math.min(30_000, 1000 * 2 ** Math.min(e.attempts, 5)) +
+                Math.random() * 500;
+              j.state = rejectedRecovery
+                ? "needs_attention"
+                : !reason.ambiguous
+                  ? "failed"
+                  : execution.provider === "router" && e.attempts < 8
+                    ? e.cancelRequested
+                      ? "cancelling"
+                      : "submitting"
+                    : "needs_attention";
+              j.error =
+                j.state === "needs_attention"
+                  ? "The submission receipt could not be recovered. Check Comfy before starting another generation."
+                  : reason.message;
+            });
+          }
       } else {
         try {
           const result = execution.cancelRequested

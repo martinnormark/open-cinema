@@ -259,3 +259,4 @@ export async function serveObject(
 }
 
 export * from "./uploads";
+export * from "./inline";

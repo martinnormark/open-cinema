@@ -11,14 +11,12 @@ export * from "./workflows/flux-reference";
 export * from "./workflows/ltx-video";
 export * from "./estimates";
 
-export const ROUTER_MODEL = "bfl/flux-3-image";
-/** Verified against Router's published model schema. No seed field is accepted. */
-export function fluxRouterRequest(prompt: string) {
-  return {
-    model: ROUTER_MODEL,
-    input: { prompt, aspect_ratio: "1:1", resolution: "1k", grounding: false },
-  };
-}
+import { FLUX_IMAGE_MODEL } from "./workflows/flux-image";
+import { fluxSampleOutputs, type ProviderOutput } from "./workflows";
+export * from "./workflows";
+
+/** Legacy Router checkpoints carry no workflow kind; they ran FLUX 3 Image. */
+export const ROUTER_MODEL = FLUX_IMAGE_MODEL;
 export function mapProviderState(status: string): ComfyJobStatus["state"] {
   if (status === "IN_QUEUE") return "queued";
   if (status === "IN_PROGRESS") return "running";
@@ -54,46 +52,13 @@ export function submissionFailure(error: unknown, provider = "router") {
       : "Waiting to recover the Router receipt using the original request key.",
   };
 }
-/** BFL models return `result.sample`; LTX returns `result.video_url`. */
-function sample(data: unknown): string | null {
-  if (!data || typeof data !== "object" || !("result" in data)) return null;
-  const result = data.result;
-  if (!result || typeof result !== "object") return null;
-  const value =
-    "sample" in result && typeof result.sample === "string"
-      ? result.sample
-      : "video_url" in result && typeof result.video_url === "string"
-        ? result.video_url
-        : null;
-  if (!value) return null;
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" && !url.username && !url.password
-      ? url.href
-      : null;
-  } catch {
-    return null;
-  }
-}
-function mediaType(url: string) {
-  const path = new URL(url).pathname.toLowerCase();
-  return path.endsWith(".png")
-    ? "image/png"
-    : /\.jpe?g$/.test(path)
-      ? "image/jpeg"
-      : path.endsWith(".webp")
-        ? "image/webp"
-        : path.endsWith(".mp4")
-          ? "video/mp4"
-          : path.endsWith(".webm")
-            ? "video/webm"
-            : "image/*";
-}
 /** SDK calls stay bounded; durable alarms own retries and polling. */
 export function createComfyClient(options: {
   apiKey: string;
   provider?: "router" | "cloud-workflow";
   workflow?: Record<string, unknown>;
+  /** Maps a Router result document to outputs; defaults to FLUX `result.sample`. */
+  outputs?: ((data: unknown) => ProviderOutput[]) | undefined;
 }) {
   if (options.provider === "cloud-workflow") return createCloudClient(options);
   if (!options.apiKey.trim()) throw new Error("Comfy credentials are required");
@@ -106,6 +71,7 @@ export function createComfyClient(options: {
   const model = options.workflow?.model ?? ROUTER_MODEL;
   if (typeof model !== "string")
     throw new Error("Invalid persisted Router model");
+  const readOutputs = options.outputs ?? fluxSampleOutputs;
   const request = (id: string) => comfy.models.handle(model, id);
   const bounded = () => ({
     timeoutMs: 15_000,
@@ -131,8 +97,8 @@ export function createComfyClient(options: {
     }
     try {
       const output = await handle.get(bounded());
-      const url = sample(output.data);
-      if (!url) {
+      const outputs = readOutputs(output.data);
+      if (!outputs.length) {
         return {
           ...result,
           state: "failed",
@@ -143,7 +109,10 @@ export function createComfyClient(options: {
         ...result,
         state: "succeeded",
         progress: 1,
-        outputs: [{ providerAssetId: "sample", mediaType: mediaType(url) }],
+        outputs: outputs.map(({ providerAssetId, mediaType }) => ({
+          providerAssetId,
+          mediaType,
+        })),
       };
     } catch (error) {
       // A terminal error can appear only in the result document. Transport errors
@@ -201,8 +170,8 @@ export function createComfyClient(options: {
       return getStatus(id);
     },
     async getOutputUrl(id: string, assetId: string): Promise<string | null> {
-      if (assetId !== "sample") return null;
-      return sample((await request(id).get(bounded())).data);
+      const outputs = readOutputs((await request(id).get(bounded())).data);
+      return outputs.find((o) => o.providerAssetId === assetId)?.url ?? null;
     },
   };
 }

@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { workflowKindSchema } from "./workflow-kinds";
+import type { WorkflowCommandInput } from "./workflows";
 
 export const jobStateSchema = z.enum([
   "queued",
@@ -46,6 +48,8 @@ export const jobSchema = z.object({
   error: z.string().nullable(),
   prompt: z.string().default(""),
   model: z.string().default("FLUX 3 Image Klein"),
+  workflowKind: workflowKindSchema.default("image.flux"),
+  projectId: z.string().nullable().default(null),
   seed: z.number().int().nonnegative().nullable().default(null),
   progress: z.number().min(0).max(1).nullable().default(null),
   outputs: z.array(jobOutputSchema),
@@ -122,7 +126,11 @@ export function getOrbState(
 /** Transport contract; no dependency on the Worker implementation. */
 export interface GenerationCoordinatorApi {
   getSnapshot(scope: OwnerScope): Promise<JobSnapshot | null>;
-  submit(scope: OwnerScope, command: PromptCommand): Promise<CommandResult>;
+  /** A bare prompt is shorthand for an `image.flux` workflow command. */
+  submit(
+    scope: OwnerScope,
+    command: PromptCommand | WorkflowCommandInput,
+  ): Promise<CommandResult>;
   cancel(scope: OwnerScope, jobId: string): Promise<CommandResult>;
   reconcile(scope: OwnerScope, jobId: string): Promise<CommandResult>;
   getStoredOutput(

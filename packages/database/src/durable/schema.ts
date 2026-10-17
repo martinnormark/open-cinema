@@ -1,14 +1,42 @@
 import {
   jobSchema,
-  promptCommandSchema,
+  promptToRequest,
+  resolvedMentionSchema,
+  workflowCommandSchema,
   workflowGraphSchema,
+  workflowKindSchema,
 } from "@open-cinema/contracts";
 import { z } from "zod";
+
+/** v4 and earlier stored the prompt-only command; it always meant `image.flux`. */
+const legacyCommandSchema = z.object({
+  idempotencyKey: z.string().min(1),
+  prompt: z.string(),
+  seed: z.number().int().optional(),
+});
+const commandSchema = z.preprocess((value) => {
+  const legacy = legacyCommandSchema.safeParse(value);
+  return legacy.success && !("request" in (value as object))
+    ? {
+        idempotencyKey: legacy.data.idempotencyKey,
+        request: promptToRequest(legacy.data.prompt),
+      }
+    : value;
+}, workflowCommandSchema);
+
 export const executionSchema = z.object({
   provider: z.enum(["cloud-workflow", "router"]).default("cloud-workflow"),
+  workflowKind: workflowKindSchema.default("image.flux"),
   assetsPending: z.boolean().default(false),
-  command: promptCommandSchema,
+  command: commandSchema,
+  /** Element versions and approved references captured at acceptance. */
+  mentions: z.array(resolvedMentionSchema).default([]),
   requestHash: z.string(),
+  /**
+   * Cloud: the API graph. Router v4: the full provider request. Router v5: only
+   * `{ model }`; the input is rebuilt from `command.request` at submission so
+   * short-lived media URLs are never persisted.
+   */
   workflow: workflowGraphSchema,
   submissionKey: z.string(),
   nextAttemptAt: z.number(),
@@ -18,8 +46,9 @@ export const executionSchema = z.object({
   cancelRequested: z.boolean(),
 });
 export type ExecutionRecord = z.infer<typeof executionSchema>;
+export const COORDINATOR_SCHEMA_VERSION = 5;
 const current = z.object({
-  schemaVersion: z.literal(4),
+  schemaVersion: z.literal(COORDINATOR_SCHEMA_VERSION),
   ownerId: z.string().min(1),
   sequence: z.number().int().nonnegative(),
   jobs: z.array(jobSchema),
@@ -31,32 +60,35 @@ export const coordinatorRecordSchema = z.preprocess((value) => {
     typeof value === "object" &&
     value !== null &&
     "schemaVersion" in value &&
-    (value.schemaVersion === 1 ||
-      value.schemaVersion === 2 ||
-      value.schemaVersion === 3)
+    typeof value.schemaVersion === "number" &&
+    value.schemaVersion >= 1 &&
+    value.schemaVersion < COORDINATOR_SCHEMA_VERSION
   ) {
+    const from = value.schemaVersion;
+    // v5 adds workflow kinds; defaults and the command preprocess upgrade v4 executions.
     const upgraded = current.parse({
       ...value,
-      schemaVersion: 4,
-      ...(value.schemaVersion === 1 ? { executions: {} } : {}),
+      schemaVersion: COORDINATOR_SCHEMA_VERSION,
+      ...(from === 1 ? { executions: {} } : {}),
     });
-    for (const job of upgraded.jobs) {
-      const execution = upgraded.executions[job.id];
-      if (
-        execution &&
-        job.state === "succeeded" &&
-        job.outputs.some((o) => !o.r2Key)
-      ) {
-        job.state = "persisting";
-        job.version++;
-        upgraded.sequence++;
-        execution.assetsPending = true;
-        execution.pendingProjection = true;
-        execution.attempts = 0;
-        execution.nextAttemptAt = Date.now();
-        execution.deadline = Date.now() + 15 * 60_000;
+    if (from <= 3)
+      for (const job of upgraded.jobs) {
+        const execution = upgraded.executions[job.id];
+        if (
+          execution &&
+          job.state === "succeeded" &&
+          job.outputs.some((o) => !o.r2Key)
+        ) {
+          job.state = "persisting";
+          job.version++;
+          upgraded.sequence++;
+          execution.assetsPending = true;
+          execution.pendingProjection = true;
+          execution.attempts = 0;
+          execution.nextAttemptAt = Date.now();
+          execution.deadline = Date.now() + 15 * 60_000;
+        }
       }
-    }
     return upgraded;
   }
   return value;

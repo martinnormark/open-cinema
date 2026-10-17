@@ -20,6 +20,8 @@ export async function applyJobSnapshot(
     providerJobId: job.providerJobId,
     prompt: job.prompt,
     model: job.model,
+    workflowKind: job.workflowKind,
+    projectId: job.projectId,
     seed: job.seed,
     progress: job.progress,
     error: job.error,
@@ -36,7 +38,14 @@ export async function applyJobSnapshot(
       idempotencyKey: execution.command.idempotencyKey,
       requestHash: execution.requestHash,
       workflowSnapshot: JSON.parse(JSON.stringify(execution.workflow)),
-      inputsSnapshot: { prompt: job.prompt, seed: job.seed },
+      inputsSnapshot: JSON.parse(
+        JSON.stringify({
+          prompt: job.prompt,
+          seed: job.seed,
+          request: execution.command.request,
+          mentions: execution.mentions,
+        }),
+      ),
     },
   });
   // Output IDs are immutable provider asset IDs scoped to this job. Repeated writes are safe.
@@ -63,4 +72,59 @@ export async function applyJobSnapshot(
     where: { id: job.id, ownerId: job.ownerId, version: { lt: job.version } },
     data,
   });
+  await projectRevision(db, job, execution);
+}
+
+/**
+ * A selective revision shares its job's ID. It is created with the job's first
+ * projection and only ever advances from pending, so replays are harmless.
+ */
+async function projectRevision(
+  db: DatabaseContext,
+  job: Job,
+  execution: ExecutionRecord,
+) {
+  const { request, revision } = execution.command;
+  if (
+    !revision ||
+    (request.workflowKind !== "video.background-replace" &&
+      request.workflowKind !== "video.character-replace")
+  )
+    return;
+  const source = request.inputs.source;
+  const client = getClient(db);
+  await client.revision.upsert({
+    where: { id: job.id },
+    update: {},
+    create: {
+      id: job.id,
+      ownerId: job.ownerId,
+      projectId: job.projectId,
+      parentRevisionId: revision.parentRevisionId ?? null,
+      sourceType: source.type,
+      ...(source.type === "media-asset"
+        ? { sourceAssetId: source.assetId }
+        : { sourceJobId: source.jobId, sourceOutputId: source.outputId }),
+      jobId: job.id,
+      workflowKind: request.workflowKind,
+      intent: revision.intent,
+      status: "pending",
+      createdAt: new Date(job.createdAt),
+    },
+  });
+  const output = job.outputs.find((o) => o.r2Key);
+  if (job.state === "succeeded" && output)
+    await client.revision.updateMany({
+      where: { id: job.id, status: "pending" },
+      data: {
+        status: "proposed",
+        resultJobId: job.id,
+        resultOutputId: output.id,
+      },
+    });
+  else if (job.state === "failed" || job.state === "cancelled")
+    await client.revision.updateMany({
+      where: { id: job.id, status: "pending" },
+      data: { status: "failed" },
+    });
 }

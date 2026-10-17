@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { elementMentionSchema } from "./elements";
+import {
+  elementMentionSchema,
+  elementTypeSchema,
+  referenceRoleSchema,
+  referenceViewSchema,
+} from "./elements";
 import { assetRefSchema, type AssetRef } from "./media";
 import { preservationIntentSchema, targetSelectionSchema } from "./replacement";
 import { workflowKindSchema, type WorkflowKind } from "./workflow-kinds";
@@ -238,3 +243,37 @@ export const WORKFLOW_DESCRIPTORS = {
     models: ["higgsfield/higgsfield-genjutsu-motion-transfer-v1.0"],
   },
 } as const satisfies Record<WorkflowKind, WorkflowDescriptor>;
+
+/**
+ * What a mention resolved to when the job was accepted. Persisted with the job
+ * so a result records the Element version and references that produced it.
+ */
+export const resolvedMentionSchema = z.object({
+  elementId: z.string(),
+  handle: z.string(),
+  name: z.string(),
+  type: elementTypeSchema,
+  version: z.number().int().positive(),
+  description: z.string(),
+  stateId: z.string().nullable(),
+  stateName: z.string().nullable(),
+  stateDescription: z.string().nullable(),
+  references: z
+    .array(
+      z.object({
+        asset: assetRefSchema,
+        view: referenceViewSchema.nullable(),
+        roles: z.array(referenceRoleSchema),
+      }),
+    )
+    .max(16),
+});
+export type ResolvedMention = z.infer<typeof resolvedMentionSchema>;
+
+/** Converts the legacy prompt-only command into the typed request it means. */
+export function promptToRequest(prompt: string): GenerationRequest {
+  return generationRequestSchema.parse({
+    workflowKind: "image.flux",
+    inputs: { prompt },
+  });
+}

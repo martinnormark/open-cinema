@@ -13,6 +13,7 @@ import { createDatabase } from "@open-cinema/database";
 import { getJob, getJobOutput } from "@open-cinema/database/queries";
 import { applyJobSnapshot } from "@open-cinema/database/mutations";
 import {
+  COORDINATOR_SCHEMA_VERSION,
   readCoordinator,
   mutateCoordinator,
 } from "@open-cinema/database/durable";
@@ -343,7 +344,7 @@ it("keeps a legacy interrupted Cloud submission suspended when upgrading v2 chec
         readCoordinator(state.storage),
       )
     )?.schemaVersion,
-  ).toBe(4);
+  ).toBe(COORDINATOR_SCHEMA_VERSION);
 });
 
 it("lets provider completion win a cancellation race", async () => {

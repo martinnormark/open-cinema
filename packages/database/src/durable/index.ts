@@ -6,6 +6,7 @@ export {
   scheduleCoordinatorWake,
 } from "../mutations/coordinator";
 export {
+  COORDINATOR_SCHEMA_VERSION,
   coordinatorRecordSchema,
   type ExecutionRecord,
   type CoordinatorRecord,

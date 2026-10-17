@@ -1,5 +1,6 @@
 import type { OwnerScope } from "@open-cinema/contracts";
 import {
+  COORDINATOR_SCHEMA_VERSION,
   coordinatorRecordSchema,
   type CoordinatorRecord,
 } from "../durable/schema";
@@ -23,7 +24,7 @@ export async function initializeCoordinator(
       return record;
     }
     const record: CoordinatorRecord = {
-      schemaVersion: 4,
+      schemaVersion: COORDINATOR_SCHEMA_VERSION,
       ownerId: scope.ownerId,
       sequence: 0,
       jobs: [],
