@@ -9,6 +9,7 @@ export * from "./workflows/flux-image";
 export * from "./workflows/flux-reference";
 export * from "./workflows/ltx-video";
 export * from "./estimates";
+export { uploadToComfyStorage } from "./storage";
 
 import { FLUX_IMAGE_MODEL } from "./workflows/flux-image";
 import {

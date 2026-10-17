@@ -36,20 +36,26 @@ const harbor: ResolvedMention = {
 function context(publicOrigin: string | null): BuildContext {
   return {
     mentions: [harbor],
-    asset: async (ref) => ({
-      ref,
-      mediaType:
-        ref.type === "media-asset" && ref.assetId === "take"
-          ? "video/mp4"
-          : "image/png",
-      sizeBytes: 10,
-      publicUrl:
+    asset: async (ref) => {
+      const id = ref.type === "media-asset" ? ref.assetId : ref.outputId;
+      const publicUrl =
         publicOrigin && ref.type === "media-asset"
           ? `${publicOrigin}/${ref.assetId}`
-          : null,
-      base64: async () => "AAAA",
-      dataUri: async () => "data:image/png;base64,AAAA",
-    }),
+          : null;
+      return {
+        ref,
+        mediaType:
+          ref.type === "media-asset" && ref.assetId === "take"
+            ? "video/mp4"
+            : "image/png",
+        sizeBytes: 10,
+        publicUrl,
+        fetchableUrl: async () =>
+          publicUrl ?? `https://comfy-storage.test/${id}`,
+        base64: async () => "AAAA",
+        dataUri: async () => "data:image/png;base64,AAAA",
+      };
+    },
   };
 }
 
@@ -88,11 +94,12 @@ it("edits the source on Kling 3.0 Omni with the Location's establishing view fir
   expect(prompt).toContain("Keep the camera movement");
 });
 
-it("refuses to submit when the source clip has no provider-reachable URL", async () => {
+it("sends the source clip by its Comfy storage URL when there is no public origin", async () => {
   const definition = getWorkflowDefinition("video.background-replace")!;
-  await expect(definition.build(inputs, context(null))).rejects.toThrow(
-    /public media origin/,
-  );
+  const request = await definition.build(inputs, context(null));
+  expect(request.input).toMatchObject({
+    video_list: [{ video_url: "https://comfy-storage.test/take" }],
+  });
 });
 
 it("reads Kling and SwitchX result documents as recorded in Phase 0", () => {

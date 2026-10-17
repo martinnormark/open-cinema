@@ -79,5 +79,5 @@ workerd connects directly, not through `HTTPS_PROXY`. In an environment whose pr
 
 ## Known gaps
 
-- Job outputs have no signed public link yet, so a replacement whose source is a generated clip can only use inline base64 (14 MB or less) until one exists.
+- Job outputs have no signed link of their own. Models that accept media only by URL, such as the replacement kinds, call `asset.fetchableUrl()` instead. It returns the signed `/api/media` link when there is one. Otherwise it uploads the bytes once per submission to Comfy's API-node storage (`POST /customers/storage`, then a PUT) and returns the roughly 24-hour signed download URL. Because the URL is new each time, a request rebuilt after a lost receipt is not byte-identical.
 - `apps/jobs` tests run files serially (`fileParallelism: false`). With parallel files in small containers, the alarm-driven lifecycle tests time out. Their "cancels queued work" case also assumes the cancel arrives before the coordinator's immediate alarm, which only holds without contention.

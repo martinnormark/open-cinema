@@ -141,11 +141,9 @@ export const backgroundReplaceWorkflow: WorkflowDefinition<"video.background-rep
     deadlineMs: 60 * 60_000,
     model: () => BACKGROUND_REPLACE_MODELS[DEFAULT_BACKGROUND_PIPELINE],
     async build(inputs, context) {
+      // Kling and SwitchX fetch the source clip by URL only.
       const source = await context.asset(inputs.source);
-      if (!source.publicUrl)
-        throw new Error(
-          "Background replacement needs a public media origin: providers fetch the source clip by URL",
-        );
+      const videoUrl = await source.fetchableUrl();
       const location = context.mentions.find(
         (m) => m.elementId === inputs.location?.elementId,
       );
@@ -159,11 +157,11 @@ export const backgroundReplaceWorkflow: WorkflowDefinition<"video.background-rep
           return asset.publicUrl ?? (await asset.dataUri());
         }),
       );
-      const media = { videoUrl: source.publicUrl, referenceImages };
+      const media = { videoUrl, referenceImages };
       if (DEFAULT_BACKGROUND_PIPELINE === "switchx") {
         const matte =
           inputs.target.type === "mask"
-            ? (await context.asset(inputs.target.mask)).publicUrl
+            ? await (await context.asset(inputs.target.mask)).fetchableUrl()
             : null;
         return switchxBackgroundRequest(inputs, location, {
           ...media,

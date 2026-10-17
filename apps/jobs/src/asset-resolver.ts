@@ -4,7 +4,11 @@ import {
   type AssetRef,
   type OwnerScope,
 } from "@open-cinema/contracts";
-import type { ResolvedAsset } from "@open-cinema/comfy";
+import {
+  routerBaseUrl,
+  uploadToComfyStorage,
+  type ResolvedAsset,
+} from "@open-cinema/comfy";
 import { createDatabase } from "@open-cinema/database";
 import { resolveAssetRef } from "@open-cinema/database/queries";
 
@@ -52,8 +56,31 @@ export function createAssetResolver(
       });
       publicUrl = `${origin}/api/media/${encodeURIComponent(ref.assetId)}?${query}`;
     }
+    let uploaded: Promise<string> | null = null;
+    const fetchableUrl = () => {
+      if (publicUrl) return Promise.resolve(publicUrl);
+      uploaded ??= (async () => {
+        const object = await env.GENERATED_ASSETS.get(stored.r2Key);
+        if (!object) throw new AssetUnavailableError(assetRefKey(ref));
+        // Signed upload URLs need a known length; R2 knows it exactly.
+        const { readable, writable } = new FixedLengthStream(object.size);
+        void object.body.pipeTo(writable);
+        const extension = stored.mediaType.split("/")[1]?.split(";")[0];
+        return uploadToComfyStorage({
+          apiKey: env.COMFY_API_KEY ?? "",
+          baseUrl: routerBaseUrl(env.COMFY_BASE_URL),
+          fileName: `${crypto.randomUUID()}${extension ? `.${extension}` : ""}`,
+          contentType: stored.mediaType,
+          sizeBytes: object.size,
+          body: readable,
+          signal: AbortSignal.timeout(10 * 60_000),
+        });
+      })();
+      return uploaded;
+    };
     return {
       ref,
+      fetchableUrl,
       mediaType: stored.mediaType,
       sizeBytes: stored.sizeBytes,
       publicUrl,

@@ -237,7 +237,7 @@ export const WORKFLOW_DESCRIPTORS = {
     kind: "video.background-replace",
     label: "Replace background",
     output: "video",
-    models: ["bria/video-edit-replace-background"],
+    models: ["kling/kling-v3-omni", "beeble/switchx"],
   },
   "video.character-replace": {
     kind: "video.character-replace",

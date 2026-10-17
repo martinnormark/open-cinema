@@ -19,6 +19,12 @@ export interface ResolvedAsset {
    * has no public media origin (local development). Never persist it.
    */
   publicUrl: string | null;
+  /**
+   * An https URL a provider can fetch: `publicUrl` when set, otherwise the
+   * bytes uploaded to Comfy's API-node storage (signed for about 24 h). Use it
+   * for models that accept media by URL only. Never persist it.
+   */
+  fetchableUrl(): Promise<string>;
 }
 
 export interface BuildContext {
