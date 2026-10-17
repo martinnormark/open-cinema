@@ -42,9 +42,12 @@ export function CompareViewer({
   resultLabel = "Revision",
   aspectRatio = 16 / 9,
   footer,
+  onResultLoaded,
 }: {
   sourceUrl: string;
   resultUrl: string;
+  /** Fires once the result's metadata is in, e.g. to start post-run checks. */
+  onResultLoaded?: () => void;
   sourceLabel?: string;
   resultLabel?: string;
   aspectRatio?: number;
@@ -333,6 +336,7 @@ export function CompareViewer({
                 // A swapped result (another variant) rejoins playback in place.
                 if (source.current && !source.current.paused)
                   void result.current?.play().catch(() => undefined);
+                onResultLoaded?.();
               }}
             />
           </div>

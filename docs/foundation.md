@@ -70,12 +70,14 @@ Each domain gets its own `apps/web/src/server/<domain>.ts`, such as `elements.ts
 
 workerd connects directly, not through `HTTPS_PROXY`. In an environment whose proxy injects Comfy credentials, such as a Claude Code cloud container with no `COMFY_API_KEY` value, the local jobs Worker gets 401s from Router. For development:
 
-1. Run `bun scripts/comfy-relay.ts`. It listens on `127.0.0.1:8790` only, forwards to `https://api.comfy.org` through `HTTPS_PROXY`, and drops the caller's `Authorization` header.
+1. Run `bun scripts/comfy-relay.ts`. It listens on `127.0.0.1:8790` only, forwards Comfy Cloud's `/api/...` paths to `https://cloud.comfy.org` and everything else to `https://api.comfy.org` through `HTTPS_PROXY`, and drops the caller's `Authorization` header.
 2. In `apps/jobs/.dev.vars`, set `COMFY_BASE_URL="http://127.0.0.1:8790"` and set `COMFY_API_KEY` to any non-empty placeholder.
 
 `apps/jobs/wrangler.jsonc` declares `COMFY_BASE_URL` and `MEDIA_PUBLIC_ORIGIN` as empty `vars`. When `secrets.required` is set, Wrangler loads only declared keys from `.dev.vars`, so without that declaration both `wrangler dev` and `bun run dev` silently drop the override. `MEDIA_SIGNING_SECRET` is not declared. It is a production secret (`wrangler secret put`), and local development has no public origin for it to sign links for anyway.
 
-`routerBaseUrl` ignores any override that is not plain http on loopback, so a deployed Worker always sends its own secret to Router directly. I verified on 2026-10-17 that a queued FLUX 3 Image submission and its status polling succeed through the relay with a placeholder key.
+`loopbackRelay` (used for both Router and Cloud uploads) ignores any override that is not plain http on loopback, so a deployed Worker always sends its own secret to Router directly. I verified on 2026-10-17 that a queued FLUX 3 Image submission and its status polling succeed through the relay with a placeholder key.
+
+Comfy Cloud's `/api/v2/...` endpoints (asset upload and job submission, which the app uses) accept only a Comfy API key. On 2026-10-17 the proxy-injected Cloud credential in a Claude Code container answered `401 Missing or invalid API key` there while the older `/api/...` routes accepted it, so the LTX Alpha Gen background swap needs a real `COMFY_API_KEY` to run from the app. Its graph itself ran successfully on Cloud (job `f30bd530`, 97 frames at 640×360 in about 40 s).
 
 ## Known gaps
 

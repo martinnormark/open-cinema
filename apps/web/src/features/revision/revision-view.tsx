@@ -9,6 +9,7 @@ import {
   X,
 } from "lucide-react";
 import {
+  approvedReferences,
   assetRefKey,
   outputVariant,
   resultOutputs,
@@ -24,8 +25,17 @@ import { cn } from "@/lib/utils";
 import { useGeneration } from "@/features/generation/store";
 import { useLibrary } from "@/features/library";
 import { cancelGeneration, reconcileGeneration } from "@/server/functions";
-import { decideRevision, type RevisionEntry } from "@/server/revisions";
+import {
+  decideRevision,
+  saveRevisionChecks,
+  type RevisionEntry,
+} from "@/server/revisions";
+import { useElements } from "@/features/elements/store";
+import { assetUrl as elementAssetUrl } from "@/features/elements/model";
 import { CompareViewer, Segmented } from "./compare-viewer";
+import { ResultChecksPanel } from "./result-checks";
+import { requestResultChecks } from "./shot-checks-client";
+import type { ResultChecks } from "./shot-checks";
 import {
   assetUrl,
   phaseLabels,
@@ -65,11 +75,13 @@ export function RevisionView({
   project,
   decisions,
   history,
+  checks,
 }: {
   revision: Revision;
   project: Project | null;
   decisions: RevisionDecisions | null;
   history: RevisionEntry[];
+  checks: ResultChecks | null;
 }) {
   const router = useRouter();
   const { snapshot } = useGeneration();
@@ -103,6 +115,39 @@ export function RevisionView({
   const items = useLibrary((s) => s.items);
   const [deciding, setDeciding] = useState<"kept" | "rejected" | null>(null);
   const [error, setError] = useState("");
+  const { elements } = useElements();
+  const character =
+    kind === "character" && decisions?.element
+      ? (elements.find((e) => e.id === decisions.element!.id) ?? null)
+      : null;
+
+  /** Post-run checks start when the result loads, unless already stored. */
+  function checkResult() {
+    if (kind !== "character" || checks || !result || !decisions?.targetPoint)
+      return;
+    const state = character?.states.find(
+      (s) => s.name === decisions.element?.stateName,
+    );
+    const faces = character
+      ? approvedReferences(character, state?.id).filter(
+          (r) =>
+            r.view === null ||
+            ["face-closeup", "front", "three-quarter", "full-body"].includes(
+              r.view,
+            ),
+        )
+      : [];
+    if (!faces.length) return;
+    requestResultChecks({
+      revisionId: revision.id,
+      sourceUrl: assetUrl(revision.source),
+      resultUrl: assetUrl(result),
+      mark: decisions.targetPoint,
+      referenceUrls: faces.slice(0, 4).map((r) => elementAssetUrl(r.asset)),
+      save: (next) =>
+        saveRevisionChecks({ data: { revisionId: revision.id, checks: next } }),
+    });
+  }
 
   async function decide(status: "kept" | "rejected") {
     setDeciding(status);
@@ -221,6 +266,7 @@ export function RevisionView({
                     </div>
                   ) : undefined
                 }
+                onResultLoaded={checkResult}
               />
             </div>
           ) : (
@@ -230,6 +276,16 @@ export function RevisionView({
               phase={phase}
               connected={!!snapshot}
               estimate={decisions?.estimate?.time ?? null}
+            />
+          )}
+
+          {result && kind === "character" && (
+            <ResultChecksPanel
+              revisionId={revision.id}
+              stored={checks}
+              characterName={decisions?.element?.name ?? "the Character"}
+              canCheck={!!decisions?.targetPoint}
+              preflight={decisions?.preflight ?? null}
             />
           )}
 

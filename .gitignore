@@ -160,3 +160,4 @@ artifacts/
 
 # Python bytecode
 __pycache__/
+apps/web/public/models/

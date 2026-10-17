@@ -29,6 +29,10 @@ import {
   revisionSubmissionSchema,
   type RevisionDecisions,
 } from "@/features/revision/model";
+import {
+  resultChecksSchema,
+  type ResultChecks,
+} from "@/features/revision/shot-checks";
 import { getCoordinator } from "./jobs";
 import { requireSameOrigin, requireSession } from "./session";
 
@@ -67,6 +71,51 @@ async function readDecisions(
     return null;
   }
 }
+
+/** Post-run likeness and bystander checks, measured in the browser once per result. */
+const checksKey = (ownerId: string, revisionId: string) =>
+  `revisions/${ownerId}/${revisionId}/checks.json`;
+
+async function readChecks(
+  ownerId: string,
+  revisionId: string,
+): Promise<ResultChecks | null> {
+  try {
+    const object = await env.GENERATED_ASSETS.get(
+      checksKey(ownerId, revisionId),
+    );
+    if (!object) return null;
+    const parsed = resultChecksSchema.safeParse(await object.json());
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+export const saveRevisionChecks = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      revisionId: z.string().min(1).max(100),
+      checks: resultChecksSchema,
+    }),
+  )
+  .handler(async ({ data }) => {
+    requireSameOrigin();
+    const session = await requireSession();
+    const revision = await getRevision(
+      db(),
+      { ownerId: session.userId },
+      data.revisionId,
+    );
+    if (!revision || revision.workflowKind !== "video.character-replace")
+      return false;
+    await env.GENERATED_ASSETS.put(
+      checksKey(session.userId, revision.id),
+      JSON.stringify(data.checks),
+      { httpMetadata: { contentType: "application/json" } },
+    );
+    return true;
+  });
 
 /** Written at submission so a revision page works before D1 catches up. */
 const pendingRevisionSchema = z.object({
@@ -174,6 +223,10 @@ export const getRevisionView = createServerFn({ method: "GET" })
       signedIn: true as const,
       revision,
       project,
+      checks:
+        revision.workflowKind === "video.character-replace"
+          ? await readChecks(session.userId, revision.id)
+          : null,
       decisions:
         history.find((entry) => entry.revision.id === revision.id)?.decisions ??
         (await readDecisions(session.userId, revision.id)),

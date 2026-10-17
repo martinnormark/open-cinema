@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { formatCost, type CostUnit } from "@/features/settings/preferences";
+import { preflightSchema } from "./shot-checks";
 import {
   backgroundPipelineSchema,
   preservedAspectSchema,
@@ -74,10 +75,20 @@ export const preservedLabels: Record<PreservedAspect, string> = {
   lighting: "Lighting",
 };
 
-export const wardrobeIntents = {
+/**
+ * `unavailable` options stay visible so the limit is stated, not hidden: in
+ * Phase 0 Kling dressed the Character in their reference outfit on both clips
+ * that asked to keep the source clothing (G4, U5; docs/phase0-recast.md).
+ */
+export const wardrobeIntents: Record<
+  "keep" | "character" | "describe",
+  { label: string; detail: string; unavailable?: string }
+> = {
   keep: {
     label: "Keep the source wardrobe",
     detail: "The new character wears what the original person wore.",
+    unavailable:
+      "Not reliable yet. In testing, the model dressed the new character in their reference outfit instead.",
   },
   character: {
     label: "Use the character’s look",
@@ -87,7 +98,7 @@ export const wardrobeIntents = {
     label: "Describe new wardrobe",
     detail: "Say what they wear; it applies to this shot only.",
   },
-} as const;
+};
 export type WardrobeIntent = keyof typeof wardrobeIntents;
 
 /**
@@ -115,18 +126,18 @@ export const revisionDecisionsSchema = z.object({
   estimate: z
     .object({ cost: z.string(), time: z.string(), basis: z.string() })
     .nullable(),
+  /** Where the recast person was marked, for the post-run checks. */
+  targetPoint: z
+    .object({ x: z.number(), y: z.number(), timeMs: z.number() })
+    .nullable()
+    .optional(),
+  /** The composer's shot check when the recast was started. */
+  preflight: preflightSchema.nullable().optional(),
   /** The studio's exact choices, so "Try again" reopens it as it was. */
   draft: z
     .object({
       stateId: z.string().nullable(),
       targetNote: z.string().max(300),
-      targetPoint: z
-        .object({
-          x: z.number().min(0).max(1),
-          y: z.number().min(0).max(1),
-          timeMs: z.number().nonnegative(),
-        })
-        .nullable(),
       pipeline: backgroundPipelineSchema,
       /** `assetRefKey` of the chosen plate, for the alpha composite. */
       plate: z.string().max(400).nullable(),
