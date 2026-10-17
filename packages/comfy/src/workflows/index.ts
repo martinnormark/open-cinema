@@ -5,6 +5,7 @@ import {
   fluxImageWorkflow,
   fluxReferenceWorkflow,
   ltxVideoWorkflow,
+  performanceTransferWorkflow,
 } from "./definitions";
 import {
   objectSwapWorkflow,
@@ -50,7 +51,16 @@ export {
   ltxVideoWorkflow,
   backgroundReplaceWorkflow,
   characterReplaceWorkflow,
+  performanceTransferWorkflow,
 } from "./definitions";
+export {
+  LTX_PERFORMANCE_LIMITS,
+  LTX_PERFORMANCE_MODEL_ID,
+  LTX_PERFORMANCE_MODELS,
+  characterKeyframe,
+  ltxPerformanceGraph,
+  performancePrompt,
+} from "./ltx-performance-transfer";
 export {
   CHARACTER_REPLACE_MODEL,
   characterReferences,
@@ -101,6 +111,7 @@ const registry: Registry = {
   "video.ltx": ltxVideoWorkflow,
   "video.background-replace": backgroundReplaceWorkflow,
   "video.character-replace": characterReplaceWorkflow,
+  "video.performance-transfer": performanceTransferWorkflow,
   "video.object-swap": objectSwapWorkflow,
   "video.restyle": restyleWorkflow,
   "video.restage": restageWorkflow,
