@@ -6,19 +6,19 @@ The task: replace one selected person in a take with a saved Character, face **a
 
 ## Recommendation
 
-**Ship character recast in the MVP on Kling 3.0 Omni video edit, inside a narrow stated envelope: a clearly visible target whose face is seen at medium size or larger, wearing the Character's reference outfit.** Inside that envelope it passed every gate on all six clips, picked the right person every time (including the two-person and five-person clips where Kling O1 and HappyHorse picked wrong), kept performance frame for frame and left everything else intact. Outside it, it fails in three specific ways the product must refuse or warn about before spending credits: back-view-only targets, small distant faces, and "keep the original clothing".
+**Ship character recast in the MVP on Kling 3.0 Omni video edit, inside a narrow stated envelope: a clearly visible target whose face is seen at medium size or larger, wearing the Character's reference outfit.** Inside that envelope it passed every gate on all six clips, and across all ten clips it picked the right person every time (including the two-person and five-person clips where Kling O1 and HappyHorse picked wrong), kept performance frame for frame and left everything else intact. Outside it, it fails in three specific ways the product must refuse or warn about before spending credits: back-view-only targets, small distant faces, and "keep the original clothing" (ignored on both clips that asked for it).
 
 Whole-body recast is real, not a face swap: hair, build and clothing change on every Kling run, so no run trips G6.
 
-| Proposed bar (rubric)                     | Kling 3.0 Omni, whole set (9 clips) | Kling 3.0 Omni, inside the envelope (6 clips) |
+| Proposed bar (rubric)                     | Kling 3.0 Omni, whole set (10 clips) | Kling 3.0 Omni, inside the envelope (6 clips) |
 | ----------------------------------------- | ----------------------------------- | --------------------------------------------- |
-| ≥ 80 % of runs pass all gates             | **9 / 9**                           | **6 / 6**                                     |
+| ≥ 80 % of runs pass all gates             | **10 / 10**                         | **6 / 6**                                     |
 | Median Preservation ≥ 3.0                 | 3.88                                | 3.81                                          |
 | No protected criterion below 2 (passing)  | min 1 (U4: performance reversed)    | **min 3**                                     |
-| Median Change ≥ 3.0                       | 3.8                                 | 3.9                                           |
-| A1 reference fidelity ≥ 3 (passing)       | 6 / 9 (U4, G4, G5 at 2)             | **6 / 6**                                     |
-| Correct person selected                   | 9 / 9                               | 6 / 6                                         |
-| Median protected PSNR (dB)                | 34.8 (18.2–37.4)                    | 31.0 (24.1–37.4)                              |
+| Median Change ≥ 3.0                       | 3.7                                 | 3.9                                           |
+| A1 reference fidelity ≥ 3 (passing)       | 6 / 10 (U4, U5, G4, G5 at 2)       | **6 / 6**                                     |
+| Correct person selected                   | 10 / 10                             | 6 / 6                                         |
+| Median protected PSNR (dB)                | 34.3 (18.2–37.4)                    | 31.0 (24.1–37.4)                              |
 | Cost for a 5 s clip                       | $0.85                               | $0.85                                         |
 
 So: the rubric bar is **met inside the envelope and not met across the whole set**. The bar can be met with the Router models available today; it cannot yet be shown for open weights (see [Open weights](#open-weights-not-tested)).
@@ -27,7 +27,7 @@ Caveats that matter for the release decision:
 
 - **The evidence is narrow.** Ten clips of 5 s (five real Mixkit takes, five generated), two Characters, one run per clip, one reviewer, and that reviewer is an AI working from contact sheets at matched timestamps plus ArcFace and protected-region measurements. Treat "passes" as "good enough to put in front of users with a stated envelope", not as a measured production rate.
 - **Likeness drifts older.** Mara's sheet is a woman in her early thirties; in three of seven Kling runs she reads ten to twenty years older (U4, G2, G5). The platinum "silver-white" hair is the likely cue. Characters with distinctive hair colour should carry an explicit age in their description, and the job should warn when the result's face similarity to the Character is low (below about 0.35 ArcFace).
-- **Turnaround through the shared Router queue was 57–113 minutes tonight**, which misses the 60 minute deadline the workflow registry sets. See below.
+- **Turnaround through the shared Router queue was 57–117 minutes tonight**, which misses the 60 minute deadline the workflow registry sets. See below.
 - **The Router account ran out of credits at about 03:45 UTC** (`402 insufficient_credits`), which stopped the follow-up experiment on source wardrobe described below.
 
 The default is wired: `video.character-replace` builds the Kling 3.0 Omni request in [`packages/comfy/src/workflows/character-replace.ts`](../packages/comfy/src/workflows/character-replace.ts) (tests in `apps/jobs/test/character-replace.test.ts`), and the equivalent ComfyUI graph is packaged in [`workflows/character-replace/`](../workflows/character-replace/README.md).
@@ -47,10 +47,11 @@ State this before generation; refuse or warn outside it.
 | Occlusion       | The target fully hidden behind a pillar and a passer-by, then re-emerging.                                | G3                               |
 | Interactions    | Hand-holding, a cup to the lips, an object handed over.                                                   | U4, G2, G4                       |
 | Camera          | Locked-off, push-in, backward dolly, pan, orbit, handheld.                                                | U2, G2, G1, G3, G4, G5           |
-| Wardrobe intent | **Reference outfit only.** "Keep the original clothing" is not honoured yet (G4).                         | G4                               |
+| Aspect          | 16:9 and 9:16; framing is kept.                                                                           | U5 (9:16)                        |
+| Wardrobe intent | **Reference outfit only.** "Keep the original clothing" is not honoured yet.                              | G4, U5                           |
 | Character       | Up to four approved reference views; full-body first, then face, then three-quarter.                      | Mara (6 views), Theo (5 views)   |
 
-Outside the envelope until measured: back-view-only targets (U4 failed), targets whose face stays small in a wide shot (G5 failed on likeness), keeping the source clothing (G4 failed), 9:16 takes (U5 did not return in time), takes longer than 5 s, real dialogue with lip sync to audio (`keep_original_sound` is wired but untested), more than one recast in a take, and crowds.
+Outside the envelope until measured: back-view-only targets (U4 failed), targets whose face stays small in a wide shot (G5 failed on likeness), keeping the source clothing (G4 and U5 failed), takes longer than 5 s, real dialogue with lip sync to audio (`keep_original_sound` is wired but untested), more than one recast in a take, and crowds.
 
 ## Pipelines compared
 
@@ -67,11 +68,11 @@ Six candidates on the two real multi-person clips (U1: a couple, recast the woma
 
 ## Successes
 
-- **Selection by words plus a side works on Kling 3.0 Omni.** The product sends no coordinates; `describeTarget` turns the creator's point into "on the left / in the centre / on the right of the frame" and appends it to their description. Kling 3.0 picked the right person on all nine clips, including U2's five people and U1, which Kling O1 got wrong.
+- **Selection by words plus a side works on Kling 3.0 Omni.** The product sends no coordinates; `describeTarget` turns the creator's point into "on the left / in the centre / on the right of the frame" and appends it to their description. Kling 3.0 picked the right person on all ten clips, including U2's five people and U1, which Kling O1 got wrong.
 - **Performance is kept.** Head turns, gaze, laughs, a cup to the lips (G2), pointing at shared papers (U2), a 360° turn and a jump (G5), and a spin-heavy dance behind foreground poppies (U3) all land on the source frames.
 - **Everyone else is kept.** Where bystanders face the camera, their faces stay at 0.82–0.98 ArcFace similarity to the source, and on the generated clips the protected region is 35–37 dB PSNR, close to untouched.
 - **Occlusion is handled.** In G3 Mara disappears behind a pillar and a man carrying a crate, then re-emerges with the same face, bob and jacket.
-- **Interactions survive.** The box hand-off in G4 and the hand-hold in U4 keep their contact and timing with the new body.
+- **Interactions survive.** The handshake in U5, the box hand-off in G4 and the hand-hold in U4 keep their contact and timing with the new body.
 - **Whole-character, not face-only.** Hair, build and wardrobe change on every run; Theo's beanie, glasses, beard and peacoat all arrive in G1.
 
 ## Failures
@@ -79,7 +80,7 @@ Six candidates on the two real multi-person clips (U1: a couple, recast the woma
 | Run                              | What went wrong                                                                                                                                                                  | Product response                                                                                                    |
 | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | Kling 3.0, U4 (back view)        | The woman walking away becomes Mara **facing the camera while still walking away**, so her body is reversed against the hand-hold, and she reads twenty years older.             | Refuse or warn when the target's face is never visible.                                                             |
-| Kling 3.0, G4 (keep clothing)    | Asked to keep the source denim shirt, Kling dressed Theo in his reference peacoat and beanie. The images win over the prompt.                                                    | Do not offer "keep original clothing" until the face-only reference variant (below) is measured.                    |
+| Kling 3.0, G4 and U5 (keep clothing) | Asked to keep the source denim shirt (G4) and the black suit and tie (U5), Kling dressed Theo in his reference peacoat and beanie both times. The images win over the prompt. | Do not offer "keep original clothing" until the face-only reference variant (below) is measured.                    |
 | Kling 3.0, G5 (wide shot)        | Body, outfit and motion are right, but the small face reads as an older woman, not Mara (ref_sim 0.16).                                                                           | Warn when the target is small in frame; check face similarity after the run and flag weak likeness.                 |
 | Kling O1, U1                     | Wrong person recast; the other person restyled.                                                                                                                                  | Do not use O1 for recast.                                                                                           |
 | HappyHorse, U2 / U1              | Two people recast; then a content-policy refusal.                                                                                                                                 | Not used.                                                                                                           |
@@ -109,7 +110,7 @@ Product decision this leaves open: ship recast on a closed partner model now (Kl
 
 | Pipeline        | Rate                       | 5 s clip   | Turnaround tonight (submit to result)       |
 | --------------- | -------------------------- | ---------- | ------------------------------------------- |
-| Kling 3.0 Omni  | $0.168/s (6 Kling units)   | **$0.85**  | 68–113 min (median 94 min)                  |
+| Kling 3.0 Omni  | $0.168/s (6 Kling units)   | **$0.85**  | 68–117 min (median 96 min)                  |
 | Kling O1        | $0.168/s                   | $0.85      | 62–74 min                                   |
 | Wan 2.7 edit    | $0.10/s                    | $0.50      | 57–79 min                                   |
 | HappyHorse edit | $0.14/s                    | $0.71      | 86 min                                      |
@@ -132,4 +133,4 @@ Router results carry no `X-Comfy-Credits-Used` header on the queued API, so cost
 3. Conform Kling's 24 fps output to the source frame rate.
 4. After each run, compute face similarity of the result to the Character and to every protected person, and flag a weak likeness or a changed bystander instead of delivering silently. This catches the wrong-person failure class even though Kling 3.0 did not show it here.
 5. Run the open-weights comparison (Wan Animate replacement through Comfy Cloud) once Cloud workflow runs are available.
-6. Re-run the set on real dialogue takes with audio and on 9:16 (U5).
+6. Re-run the set on real dialogue takes with audio and on takes longer than 5 s.
