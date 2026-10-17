@@ -37,6 +37,19 @@ export const cameraLabels: Record<ShotCamera, string> = {
 
 export const DURATIONS = [2, 3, 4, 5, 6, 8, 10] as const;
 
+/** Motion runs on FLUX 3 Video, which makes clips of 5 to 20 seconds. */
+export const MIN_MOTION_SECONDS = 5;
+
+/**
+ * How long a shot lasts in the cut: its planned length as a still, at least
+ * five seconds once an approved motion take animates it.
+ */
+export function playedSeconds(shot: Shot): number {
+  return approvedTake(shot, "motion")
+    ? Math.max(MIN_MOTION_SECONDS, shot.durationSeconds)
+    : shot.durationSeconds;
+}
+
 /** A take as the board shows it: the stored asset, or its job's live state. */
 export interface TakeView {
   take: ShotTake;
@@ -161,6 +174,9 @@ export function shotWarnings(shot: Shot, elements: readonly Element[]) {
     warnings.push(
       `${unknown.join(", ")} ${unknown.length === 1 ? "is" : "are"} not one of your Elements, so ${unknown.length === 1 ? "it reads" : "they read"} as plain words.`,
     );
+  for (const m of mentions)
+    if (m.blocking && m.problem)
+      warnings.push(`${m.problem} The shot would generate without it.`);
   const bare = mentions.filter((m) => m.element && !m.references.length);
   if (bare.length)
     warnings.push(

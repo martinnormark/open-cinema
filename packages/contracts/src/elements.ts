@@ -250,10 +250,63 @@ export const elementMentionSchema = z.object({
 });
 export type ElementMention = z.infer<typeof elementMentionSchema>;
 
-export const MENTION_PATTERN = /@([A-Za-z][A-Za-z0-9_]{0,39})/g;
+/**
+ * `@Handle`, `@Handle:state` or `@Handle:state+state`, where the `@` starts a
+ * word: "ana@Mara" is an address, not a mention. Element handles are ASCII;
+ * state handles keep any letter, as `toStateHandle` makes them.
+ */
+const MENTION_TOKEN =
+  /(?<![\p{L}\p{N}_@])@([A-Za-z][A-Za-z0-9_]{0,39})(?::([\p{L}\p{N}-]+(?:\+[\p{L}\p{N}-]+)*))?/gu;
+
+export interface MentionToken {
+  /** Offset of the `@`. */
+  start: number;
+  end: number;
+  raw: string;
+  handle: string;
+  /** Every state named after the `:`, in order. */
+  stateHandles: string[];
+}
+
+/** Every mention token in `text`, in order. */
+export function mentionTokens(text: string): MentionToken[] {
+  return [...text.matchAll(MENTION_TOKEN)].map((match) => ({
+    start: match.index,
+    end: match.index + match[0].length,
+    raw: match[0],
+    handle: match[1]!,
+    stateHandles: match[2] ? match[2].split("+") : [],
+  }));
+}
+
+/** Rewrites each mention token; returning `token.raw` leaves it as written. */
+export function replaceMentions(
+  text: string,
+  replace: (token: MentionToken) => string,
+): string {
+  let out = "";
+  let at = 0;
+  for (const token of mentionTokens(text)) {
+    out += text.slice(at, token.start) + replace(token);
+    at = token.end;
+  }
+  return out + text.slice(at);
+}
 
 export function parseMentionHandles(prompt: string): string[] {
-  return [...new Set([...prompt.matchAll(MENTION_PATTERN)].map((m) => m[1]!))];
+  return [...new Set(mentionTokens(prompt).map((t) => t.handle))];
+}
+
+/** `Rain soaked` → `rain-soaked`: how a state is written after `@Handle:`. */
+export function toStateHandle(name: string): string {
+  return name
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean)
+    .join("-")
+    .slice(0, 40);
 }
 
 export const createElementInputSchema = z.object({

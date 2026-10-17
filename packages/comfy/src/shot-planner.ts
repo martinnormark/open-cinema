@@ -1,5 +1,6 @@
 import {
   planSequenceInputSchema,
+  replaceMentions,
   sequencePlanSchema,
   shotCameraSchema,
   shotFramingSchema,
@@ -159,12 +160,9 @@ export function readPlan(
   if (!call) return null;
   const known = new Set(input.elements.map((e) => e.handle.toLowerCase()));
   const clean = (text: unknown) =>
-    String(text ?? "")
-      .replace(
-        /@([A-Za-z][A-Za-z0-9_]*)(:[A-Za-z0-9-]+)?/g,
-        (match, handle: string) =>
-          known.has(handle.toLowerCase()) ? match : handle,
-      )
+    replaceMentions(String(text ?? ""), (token) =>
+      known.has(token.handle.toLowerCase()) ? token.raw : token.handle,
+    )
       .trim()
       .slice(0, 2000);
   const raw = call.input as { title?: unknown; shots?: unknown };

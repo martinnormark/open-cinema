@@ -1,3 +1,9 @@
+import {
+  replaceMentions,
+  toStateHandle,
+  type MentionToken,
+} from "@open-cinema/contracts";
+
 /** Accepts only credential-free https URLs from provider result documents. */
 export function httpsUrl(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -40,6 +46,29 @@ interface MentionText {
   description?: string;
   stateName: string | null;
   stateDescription?: string | null;
+  /** Lets `@Mara:wet` and `@Mara:dry` in one prompt each find their own. */
+  states?: readonly { name: string }[];
+}
+
+/**
+ * The mention a token stands for. Handles match whatever case the creator
+ * typed, as the composer does; when the same Element is mentioned in two
+ * states the token's own states decide.
+ */
+function mentionFor<M extends MentionText>(
+  token: MentionToken,
+  mentions: readonly M[],
+): M | undefined {
+  const handle = token.handle.toLowerCase();
+  const same = mentions.filter((m) => m.handle.toLowerCase() === handle);
+  if (same.length < 2) return same[0];
+  const wanted = token.stateHandles.map((h) => h.toLowerCase()).join("+");
+  return (
+    same.find(
+      (m) =>
+        (m.states ?? []).map((s) => toStateHandle(s.name)).join("+") === wanted,
+    ) ?? same[0]
+  );
 }
 
 /**
@@ -86,11 +115,8 @@ export function expandMentions(
   mentions: readonly MentionText[],
   detail: MentionDetail = "name",
 ): string {
-  return prompt.replace(
-    /@([A-Za-z][A-Za-z0-9_]{0,39})(?::[A-Za-z0-9-]+(?:\+[A-Za-z0-9-]+)*)?/g,
-    (token, handle: string) => {
-      const mention = mentions.find((m) => m.handle === handle);
-      return mention ? mentionText(mention, detail) : token;
-    },
-  );
+  return replaceMentions(prompt, (token) => {
+    const mention = mentionFor(token, mentions);
+    return mention ? mentionText(mention, detail) : token.raw;
+  });
 }

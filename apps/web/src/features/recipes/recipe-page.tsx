@@ -531,6 +531,13 @@ function UseRecipe({ view }: { view: RecipeView }) {
   >();
   const [keepProjectLook, setKeepProjectLook] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Kept until a definite answer, so retrying an interrupted request finds
+  // the job it may already have started instead of running it twice. A
+  // changed request is a new one and gets a new key.
+  const [pending, setPending] = useState<{
+    key: string;
+    body: string;
+  } | null>(null);
   const [error, setError] = useState("");
   const [started, setStarted] = useState<string | null>(null);
   const projectId =
@@ -562,21 +569,25 @@ function UseRecipe({ view }: { view: RecipeView }) {
     setBusy(true);
     setError("");
     setStarted(null);
+    const body = JSON.stringify([request, project?.id]);
+    const key = pending?.body === body ? pending.key : crypto.randomUUID();
+    setPending({ key, body });
     try {
       const result = await submitWorkflow({
         data: {
-          idempotencyKey: crypto.randomUUID(),
+          idempotencyKey: key,
           request,
           ...(project ? { projectId: project.id } : {}),
         },
       });
+      setPending(null);
       if (result.ok) {
         acceptSnapshot(result.snapshot);
         setStarted(result.jobId ?? "started");
       } else setError(result.error);
     } catch {
       setError(
-        "The request was interrupted. Check Activity before trying again.",
+        "The request was interrupted. Generating again checks whether it was accepted, using the same request key.",
       );
     } finally {
       setBusy(false);
@@ -723,7 +734,9 @@ function UseRecipe({ view }: { view: RecipeView }) {
                 durationSeconds: spec.durationSeconds,
                 recipe: { id: view.id, version: view.version, name: view.name },
               });
-              if (project) setCurrentProject(project.id);
+              // "No project" must not leave the shot filed under, and lit by,
+              // whichever project the studio last had open.
+              setCurrentProject(project?.id ?? null);
               void navigate({ to: "/" });
             }}
           >

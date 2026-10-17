@@ -15,6 +15,7 @@ import {
   takeOriginSchema,
   takeRoleSchema,
   takeStatusSchema,
+  MAX_SEQUENCE_SHOTS,
 } from "./sequences";
 import { WORKFLOW_DESCRIPTORS, type WorkflowKind } from "./workflows";
 
@@ -79,7 +80,7 @@ export const worldElementSchema = z.object({
         kind: stateKindSchema.default("other"),
       }),
     )
-    .max(40)
+    .max(100)
     .default([]),
   references: z
     .array(
@@ -92,7 +93,7 @@ export const worldElementSchema = z.object({
         note: z.string().max(500).default(""),
       }),
     )
-    .max(80)
+    .max(200)
     .default([]),
 });
 export type WorldElement = z.infer<typeof worldElementSchema>;
@@ -141,10 +142,10 @@ export const worldSequenceSchema = z.object({
         camera: shotCameraSchema.catch("static"),
         durationSeconds: shotDurationSchema.catch(5),
         continuity: shotContinuitySchema.catch("fresh"),
-        takes: z.array(worldTakeSchema).max(40).default([]),
+        takes: z.array(worldTakeSchema).max(100).default([]),
       }),
     )
-    .max(24),
+    .max(MAX_SEQUENCE_SHOTS),
 });
 export type WorldSequence = z.infer<typeof worldSequenceSchema>;
 
@@ -162,7 +163,7 @@ export const worldManifestSchema = z.object({
   project: z
     .object({
       name: z.string().min(1).max(120),
-      direction: z.string().max(2000).default(""),
+      direction: z.string().max(4000).default(""),
       look: lookSchema.catch({}).default({}),
     })
     .nullable()

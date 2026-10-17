@@ -5,6 +5,7 @@ import {
   type WorldManifest,
   type WorldMedia,
 } from "@open-cinema/contracts";
+import { probeMedia } from "@/features/library/media-probe";
 import { readZip, ZipError, type ZipEntry } from "@/lib/zip";
 
 /** A world bundle opened in the browser, ready to bring in. */
@@ -74,6 +75,18 @@ async function upload(
   if (media.height) headers["X-Media-Height"] = String(media.height);
   if (media.durationMs)
     headers["X-Media-Duration"] = String(media.durationMs / 1000);
+  if (media.mediaType.startsWith("video/")) {
+    // What the library's own uploads record, so a non-square clip is made
+    // square before Kling reads it and silent clips offer no audio.
+    const probe = await probeMedia(
+      new File([body], filenameFor(media), { type: media.mediaType }),
+    );
+    if (probe.fps) headers["X-Media-Fps"] = String(probe.fps);
+    if (probe.pixelAspect)
+      headers["X-Media-Pixel-Aspect"] = String(probe.pixelAspect);
+    if (probe.hasAudio !== null)
+      headers["X-Media-Audio"] = probe.hasAudio ? "1" : "0";
+  }
   const response = await fetch("/api/media/upload", {
     method: "POST",
     headers,

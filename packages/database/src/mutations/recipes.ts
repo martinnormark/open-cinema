@@ -50,6 +50,8 @@ export async function createRecipe(
   db: DatabaseContext,
   scope: OwnerScope,
   input: CreateRecipeInput,
+  /** A recipe brought in from another studio keeps its version and history. */
+  restored?: { version: number; history: RecipeVersion[] },
 ): Promise<Recipe> {
   const data = createRecipeInputSchema.parse(input);
   const problems = recipeSpecProblems(data.spec);
@@ -64,7 +66,8 @@ export async function createRecipe(
       spec: data.spec,
       parentId: data.parentId ?? null,
       ...(await coverColumns(db, scope, data.cover ?? null)),
-      history: [],
+      ...(restored ? { version: restored.version } : {}),
+      history: restored?.history.slice(0, MAX_HISTORY) ?? [],
     },
   });
   return toRecipe(row);

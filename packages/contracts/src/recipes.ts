@@ -1,7 +1,11 @@
 import { z } from "zod";
 import { capabilityIdSchema, type CapabilityId } from "./capabilities";
 import { effectiveLook, lookSchema, shotDirectionSchema } from "./direction";
-import { elementTypeSchema, type ElementType } from "./elements";
+import {
+  elementTypeSchema,
+  replaceMentions,
+  type ElementType,
+} from "./elements";
 import { assetRefSchema } from "./media";
 import {
   imageAspectRatioSchema,
@@ -172,30 +176,28 @@ export function recipeFromGeneration(
     return null;
   const slots: RecipeSlot[] = [];
   const keys = new Map<string, string>();
-  const template = request.inputs.prompt.replace(
-    /@([A-Za-z][A-Za-z0-9_]{0,39})(?::[A-Za-z0-9-]+(?:\+[A-Za-z0-9-]+)*)?/g,
-    (token, handle: string) => {
-      const mention = mentions.find((m) => m.handle === handle);
-      if (!mention) return token;
-      let key = keys.get(handle);
-      if (!key) {
-        key = slotKeyFor(
-          mention.type,
-          slots.map((s) => s.key),
-        );
-        keys.set(handle, key);
-        const n = slots.filter((s) => s.type === mention.type).length;
-        slots.push({
-          key,
-          type: mention.type,
-          label: `${TYPE_LABELS[mention.type]}${n ? ` ${n + 1}` : ""}`,
-          optional: false,
-          hint: `First made with ${mention.name}.`,
-        });
-      }
-      return `{${key}}`;
-    },
-  );
+  const template = replaceMentions(request.inputs.prompt, (token) => {
+    const handle = token.handle.toLowerCase();
+    const mention = mentions.find((m) => m.handle.toLowerCase() === handle);
+    if (!mention) return token.raw;
+    let key = keys.get(handle);
+    if (!key) {
+      key = slotKeyFor(
+        mention.type,
+        slots.map((s) => s.key),
+      );
+      keys.set(handle, key);
+      const n = slots.filter((s) => s.type === mention.type).length;
+      slots.push({
+        key,
+        type: mention.type,
+        label: `${TYPE_LABELS[mention.type]}${n ? ` ${n + 1}` : ""}`,
+        optional: false,
+        hint: `First made with ${mention.name}.`,
+      });
+    }
+    return `{${key}}`;
+  });
   const direction = request.inputs.direction;
   const look = direction ? effectiveLook(direction) : {};
   const video = request.workflowKind === "video.ltx";

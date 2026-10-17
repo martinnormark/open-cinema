@@ -20,6 +20,7 @@ import { submitWorkflow } from "@/server/generation";
 import {
   MentionSummary,
   MentionTextarea,
+  blockingMentionProblem,
   mentionPayload,
   useMentions,
 } from "@/features/elements/mentions";
@@ -115,7 +116,7 @@ export function PromptStudio({
     }
   }
   async function generate() {
-    if (busy) return;
+    if (busy || (!uncertain && blockingMentionProblem(mentions))) return;
     const command: WorkflowCommandInput = uncertain ?? {
       idempotencyKey: crypto.randomUUID(),
       request,
@@ -250,7 +251,11 @@ export function PromptStudio({
           <Button
             type="submit"
             disabled={
-              !snapshot || busy || (!uncertain && prompt.trim().length < 3)
+              !snapshot ||
+              busy ||
+              (!uncertain &&
+                (prompt.trim().length < 3 ||
+                  !!blockingMentionProblem(mentions)))
             }
           >
             {busy

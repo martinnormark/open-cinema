@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   ArrowDown,
@@ -68,6 +68,7 @@ import { captureLastFrame } from "./last-frame";
 import {
   cameraLabels,
   DURATIONS,
+  MIN_MOTION_SECONDS,
   framingLabels,
   keyframeRequest,
   motionRequest,
@@ -160,14 +161,25 @@ export function ShotRow({
     }
   }
 
+  const pending = useRef<{ key: string; body: string } | null>(null);
+
   async function generate(role: TakeRole, request: GenerationRequest) {
+    // An interrupted request keeps its key, so trying the same take again
+    // finds the job it may already have started instead of running it twice.
+    const body = JSON.stringify([request, project?.id]);
+    const key =
+      pending.current?.body === body
+        ? pending.current.key
+        : crypto.randomUUID();
+    pending.current = { key, body };
     const result = await submitWorkflow({
       data: {
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: key,
         request,
         ...(project ? { projectId: project.id } : {}),
       },
     });
+    pending.current = null;
     if (!result.ok) throw new Error(result.error);
     acceptSnapshot(result.snapshot);
     if (!result.jobId) throw new Error("The job was accepted without an id.");
@@ -373,7 +385,12 @@ export function ShotRow({
               label="Length"
               value={String(shot.durationSeconds)}
               options={Object.fromEntries(
-                DURATIONS.map((d) => [String(d), `${d} s`]),
+                DURATIONS.map((d) => [
+                  String(d),
+                  d < MIN_MOTION_SECONDS
+                    ? `${d} s (motion runs ${MIN_MOTION_SECONDS} s)`
+                    : `${d} s`,
+                ]),
               )}
               onChange={(seconds) =>
                 void save({ durationSeconds: Number(seconds) as ShotDuration })

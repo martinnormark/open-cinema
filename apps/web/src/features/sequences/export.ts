@@ -5,6 +5,7 @@ import {
   type Sequence,
 } from "@open-cinema/contracts";
 import { assetUrl } from "@/features/elements/model";
+import { playedSeconds } from "./model";
 
 /**
  * Production material: the plan as a shot list, with each shot's direction,
@@ -18,7 +19,7 @@ export function exportShotList(sequence: Sequence, project: Project | null) {
     const keyframe = approvedTake(shot, "keyframe");
     const motion = approvedTake(shot, "motion");
     const start = at;
-    at += shot.durationSeconds;
+    at += playedSeconds(shot);
     return {
       number: index + 1,
       title: shot.title,
@@ -26,7 +27,7 @@ export function exportShotList(sequence: Sequence, project: Project | null) {
       prompt: shot.prompt,
       framing: shot.framing,
       camera: shot.camera,
-      durationSeconds: shot.durationSeconds,
+      durationSeconds: playedSeconds(shot),
       startsAtSeconds: start,
       continuity: shot.continuity,
       direction: composeShotPrompt(shot, {

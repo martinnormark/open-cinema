@@ -8,8 +8,11 @@ import {
 } from "react";
 import { cn } from "@/lib/utils";
 import {
+  approvedReferences,
   combineStates,
+  mentionTokens,
   STATE_KIND_LABELS,
+  type MentionToken,
   type AssetRef,
   type ElementMention,
 } from "@open-cinema/contracts";
@@ -18,40 +21,15 @@ import {
   elementTypes,
   stateHandle,
   type Element,
-  type ElementReference,
   type ElementState,
   type ReferenceView,
 } from "./model";
 import { useElements } from "./store";
 
-/** `@Handle`, `@Handle:state` or `@Handle:state+state` where the `@` starts a word. */
-const MENTION =
-  /(^|[^\p{L}\p{N}_@])@([A-Za-z][A-Za-z0-9_]{0,39})(?::([A-Za-z0-9-]+(?:\+[A-Za-z0-9-]+)*))?/gu;
-
-export interface MentionToken {
-  /** Offset of the `@`. */
-  start: number;
-  end: number;
-  raw: string;
-  handle: string;
-  /** Every state named after the `:`, in order. */
-  stateHandles: string[];
-}
+export type { MentionToken };
 
 export function parseMentions(text: string): MentionToken[] {
-  const tokens: MentionToken[] = [];
-  for (const match of text.matchAll(MENTION)) {
-    const start = match.index + match[1]!.length;
-    const raw = match[0].slice(match[1]!.length);
-    tokens.push({
-      start,
-      end: start + raw.length,
-      raw,
-      handle: match[2]!,
-      stateHandles: match[3] ? match[3].split("+") : [],
-    });
-  }
-  return tokens;
+  return mentionTokens(text);
 }
 
 export interface MentionReference {
@@ -71,21 +49,33 @@ export interface ResolvedMention {
   /** Approved state references first, then approved identity references. */
   references: MentionReference[];
   problem: string | null;
+  /**
+   * A state that does not resolve, or two that clash: generating would
+   * quietly drop it, so the composer waits for a fix. Missing references are
+   * only a warning.
+   */
+  blocking: boolean;
 }
 
-function approved(
-  references: ElementReference[],
-  stateId: string | null,
-): MentionReference[] {
-  return references
-    .filter((r) => r.status === "approved" && r.stateId === stateId)
-    .map((r) => ({
-      id: r.id,
-      view: r.view,
-      asset: r.asset,
-      url: assetUrl(r.asset),
-      fromState: stateId !== null,
-    }));
+/** The first mention problem that should stop a generation. */
+export function blockingMentionProblem(
+  mentions: readonly ResolvedMention[],
+): string | null {
+  return mentions.find((m) => m.blocking)?.problem ?? null;
+}
+
+/**
+ * The references the server resolves for this mention (`approvedReferences`):
+ * the states' own first, then the base sheet's views they do not replace.
+ */
+function approved(element: Element, stateIds: string[]): MentionReference[] {
+  return approvedReferences(element, stateIds).map((r) => ({
+    id: r.id,
+    view: r.view,
+    asset: r.asset,
+    url: assetUrl(r.asset),
+    fromState: r.stateId !== null,
+  }));
 }
 
 /** Pure resolver: turns mentions in `text` into Elements, states and approved references. */
@@ -104,6 +94,7 @@ export function resolveMentions(
         states: [],
         references: [],
         problem: `No Element is named @${token.handle}.`,
+        blocking: false,
       };
     const found = token.stateHandles.map(
       (name) =>
@@ -116,16 +107,15 @@ export function resolveMentions(
       found.flatMap((s) => (typeof s === "string" ? [] : [s.id])),
     );
     const states = combined.states;
-    const identity = approved(element.references, null);
-    const references = [
-      ...states.flatMap((s) => approved(element.references, s.id)),
-      ...identity,
-    ];
+    const references = approved(
+      element,
+      states.map((s) => s.id),
+    );
     const problem = unknown
       ? `@${element.handle} has no state named “${unknown}”.`
       : combined.problem
         ? combined.problem
-        : identity.length === 0
+        : references.length === 0
           ? `@${element.handle} has no approved references yet.`
           : null;
     return {
@@ -135,6 +125,7 @@ export function resolveMentions(
       states,
       references,
       problem,
+      blocking: !!(unknown || combined.problem),
     };
   });
 }

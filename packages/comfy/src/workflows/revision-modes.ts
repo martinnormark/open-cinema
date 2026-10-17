@@ -285,7 +285,13 @@ export async function ltxCameraRequest(
     input: {
       graph: ltxCameraGraph({
         move: inputs.camera,
-        prompt: expandMentions(inputs.prompt, context.mentions),
+        // No reference images reach the camera graph: say who each Element
+        // is, as the Router LTX path does.
+        prompt: expandMentions(
+          inputs.prompt,
+          context.mentions,
+          inputs.firstFrame ? "state" : "full",
+        ),
         durationSeconds: inputs.durationSeconds,
         fps: inputs.fps,
         resolution: inputs.resolution,

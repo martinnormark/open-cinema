@@ -3,6 +3,8 @@ import {
   elementHandleSchema,
   recipeSpecProblems,
   recipeSpecSchema,
+  recipeVersionSchema,
+  replaceMentions,
   toElementHandle,
   worldAdaptations,
   type OwnerScope,
@@ -54,13 +56,10 @@ export function adaptRecipeSpec(
 /** Rewrites `@Old` mentions (with or without states) to renamed handles. */
 function renameMentions(text: string, renamed: ReadonlyMap<string, string>) {
   if (!renamed.size) return text;
-  return text.replace(
-    /@([A-Za-z][A-Za-z0-9_]{0,39})(?![A-Za-z0-9_])/g,
-    (token, handle: string) => {
-      const to = renamed.get(handle);
-      return to ? `@${to}` : token;
-    },
-  );
+  return replaceMentions(text, (token) => {
+    const to = renamed.get(token.handle);
+    return to ? `@${to}${token.raw.slice(token.handle.length + 1)}` : token.raw;
+  });
 }
 
 /**
@@ -145,13 +144,29 @@ export async function importWorld(
     const { spec } = adaptRecipeSpec(recipe.spec);
     if (!spec) continue;
     const cover = asset(recipe.cover);
-    await createRecipe(db, scope, {
-      name: recipe.name,
-      summary: recipe.summary,
-      spec,
-      ...(recipe.parentId ? { parentId: recipe.parentId } : {}),
-      ...(cover ? { cover } : {}),
+    // Earlier versions come along when this studio can read them, so the
+    // recipe can still be compared or rolled back here.
+    const history = recipe.history.flatMap((entry) => {
+      if (!entry || typeof entry !== "object") return [];
+      const adapted = adaptRecipeSpec((entry as { spec?: unknown }).spec).spec;
+      const version = recipeVersionSchema.safeParse({
+        ...entry,
+        spec: adapted,
+      });
+      return adapted && version.success ? [version.data] : [];
     });
+    await createRecipe(
+      db,
+      scope,
+      {
+        name: recipe.name,
+        summary: recipe.summary,
+        spec,
+        ...(recipe.parentId ? { parentId: recipe.parentId } : {}),
+        ...(cover ? { cover } : {}),
+      },
+      { version: recipe.version, history },
+    );
     recipes++;
   }
 

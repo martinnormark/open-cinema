@@ -121,7 +121,7 @@ function IdeaComposer({
           ? await planMySequence({
               data: {
                 idea: idea.trim(),
-                direction: project?.direction ?? "",
+                direction: (project?.direction ?? "").slice(0, 2000),
                 elements: elements.slice(0, 40).map((e) => ({
                   handle: e.handle,
                   type: e.type,

@@ -9,6 +9,9 @@ import { assetRefSchema } from "./media";
  * without touching approved work elsewhere in the sequence.
  */
 
+/** A sequence holds at most this many shots, however they were added. */
+export const MAX_SEQUENCE_SHOTS = 24;
+
 export const shotFramingSchema = z.enum([
   "wide",
   "medium",
@@ -153,7 +156,7 @@ export const createSequenceInputSchema = z.object({
   projectId: z.string().min(1).optional(),
   title: z.string().trim().min(1).max(120),
   idea: z.string().trim().max(8000).default(""),
-  shots: z.array(shotDraftSchema).max(24).default([]),
+  shots: z.array(shotDraftSchema).max(MAX_SEQUENCE_SHOTS).default([]),
 });
 export type CreateSequenceInput = z.input<typeof createSequenceInputSchema>;
 

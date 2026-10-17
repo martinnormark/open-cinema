@@ -4,6 +4,7 @@ import {
   createSequenceInputSchema,
   moveShotInputSchema,
   setTakeStatusInputSchema,
+  MAX_SEQUENCE_SHOTS,
   updateSequenceInputSchema,
   updateShotInputSchema,
   type AddShotInput,
@@ -123,6 +124,12 @@ export async function addShot(
   const sequence = await getSequence(db, scope, sequenceId);
   if (!sequence) return null;
   const shots = sequence.shots;
+  // The same ceiling a new or imported sequence has, so every sequence can
+  // travel in a world bundle.
+  if (shots.length >= MAX_SEQUENCE_SHOTS)
+    throw new Error(
+      `A sequence holds at most ${MAX_SEQUENCE_SHOTS} shots. Start another for the next scene.`,
+    );
   const index = afterShotId
     ? shots.findIndex((s) => s.id === afterShotId)
     : shots.length - 1;
