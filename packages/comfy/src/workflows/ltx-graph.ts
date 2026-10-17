@@ -38,8 +38,9 @@ export const FLUX2_KLEIN_MODELS = {
 export const LTX_DISTILLED_SIGMAS =
   "1.0, 0.99375, 0.9875, 0.98125, 0.975, 0.909375, 0.725, 0.421875, 0.0";
 
+/** Ends with the lens mask a camera-hardware prompt once drew (see LTX_FRAME_ARTEFACT). */
 export const LTX_NEGATIVE =
-  "blurry, out of focus, overexposed, underexposed, low contrast, washed out colors, excessive noise, flickering, distorted proportions, deformed facial features, extra limbs, disfigured hands, watermark, logo, subtitles, text overlay";
+  "blurry, out of focus, overexposed, underexposed, low contrast, washed out colors, excessive noise, flickering, distorted proportions, deformed facial features, extra limbs, disfigured hands, watermark, logo, subtitles, text overlay, vignette, dark corners, circular frame, keyhole mask, fisheye";
 
 export interface GraphLimits {
   /** Longest generated clip in frames (8n+1). */

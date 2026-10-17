@@ -91,6 +91,12 @@ export {
   thingReferences,
 } from "./revision-modes";
 export { ltxEditGraph, ltxEditPrompts, LTX_EDIT_LIMITS } from "./ltx-edit";
+export {
+  ltxRecastGraph,
+  ltxRecastPrompts,
+  LTX_RECAST_LIMITS,
+  LTX_RECAST_MODELS,
+} from "./ltx-recast";
 export { ltxCameraGraph } from "./ltx-camera";
 export { ltxRestageGraph, LTX_RESTAGE_LIMITS } from "./ltx-restage";
 

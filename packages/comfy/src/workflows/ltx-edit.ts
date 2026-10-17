@@ -63,7 +63,8 @@ export interface LtxEditGraphOptions {
   swap?: { original: string; replacement: string } | undefined;
 }
 
-function keyframeNodes(
+/** FLUX.2 Klein edits the take's first frame with the references (also used by ./ltx-recast.ts). */
+export function keyframeNodes(
   first: Link,
   prompt: string,
   references: number,
