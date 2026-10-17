@@ -22,6 +22,8 @@ import {
   type ResolvedMention,
   type WorkflowCommand,
   type WorkflowCommandInput,
+  type PlanSequenceInput,
+  type SequencePlan,
 } from "@open-cinema/contracts";
 import {
   initializeCoordinator,
@@ -46,6 +48,7 @@ import {
   type StageContext,
   type WorkflowDefinition,
 } from "@open-cinema/comfy";
+import { planSequence } from "@open-cinema/comfy";
 import {
   AssetUnavailableError,
   createAssetResolver,
@@ -435,6 +438,21 @@ export class GenerationCoordinator
   async getProviderStatus(): Promise<{ comfyConfigured: boolean }> {
     // Reads no storage, so probing a throwaway DO name creates no coordinator.
     return { comfyConfigured: Boolean(this.env.COMFY_API_KEY?.trim()) };
+  }
+
+  /**
+   * A short synchronous model call, not a job: nothing is generated or stored,
+   * and the creator reviews every proposed shot before spending on media.
+   */
+  async planSequence(
+    scope: OwnerScope,
+    input: PlanSequenceInput,
+  ): Promise<SequencePlan> {
+    ownerScopeSchema.parse(scope);
+    return planSequence(input, {
+      apiKey: this.env.COMFY_API_KEY ?? "",
+      baseUrl: (this.env as { COMFY_BASE_URL?: string }).COMFY_BASE_URL,
+    });
   }
 
   async getStoredOutput(

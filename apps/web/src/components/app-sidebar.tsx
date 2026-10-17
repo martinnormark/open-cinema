@@ -4,6 +4,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Clapperboard,
   FolderOpen,
+  Film,
   Shapes,
   BookOpen,
   Images,
@@ -28,6 +29,7 @@ import { BrandMark } from "@/components/brand-mark";
 const navigation = [
   { title: "Studio", to: "/", icon: Clapperboard },
   { title: "Projects", to: "/projects", icon: FolderOpen },
+  { title: "Sequences", to: "/sequences", icon: Film },
   { title: "Elements", to: "/elements", icon: Shapes },
   { title: "Recipes", to: "/recipes", icon: BookOpen },
   { title: "Library", to: "/library", icon: Images },

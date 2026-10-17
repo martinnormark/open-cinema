@@ -15,6 +15,7 @@ import { Route as ElementsRouteImport } from './routes/elements'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as ProjectsRouteImport } from './routes/projects'
 import { Route as RecipesRouteImport } from './routes/recipes'
+import { Route as SequencesRouteImport } from './routes/sequences'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ApiHealthRouteImport } from './routes/api.health'
 import { Route as ElementsIndexRouteImport } from './routes/elements.index'
@@ -24,6 +25,8 @@ import { Route as ProjectsIndexRouteImport } from './routes/projects.index'
 import { Route as ProjectsProjectIdRouteImport } from './routes/projects.$projectId'
 import { Route as RevisionsRevisionIdRouteImport } from './routes/revisions.$revisionId'
 import { Route as RevisionsNewRouteImport } from './routes/revisions.new'
+import { Route as SequencesIndexRouteImport } from './routes/sequences.index'
+import { Route as SequencesSequenceIdRouteImport } from './routes/sequences.$sequenceId'
 import { Route as ApiJobsOutputRouteImport } from './routes/api.jobs.output'
 import { Route as ApiJobsStreamRouteImport } from './routes/api.jobs.stream'
 import { Route as ApiMediaIdRouteImport } from './routes/api.media.$id'
@@ -57,6 +60,11 @@ const ProjectsRoute = ProjectsRouteImport.update({
 const RecipesRoute = RecipesRouteImport.update({
   id: '/recipes',
   path: '/recipes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SequencesRoute = SequencesRouteImport.update({
+  id: '/sequences',
+  path: '/sequences',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -104,6 +112,16 @@ const RevisionsNewRoute = RevisionsNewRouteImport.update({
   path: '/revisions/new',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SequencesIndexRoute = SequencesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => SequencesRoute,
+} as any)
+const SequencesSequenceIdRoute = SequencesSequenceIdRouteImport.update({
+  id: '/$sequenceId',
+  path: '/$sequenceId',
+  getParentRoute: () => SequencesRoute,
+} as any)
 const ApiJobsOutputRoute = ApiJobsOutputRouteImport.update({
   id: '/api/jobs/output',
   path: '/api/jobs/output',
@@ -132,6 +150,7 @@ export interface FileRoutesByFullPath {
   '/library': typeof LibraryRoute
   '/projects': typeof ProjectsRouteWithChildren
   '/recipes': typeof RecipesRoute
+  '/sequences': typeof SequencesRouteWithChildren
   '/settings': typeof SettingsRoute
   '/api/health': typeof ApiHealthRoute
   '/elements/$elementId': typeof ElementsElementIdRoute
@@ -139,8 +158,10 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/revisions/$revisionId': typeof RevisionsRevisionIdRoute
   '/revisions/new': typeof RevisionsNewRoute
+  '/sequences/$sequenceId': typeof SequencesSequenceIdRoute
   '/elements/': typeof ElementsIndexRoute
   '/projects/': typeof ProjectsIndexRoute
+  '/sequences/': typeof SequencesIndexRoute
   '/api/jobs/output': typeof ApiJobsOutputRoute
   '/api/jobs/stream': typeof ApiJobsStreamRoute
   '/api/media/$id': typeof ApiMediaIdRoute
@@ -158,8 +179,10 @@ export interface FileRoutesByTo {
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/revisions/$revisionId': typeof RevisionsRevisionIdRoute
   '/revisions/new': typeof RevisionsNewRoute
+  '/sequences/$sequenceId': typeof SequencesSequenceIdRoute
   '/elements': typeof ElementsIndexRoute
   '/projects': typeof ProjectsIndexRoute
+  '/sequences': typeof SequencesIndexRoute
   '/api/jobs/output': typeof ApiJobsOutputRoute
   '/api/jobs/stream': typeof ApiJobsStreamRoute
   '/api/media/$id': typeof ApiMediaIdRoute
@@ -173,6 +196,7 @@ export interface FileRoutesById {
   '/library': typeof LibraryRoute
   '/projects': typeof ProjectsRouteWithChildren
   '/recipes': typeof RecipesRoute
+  '/sequences': typeof SequencesRouteWithChildren
   '/settings': typeof SettingsRoute
   '/api/health': typeof ApiHealthRoute
   '/elements/$elementId': typeof ElementsElementIdRoute
@@ -180,8 +204,10 @@ export interface FileRoutesById {
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/revisions/$revisionId': typeof RevisionsRevisionIdRoute
   '/revisions/new': typeof RevisionsNewRoute
+  '/sequences/$sequenceId': typeof SequencesSequenceIdRoute
   '/elements/': typeof ElementsIndexRoute
   '/projects/': typeof ProjectsIndexRoute
+  '/sequences/': typeof SequencesIndexRoute
   '/api/jobs/output': typeof ApiJobsOutputRoute
   '/api/jobs/stream': typeof ApiJobsStreamRoute
   '/api/media/$id': typeof ApiMediaIdRoute
@@ -196,6 +222,7 @@ export interface FileRouteTypes {
     | '/library'
     | '/projects'
     | '/recipes'
+    | '/sequences'
     | '/settings'
     | '/api/health'
     | '/elements/$elementId'
@@ -203,8 +230,10 @@ export interface FileRouteTypes {
     | '/projects/$projectId'
     | '/revisions/$revisionId'
     | '/revisions/new'
+    | '/sequences/$sequenceId'
     | '/elements/'
     | '/projects/'
+    | '/sequences/'
     | '/api/jobs/output'
     | '/api/jobs/stream'
     | '/api/media/$id'
@@ -222,8 +251,10 @@ export interface FileRouteTypes {
     | '/projects/$projectId'
     | '/revisions/$revisionId'
     | '/revisions/new'
+    | '/sequences/$sequenceId'
     | '/elements'
     | '/projects'
+    | '/sequences'
     | '/api/jobs/output'
     | '/api/jobs/stream'
     | '/api/media/$id'
@@ -236,6 +267,7 @@ export interface FileRouteTypes {
     | '/library'
     | '/projects'
     | '/recipes'
+    | '/sequences'
     | '/settings'
     | '/api/health'
     | '/elements/$elementId'
@@ -243,8 +275,10 @@ export interface FileRouteTypes {
     | '/projects/$projectId'
     | '/revisions/$revisionId'
     | '/revisions/new'
+    | '/sequences/$sequenceId'
     | '/elements/'
     | '/projects/'
+    | '/sequences/'
     | '/api/jobs/output'
     | '/api/jobs/stream'
     | '/api/media/$id'
@@ -258,6 +292,7 @@ export interface RootRouteChildren {
   LibraryRoute: typeof LibraryRoute
   ProjectsRoute: typeof ProjectsRouteWithChildren
   RecipesRoute: typeof RecipesRoute
+  SequencesRoute: typeof SequencesRouteWithChildren
   SettingsRoute: typeof SettingsRoute
   ApiHealthRoute: typeof ApiHealthRoute
   RevisionsRevisionIdRoute: typeof RevisionsRevisionIdRoute
@@ -310,6 +345,13 @@ declare module '@tanstack/react-router' {
       path: '/recipes'
       fullPath: '/recipes'
       preLoaderRoute: typeof RecipesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sequences': {
+      id: '/sequences'
+      path: '/sequences'
+      fullPath: '/sequences'
+      preLoaderRoute: typeof SequencesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -375,6 +417,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RevisionsNewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sequences/': {
+      id: '/sequences/'
+      path: '/'
+      fullPath: '/sequences/'
+      preLoaderRoute: typeof SequencesIndexRouteImport
+      parentRoute: typeof SequencesRoute
+    }
+    '/sequences/$sequenceId': {
+      id: '/sequences/$sequenceId'
+      path: '/$sequenceId'
+      fullPath: '/sequences/$sequenceId'
+      preLoaderRoute: typeof SequencesSequenceIdRouteImport
+      parentRoute: typeof SequencesRoute
+    }
     '/api/jobs/output': {
       id: '/api/jobs/output'
       path: '/api/jobs/output'
@@ -436,6 +492,20 @@ const ProjectsRouteWithChildren = ProjectsRoute._addFileChildren(
   ProjectsRouteChildren,
 )
 
+interface SequencesRouteChildren {
+  SequencesSequenceIdRoute: typeof SequencesSequenceIdRoute
+  SequencesIndexRoute: typeof SequencesIndexRoute
+}
+
+const SequencesRouteChildren: SequencesRouteChildren = {
+  SequencesSequenceIdRoute: SequencesSequenceIdRoute,
+  SequencesIndexRoute: SequencesIndexRoute,
+}
+
+const SequencesRouteWithChildren = SequencesRoute._addFileChildren(
+  SequencesRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ActivityRoute: ActivityRoute,
@@ -443,6 +513,7 @@ const rootRouteChildren: RootRouteChildren = {
   LibraryRoute: LibraryRoute,
   ProjectsRoute: ProjectsRouteWithChildren,
   RecipesRoute: RecipesRoute,
+  SequencesRoute: SequencesRouteWithChildren,
   SettingsRoute: SettingsRoute,
   ApiHealthRoute: ApiHealthRoute,
   RevisionsRevisionIdRoute: RevisionsRevisionIdRoute,
