@@ -8,6 +8,10 @@ export default defineConfig(async () => ({
       miniflare: {
         bindings: {
           COMFY_API_KEY: "integration-test-key",
+          // Override any .dev.vars relay or public origin: tests must only ever
+          // reach msw fixtures, never a real Router endpoint.
+          COMFY_BASE_URL: "",
+          MEDIA_PUBLIC_ORIGIN: "",
           TEST_MIGRATIONS: await readD1Migrations(
             "../../packages/database/migrations",
           ),
