@@ -16,15 +16,12 @@ import {
   addElementReference,
   createElement,
   createElementState,
-  createPendingMediaAsset,
   deleteElement,
   deleteElementState,
-  markMediaAssetReady,
   removeElementReference,
   updateElement,
   updateElementReference,
 } from "@open-cinema/database/mutations";
-import { mediaStore } from "./media";
 import { requireSameOrigin, requireSession } from "./session";
 
 async function owner(): Promise<{ db: DatabaseContext; scope: OwnerScope }> {
@@ -85,41 +82,10 @@ export const deleteMyElement = createServerFn({ method: "POST" })
     return { ok: await deleteElement(db, scope, data.id) };
   });
 
-/**
- * Uploads still keep their metadata in the Library's R2 sidecar. Register the
- * owner's verified upload as a D1 MediaAsset so the reference can point at it.
- */
-async function registerUpload(
-  db: DatabaseContext,
-  scope: OwnerScope,
-  assetId: string,
-) {
-  const record = await mediaStore().get(scope.ownerId, assetId);
-  if (!record || record.kind !== "image") return;
-  await createPendingMediaAsset(db, scope, {
-    id: record.id,
-    r2Key: record.r2Key,
-    filename: record.filename,
-    mediaType: record.mediaType,
-    sizeBytes: Math.max(1, record.sizeBytes),
-    ...(record.width ? { width: record.width } : {}),
-    ...(record.height ? { height: record.height } : {}),
-  });
-  await markMediaAssetReady(db, scope, record.id, {
-    sizeBytes: record.sizeBytes,
-    etag: record.etag,
-  });
-}
-
 export const addMyElementReference = createServerFn({ method: "POST" })
   .validator(addElementReferenceInputSchema)
   .handler(async ({ data }) => {
     const { db, scope } = await mutate();
-    if (
-      data.asset.type === "media-asset" &&
-      !(await resolveAssetRef(db, scope, data.asset))
-    )
-      await registerUpload(db, scope, data.asset.assetId).catch(() => {});
     if (
       data.asset.type === "job-output" &&
       !(await resolveAssetRef(db, scope, data.asset))

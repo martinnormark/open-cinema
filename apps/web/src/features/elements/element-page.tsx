@@ -7,6 +7,7 @@ import {
   CircleDashed,
   Copy,
   ImagePlus,
+  Images,
   Plus,
   Sparkles,
   Trash2,
@@ -46,7 +47,7 @@ import {
   updateReference,
   useElement,
 } from "./store";
-import { ACCEPTED_IMAGES, uploadReferenceImage } from "./upload";
+import { MediaPicker, uploadFiles, type AssetRef } from "@/features/library";
 import { SessionRequired, typeIcons } from "./visuals";
 
 export function ElementPage({
@@ -639,26 +640,33 @@ function ReferenceSheet({
   const rejected = references.filter((r) => r.status === "rejected");
   const reviewCount = experiments.length + pending.length;
 
+  const [picking, setPicking] = useState(false);
+  async function attach(assets: AssetRef[]) {
+    for (const asset of assets)
+      await addReference({
+        elementId: element.id,
+        ...(stateId ? { stateId } : {}),
+        asset,
+        status: "experiment",
+      }).catch((e: unknown) =>
+        onError(
+          e instanceof Error ? e.message : "The image could not be added.",
+        ),
+      );
+  }
   async function upload(files: FileList | null) {
     if (!files?.length) return;
-    const list = Array.from(files);
+    const list = Array.from(files).filter((f) => f.type.startsWith("image/"));
     setUploading((n) => n + list.length);
-    for (const file of list) {
-      try {
-        const assetId = await uploadReferenceImage(file);
-        await addReference({
-          elementId: element.id,
-          ...(stateId ? { stateId } : {}),
-          asset: { type: "media-asset", assetId },
-          status: "experiment",
-        });
-      } catch (e) {
+    try {
+      const items = await uploadFiles(list);
+      if (items.some((item) => !item))
         onError(
-          e instanceof Error ? e.message : `${file.name} could not be added.`,
+          "Some images could not be uploaded. Retry them from your Library.",
         );
-      } finally {
-        setUploading((n) => n - 1);
-      }
+      await attach(items.flatMap((item) => (item ? [item.ref] : [])));
+    } finally {
+      setUploading((n) => n - list.length);
     }
   }
 
@@ -699,20 +707,38 @@ function ReferenceSheet({
               {reviewCount}
             </span>
           </h2>
-          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-sm text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring">
-            <ImagePlus aria-hidden="true" className="size-4" />
-            {uploading ? `Uploading ${uploading}…` : "Upload images"}
-            <input
-              type="file"
-              accept={ACCEPTED_IMAGES}
-              multiple
-              className="sr-only"
-              onChange={(event) => {
-                void upload(event.target.files);
-                event.target.value = "";
-              }}
-            />
-          </label>
+          <div className="flex flex-wrap gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground"
+              onClick={() => setPicking(true)}
+            >
+              <Images aria-hidden="true" /> From Library
+            </Button>
+            <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring">
+              <ImagePlus aria-hidden="true" className="size-4" />
+              {uploading ? `Uploading ${uploading}…` : "Upload images"}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                multiple
+                className="sr-only"
+                onChange={(event) => {
+                  void upload(event.target.files);
+                  event.target.value = "";
+                }}
+              />
+            </label>
+          </div>
+          <MediaPicker
+            open={picking}
+            onOpenChange={setPicking}
+            kind="image"
+            title={`Add to ${element.name}${state ? ` · ${state.name}` : ""}`}
+            description="Pick an image you uploaded or generated. It joins the explorations for you to review."
+            onSelect={(item) => void attach([item.ref])}
+          />
         </div>
         <p className="mt-1 text-sm leading-6 text-muted-foreground">
           Candidates to approve or reject. They never shape a generation until

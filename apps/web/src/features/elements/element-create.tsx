@@ -1,32 +1,53 @@
 import { useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, ImagePlus, Sparkles, X } from "lucide-react";
+import { ArrowLeft, ImagePlus, Images, Sparkles, X } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { generateViews, useJobViews } from "./generate";
 import {
+  assetUrl,
   elementTypeOrder,
   elementTypes,
   toHandle,
   type ElementType,
 } from "./model";
 import { addReference, createElement, handleTaken, useElements } from "./store";
-import { ACCEPTED_IMAGES, uploadReferenceImage } from "./upload";
+import { MediaPicker, uploadFiles, type AssetRef } from "@/features/library";
 import { SessionRequired, typeIcons } from "./visuals";
 
 const EXPLORATIONS = 2;
 
-interface Draft {
-  file: File;
-  preview: string;
+const ACCEPTED_IMAGES = "image/png,image/jpeg,image/webp";
+
+/** Starting material: a local file to upload, or something already stored. */
+type Draft =
+  | { kind: "file"; key: string; file: File; preview: string; label: string }
+  | {
+      kind: "stored";
+      key: string;
+      ref: AssetRef;
+      preview: string;
+      label: string;
+    };
+
+function storedDraft(ref: AssetRef, label: string): Draft {
+  return {
+    kind: "stored",
+    key: JSON.stringify(ref),
+    ref,
+    preview: assetUrl(ref),
+    label,
+  };
 }
 
 export function ElementCreate({
   initialType,
+  initialReference,
 }: {
   initialType?: ElementType | undefined;
+  initialReference?: AssetRef | null | undefined;
 }) {
   const navigate = useNavigate();
   const { status } = useElements();
@@ -34,7 +55,12 @@ export function ElementCreate({
   const [type, setType] = useState<ElementType>(initialType ?? "character");
   const [name, setName] = useState("");
   const [thought, setThought] = useState("");
-  const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [drafts, setDrafts] = useState<Draft[]>(() =>
+    initialReference
+      ? [storedDraft(initialReference, "Image from your Library")]
+      : [],
+  );
+  const [picking, setPicking] = useState(false);
   const [explore, setExplore] = useState(true);
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
@@ -50,6 +76,14 @@ export function ElementCreate({
 
   if (status === "signed-out") return <SessionRequired />;
 
+  function addDrafts(next: Draft[]) {
+    setDrafts((current) =>
+      [
+        ...current,
+        ...next.filter((d) => !current.some((c) => c.key === d.key)),
+      ].slice(0, 12),
+    );
+  }
   function addFiles(files: FileList | null) {
     if (!files?.length) return;
     const accepted = ACCEPTED_IMAGES.split(",");
@@ -58,12 +92,15 @@ export function ElementCreate({
     );
     if (next.length < files.length)
       setError("Only PNG, JPEG and WebP images can join a reference sheet.");
-    setDrafts((current) =>
-      [
-        ...current,
-        ...next.map((file) => ({ file, preview: URL.createObjectURL(file) })),
-      ].slice(0, 12),
+    addDrafts(
+      next.map((file) => {
+        const preview = URL.createObjectURL(file);
+        return { kind: "file", key: preview, file, preview, label: file.name };
+      }),
     );
+  }
+  function release(draft: Draft) {
+    if (draft.kind === "file") URL.revokeObjectURL(draft.preview);
   }
 
   async function create() {
@@ -79,25 +116,27 @@ export function ElementCreate({
         description: thought.trim(),
       });
       elementId = element.id;
-      for (const [index, draft] of drafts.entries()) {
-        setProgress(`Uploading ${index + 1} of ${drafts.length}…`);
-        try {
-          await addReference({
-            elementId: element.id,
-            asset: {
-              type: "media-asset",
-              assetId: await uploadReferenceImage(draft.file),
-            },
-            status: "experiment",
-          });
-        } catch (e) {
+      const files = drafts.flatMap((d) => (d.kind === "file" ? [d.file] : []));
+      if (files.length) setProgress(`Uploading ${files.length}…`);
+      const uploaded = files.length ? await uploadFiles(files) : [];
+      if (uploaded.some((item) => !item))
+        problems.push(
+          "Some images could not be uploaded. Retry them from your Library.",
+        );
+      const refs = [
+        ...drafts.flatMap((d) => (d.kind === "stored" ? [d.ref] : [])),
+        ...uploaded.flatMap((item) => (item ? [item.ref] : [])),
+      ];
+      for (const asset of refs)
+        await addReference({
+          elementId: element.id,
+          asset,
+          status: "experiment",
+        }).catch((e: unknown) =>
           problems.push(
-            e instanceof Error
-              ? e.message
-              : `${draft.file.name} was not added.`,
-          );
-        }
-      }
+            e instanceof Error ? e.message : "An image was not added.",
+          ),
+        );
       if (willExplore) {
         setProgress("Starting explorations…");
         await generateViews(element, firstViews, null, ready).catch(
@@ -109,7 +148,7 @@ export function ElementCreate({
             ),
         );
       }
-      for (const draft of drafts) URL.revokeObjectURL(draft.preview);
+      drafts.forEach(release);
       await navigate({
         to: "/elements/$elementId",
         params: { elementId: element.id },
@@ -258,24 +297,24 @@ export function ElementCreate({
           <div className="mt-3 flex flex-wrap gap-3">
             {drafts.map((draft, index) => (
               <figure
-                key={draft.preview}
+                key={draft.key}
                 className="relative size-24 overflow-hidden rounded-lg bg-surface"
               >
                 <img
                   src={draft.preview}
-                  alt={draft.file.name}
+                  alt={draft.label}
                   className="size-full object-cover"
                 />
                 <button
                   type="button"
                   onClick={() => {
-                    URL.revokeObjectURL(draft.preview);
+                    release(draft);
                     setDrafts((current) =>
                       current.filter((_, i) => i !== index),
                     );
                   }}
                   className="absolute top-1 right-1 rounded-full bg-elevated/90 p-1 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  aria-label={`Remove ${draft.file.name}`}
+                  aria-label={`Remove ${draft.label}`}
                 >
                   <X aria-hidden="true" className="size-3.5" />
                 </button>
@@ -300,6 +339,23 @@ export function ElementCreate({
               />
             </label>
           </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="mt-3 text-muted-foreground"
+            onClick={() => setPicking(true)}
+          >
+            <Images aria-hidden="true" /> Choose from Library
+          </Button>
+          <MediaPicker
+            open={picking}
+            onOpenChange={setPicking}
+            kind="image"
+            title="Starting material"
+            description="Pick images you uploaded or generated. They arrive as explorations."
+            onSelect={(item) => addDrafts([storedDraft(item.ref, item.title)])}
+          />
           <p className="mt-2 text-xs leading-5 text-muted-foreground">
             Uploads arrive as explorations. Nothing joins the reference sheet
             until you approve it.
