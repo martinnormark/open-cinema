@@ -114,7 +114,8 @@ each mention is described in text, and is where the camera-move LoRAs live.
   stays the default everywhere a Location has no move, and makes the moving
   references themselves. Bringing reference shots to LTX needs an in-context
   adapter of our own (an IC-LoRA trained on empty-location moves paired with
-  shots in the same place); no third-party LoRA is used.
+  shots in the same place); no third-party LoRA is used. The plan is in
+  [location-reference-ic-lora.md](location-reference-ic-lora.md).
 - **The reference move steers the camera.** In the first live reference shot
   (Tide Mill, 5 s), the place, the added character and the light ("low sun
   behind the mill house", where the reference was overcast) all came through,
