@@ -78,6 +78,26 @@ export const DEFAULT_PRESERVATION = {
     ],
     allowIntegration: true,
   },
+  object: {
+    preserve: [
+      "performance",
+      "timing",
+      "camera",
+      "framing",
+      "background",
+      "other-people",
+      "audio",
+    ],
+    allowIntegration: true,
+  },
+  restyle: {
+    preserve: ["performance", "timing", "camera", "framing", "audio"],
+    allowIntegration: true,
+  },
+  restage: {
+    preserve: ["performance", "timing", "audio"],
+    allowIntegration: true,
+  },
 } as const satisfies Record<string, PreservationIntent>;
 
 export const revisionStatusSchema = z.enum([

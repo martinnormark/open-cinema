@@ -6,6 +6,11 @@ import {
   fluxReferenceWorkflow,
   ltxVideoWorkflow,
 } from "./definitions";
+import {
+  objectSwapWorkflow,
+  restageWorkflow,
+  restyleWorkflow,
+} from "./revision-modes";
 import type { WorkflowDefinition, WorkflowStage } from "./types";
 
 export type {
@@ -68,6 +73,21 @@ export {
   switchxBackgroundRequest,
 } from "./background-replace";
 
+export {
+  describeObject,
+  objectSwapWorkflow,
+  restageWorkflow,
+  restyleWorkflow,
+  thingReferences,
+} from "./revision-modes";
+export { ltxEditGraph, ltxEditPrompts, LTX_EDIT_LIMITS } from "./ltx-edit";
+export {
+  crossViewPrompt,
+  ltxCameraGraph,
+  ltxRestageGraph,
+  LTX_RESTAGE_LIMITS,
+} from "./ltx-camera";
+
 type Registry = { [K in WorkflowKind]?: WorkflowDefinition<K> };
 
 /**
@@ -81,6 +101,9 @@ const registry: Registry = {
   "video.ltx": ltxVideoWorkflow,
   "video.background-replace": backgroundReplaceWorkflow,
   "video.character-replace": characterReplaceWorkflow,
+  "video.object-swap": objectSwapWorkflow,
+  "video.restyle": restyleWorkflow,
+  "video.restage": restageWorkflow,
 };
 
 export function getWorkflowDefinition<K extends WorkflowKind>(

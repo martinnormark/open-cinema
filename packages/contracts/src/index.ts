@@ -203,3 +203,4 @@ export * from "./workflows";
 export * from "./direction";
 export * from "./capabilities";
 export * from "./recipes";
+export * from "./camera";
