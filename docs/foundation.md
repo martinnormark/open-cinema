@@ -66,7 +66,16 @@ The coordinator itself needs no change. An unregistered kind is rejected at subm
 
 Each domain gets its own `apps/web/src/server/<domain>.ts`, such as `elements.ts`, `media.ts`, `revisions.ts` and `estimates.ts`. Nobody edits `functions.ts`. Database access goes through `@open-cinema/database`, never through Prisma directly. R2 blob operations live in `packages/assets`.
 
+## Running live jobs locally behind a credential-injecting proxy
+
+workerd connects directly, not through `HTTPS_PROXY`. In an environment whose proxy injects Comfy credentials, such as a Claude Code cloud container with no `COMFY_API_KEY` value, the local jobs Worker gets 401s from Router. For development:
+
+1. Run `bun scripts/comfy-relay.ts`. It listens on `127.0.0.1:8790` only, forwards to `https://api.comfy.org` through `HTTPS_PROXY`, and drops the caller's `Authorization` header.
+2. In `apps/jobs/.dev.vars`, set `COMFY_BASE_URL="http://127.0.0.1:8790"` and set `COMFY_API_KEY` to any non-empty placeholder.
+
+`routerBaseUrl` ignores any override that is not plain http on loopback, so a deployed Worker always sends its own secret to Router directly. I verified on 2026-10-17 that a queued FLUX 3 Image submission and its status polling succeed through the relay with a placeholder key.
+
 ## Known gaps
 
 - Job outputs have no signed public link yet, so a replacement whose source is a generated clip can only use inline base64 (14 MB or less) until one exists.
-- The lifecycle test "deduplicates concurrent commands … cancels queued work" fails intermittently under full-suite load. It also fails on the commit before dispatch landed: the coordinator's immediate alarm can submit before the test's cancel arrives.
+- `apps/jobs` tests run files serially (`fileParallelism: false`). With parallel files in small containers, the alarm-driven lifecycle tests time out. Their "cancels queued work" case also assumes the cancel arrives before the coordinator's immediate alarm, which only holds without contention.

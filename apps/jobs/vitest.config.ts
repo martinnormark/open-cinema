@@ -15,5 +15,10 @@ export default defineConfig(async () => ({
       },
     }),
   ],
-  test: { include: ["test/**/*.test.ts"] },
+  test: {
+    include: ["test/**/*.test.ts"],
+    // Lifecycle tests drive real DO alarms; parallel files starve them in
+    // small containers and they time out. Serial files are deterministic.
+    fileParallelism: false,
+  },
 }));

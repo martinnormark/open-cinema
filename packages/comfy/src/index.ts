@@ -55,11 +55,33 @@ export function submissionFailure(error: unknown, provider = "router") {
       : "Waiting to recover the Router receipt using the original request key.",
   };
 }
+export const ROUTER_BASE_URL = "https://api.comfy.org";
+/**
+ * Development override for a loopback relay (scripts/comfy-relay.ts). Anything
+ * that is not plain http on 127.0.0.1 or localhost is ignored, so a deployed
+ * Worker always sends its key to Router itself.
+ */
+export function routerBaseUrl(override: string | undefined): string {
+  if (!override) return ROUTER_BASE_URL;
+  try {
+    const url = new URL(override);
+    return url.protocol === "http:" &&
+      (url.hostname === "127.0.0.1" || url.hostname === "localhost") &&
+      url.pathname === "/" &&
+      !url.search
+      ? url.origin
+      : ROUTER_BASE_URL;
+  } catch {
+    return ROUTER_BASE_URL;
+  }
+}
 /** SDK calls stay bounded; durable alarms own retries and polling. */
 export function createComfyClient(options: {
   apiKey: string;
   provider?: "router" | "cloud-workflow";
   workflow?: Record<string, unknown> | ProviderRequest;
+  /** Development-only loopback relay; see routerBaseUrl. */
+  baseUrl?: string | undefined;
   /** Maps a Router result document to outputs; defaults to `sample` or `video_url`. */
   outputs?: ((data: unknown) => ProviderOutput[]) | undefined;
 }) {
@@ -69,7 +91,7 @@ export function createComfyClient(options: {
   // the SAME Worker secret, never a caller-supplied key. BYOK requires an isolated client.
   comfy.config({
     credentials: options.apiKey,
-    baseUrl: "https://api.comfy.org",
+    baseUrl: routerBaseUrl(options.baseUrl),
   });
   const model = options.workflow?.model ?? ROUTER_MODEL;
   if (typeof model !== "string")

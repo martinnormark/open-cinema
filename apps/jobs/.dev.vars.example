@@ -1,3 +1,13 @@
 # Copy to .dev.vars to enable Comfy Router generation.
 # No credentials are needed for the scaffold or integration tests.
 COMFY_API_KEY=""
+
+# Development only. In an environment whose HTTPS proxy injects Comfy
+# credentials (workerd bypasses HTTPS_PROXY), run `bun scripts/comfy-relay.ts`
+# and point the jobs Worker at it. Set COMFY_API_KEY to any non-empty
+# placeholder; the relay drops it. Ignored unless it is http on loopback.
+# COMFY_BASE_URL="http://127.0.0.1:8790"
+
+# Optional: provider-fetchable links for uploaded media (see docs/foundation.md).
+# MEDIA_PUBLIC_ORIGIN="https://studio.example.com"
+# MEDIA_SIGNING_SECRET="same value as the web Worker's LOCAL_SESSION_SECRET"

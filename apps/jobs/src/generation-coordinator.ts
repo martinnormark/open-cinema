@@ -311,6 +311,7 @@ export class GenerationCoordinator
   private client(execution: Execution) {
     return createComfyClient({
       apiKey: this.env.COMFY_API_KEY ?? "",
+      baseUrl: (this.env as { COMFY_BASE_URL?: string }).COMFY_BASE_URL,
       provider: execution.provider,
       workflow: execution.workflow,
       ...(execution.provider === "router"
