@@ -93,18 +93,21 @@ it("dispatches a typed image.flux command, snapshotting mentioned Elements witho
     description: "Tall courier with a scar over her left brow",
   });
   const bodies = captureSubmissions();
-  const job = accepted(
-    await stub.submit(scope, {
-      idempotencyKey: crypto.randomUUID(),
-      request: {
-        workflowKind: "image.flux",
-        inputs: {
-          prompt: "@Mara waits at the harbor before sunrise, @Unknown nearby",
-          aspectRatio: "16:9",
-        },
+  const command = {
+    idempotencyKey: crypto.randomUUID(),
+    request: {
+      workflowKind: "image.flux" as const,
+      inputs: {
+        prompt: "@Mara waits at the harbor before sunrise, @Unknown nearby",
+        aspectRatio: "16:9" as const,
       },
-    }),
-  );
+    },
+  };
+  const first = await stub.submit(scope, command);
+  const job = accepted(first);
+  // A retry with the same key names the job it maps to.
+  const retry = await stub.submit(scope, command);
+  expect(retry).toMatchObject({ ok: true, jobId: job.id });
   expect(job).toMatchObject({
     workflowKind: "image.flux",
     model: "FLUX 3 Image",

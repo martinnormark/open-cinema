@@ -80,7 +80,12 @@ export const snapshotSchema = z.object({
 });
 export type JobSnapshot = z.infer<typeof snapshotSchema>;
 export const commandResultSchema = z.discriminatedUnion("ok", [
-  z.object({ ok: z.literal(true), snapshot: snapshotSchema }),
+  z.object({
+    ok: z.literal(true),
+    snapshot: snapshotSchema,
+    /** The job a submit accepted, or the existing job its idempotency key maps to. */
+    jobId: z.string().optional(),
+  }),
   z.object({ ok: z.literal(false), error: z.string() }),
 ]);
 export type CommandResult = z.infer<typeof commandResultSchema>;

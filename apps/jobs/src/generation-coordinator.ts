@@ -151,15 +151,21 @@ export class GenerationCoordinator
         );
       }
     let error: string | null = null;
+    let jobId: string | null = null;
     const record = await mutateCoordinator(
       this.ctx.storage,
       scope,
       (record) => {
         error = null;
+        jobId = null;
         const existing = Object.values(record.executions).find(
           (e) => e.command.idempotencyKey === command.idempotencyKey,
         );
         if (existing) {
+          jobId =
+            Object.entries(record.executions).find(
+              ([, e]) => e === existing,
+            )?.[0] ?? null;
           if (existing.requestHash !== requestHash)
             error =
               "This request key was already used for a different request.";
@@ -200,6 +206,7 @@ export class GenerationCoordinator
           outputs: [],
         };
         record.jobs.unshift(job);
+        jobId = job.id;
         record.executions[job.id] = {
           command,
           requestHash,
@@ -221,7 +228,11 @@ export class GenerationCoordinator
     if (!record) return failure("Forbidden");
     if (error) return failure(error);
     this.broadcast(record);
-    return { ok: true, snapshot: snapshot(record) };
+    return {
+      ok: true,
+      snapshot: snapshot(record),
+      ...(jobId ? { jobId } : {}),
+    };
   }
 
   async cancel(scope: OwnerScope, jobId: string): Promise<CommandResult> {

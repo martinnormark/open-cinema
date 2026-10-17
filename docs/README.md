@@ -21,3 +21,8 @@ Researched on **2026-10-16** from official Comfy sources. These files summarize 
 | Automation and agents | [CLI and agent tools](cli-and-agent-tools.md) | Script operations or connect an AI agent |
 
 Primary entry points: [developer documentation](https://docs.comfy.org/development/overview), [developer index](https://docs.comfy.org/_llms/en/developers.txt), and [full documentation index](https://docs.comfy.org/llms.txt).
+
+## Project internals
+
+- [Foundation](foundation.md): contracts, persistence, workflow dispatch, and how to add a workflow kind.
+- [Router model catalog](comfy-router-catalog.md): every Router model and the inputs of those our workflows use.
