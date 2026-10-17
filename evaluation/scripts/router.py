@@ -113,7 +113,7 @@ def run(model, body, out_dir, poll_s=5, deadline_s=3600):
     log["elapsed_s"] = round(time.time() - t0, 1)
     s, result = _call("GET", f"/v2/models/{model}/requests/{rid}")
     log["result_status"], log["result"] = s, result
-    files = []
+    files = _save_inline(result, out_dir)
     for i, (key, url) in enumerate(_find_urls(result)):
         ext = os.path.splitext(url.split("?")[0])[1] or ".bin"
         dest = os.path.join(out_dir, f"out{i}_{key}{ext}")
@@ -125,6 +125,32 @@ def run(model, body, out_dir, poll_s=5, deadline_s=3600):
     log["files"] = files
     _write(out_dir, log)
     return log
+
+
+def _save_inline(doc, out_dir):
+    """Decode inline base64 media (Veo returns `bytesBase64Encoded`) and redact it from the log."""
+    import base64
+
+    saved = []
+
+    def walk(v):
+        if isinstance(v, dict):
+            for k, x in list(v.items()):
+                if k == "bytesBase64Encoded" and isinstance(x, str):
+                    ext = ".mp4" if "video" in (v.get("mimeType") or "video/mp4") else ".png"
+                    dest = os.path.join(out_dir, f"out{len(saved)}_inline{ext}")
+                    with open(dest, "wb") as f:
+                        f.write(base64.b64decode(x))
+                    saved.append(dest)
+                    v[k] = f"<{len(x)} base64 chars saved to {os.path.basename(dest)}>"
+                else:
+                    walk(x)
+        elif isinstance(v, list):
+            for x in v:
+                walk(x)
+
+    walk(doc)
+    return saved
 
 
 def _write(out_dir, log):

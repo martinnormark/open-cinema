@@ -1,0 +1,9 @@
+{
+ "model": "bria/video-edit-replace-background",
+ "body": {
+  "video": "<source:c3>",
+  "background_url": "<plate:loc-harbor>",
+  "output_container_and_codec": "mp4_h264",
+  "preserve_audio": false
+ }
+}

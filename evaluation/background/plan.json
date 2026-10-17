@@ -1,0 +1,10 @@
+{
+  "pairs": {
+    "c1": "harbor",
+    "c2": "greenhouse",
+    "c3": "harbor",
+    "c4": "greenhouse",
+    "c5": "harbor"
+  },
+  "pipelines": ["bria-composite", "switchx-ref", "kling-o1-edit", "bfl-video-edit", "wan27-edit", "aleph2-edit"]
+}

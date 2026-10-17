@@ -1,0 +1,11 @@
+{
+ "model": "beeble/switchx",
+ "body": {
+  "generation_type": "video",
+  "source_uri": "<source:c5>",
+  "alpha_mode": "auto",
+  "reference_image_uri": "<plate:loc-harbor>",
+  "prompt": "The same people in a small working fishing harbor at dusk: weathered wooden pier, moored fishing boats, stacked lobster crates and coiled ropes, warm sodium lamps glowing against a deep blue evening sky, calm dark water.",
+  "max_resolution": 720
+ }
+}

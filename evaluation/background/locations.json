@@ -1,0 +1,14 @@
+{
+  "harbor": {
+    "element": "@Harbor",
+    "state": "dusk",
+    "references": ["loc-harbor", "loc-harbor-pier"],
+    "description": "a small working fishing harbor at dusk: weathered wooden pier, moored fishing boats, stacked lobster crates and coiled ropes, warm sodium lamps glowing against a deep blue evening sky, calm dark water"
+  },
+  "greenhouse": {
+    "element": "@Greenhouse",
+    "state": "late morning",
+    "references": ["loc-greenhouse"],
+    "description": "the interior of a large Victorian glass greenhouse in bright late-morning sun: white painted iron frames, tall palms and ferns, terracotta pots on wooden benches, a gravel path, dappled sunlight"
+  }
+}
