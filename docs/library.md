@@ -46,6 +46,25 @@ Posters are drawn in the browser; no server decodes video.
 - **Serving:** `/api/media/<id>?variant=poster` and `/api/jobs/output?job=…&output=…&variant=poster` serve the recorded poster. `posterUrl(ref)` in `features/revision/model.ts` builds either URL.
 - **While it is drawn:** `Thumbnail` shows its film icon until the still loads. A clip just uploaded keeps the frame already drawn if its poster did not save, until the page reloads.
 
+### When no browser is open
+
+Browser-side media work only happens while some browser has the studio open. A generation keeps running in the jobs Worker after the tab that started it closes, so when it finishes nobody may be there to draw its poster. This is how each case is picked up:
+
+| Case                                                                                            | What happens                                                                                                                                                                                                                                 | Status                       |
+| ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| A job's video result finishes with no browser open                                              | Saved to R2 and listed without a poster, width, height or length. The first time any browser of the owner lists or plays it, its poster route answers 404 and `poster-repair.ts` draws the poster, saves it and records the size and length. | Handled                      |
+| A result is viewed before D1 lists it                                                           | The poster `PUT` answers 404 because the output is not projected yet. The repair is forgotten and a later view tries again.                                                                                                                  | Handled                      |
+| The tab closes after an upload is saved but before its poster `PUT`                             | Same as an older upload: drawn on first view.                                                                                                                                                                                                | Handled                      |
+| The tab closes while converting or uploading                                                    | Nothing was stored, since conversion happens before the upload. The creator uploads it again.                                                                                                                                                | Handled (nothing to recover) |
+| A clip with non-square pixels reaches a job without the browser's conversion                    | The asset resolver squares it on Comfy Cloud when the job submits it ([background-job.md](background-job.md#square-pixels)). That runs in the Worker and needs no browser. Generated results always have square pixels.                      | Handled                      |
+| Something other than the studio UI reads results, such as a notification, an agent or an export | It gets no poster, and no size or length for a generated video, until a browser has viewed that result once. The Library card also shows "Video" instead of a length until then.                                                             | Not handled, deferred        |
+
+Options for the deferred case, cheapest first:
+
+1. **Measure in the Worker when a result is saved.** Size and length come from the MP4's `moov` box and need no decoding. Mediabunny's demuxer runs in a Worker over an R2-backed source, or a small `moov` reader would do. Recording them with the output would fix the missing length without a browser.
+2. **Use a provider's own thumbnail.** Some Router models return a cover image with the video, which could be saved as the poster at no cost.
+3. **Run a poster graph on Comfy Cloud** (VideoHelperSuite's loader, then one saved frame) when a result is saved, or when a non-browser client first asks for its poster. This works for every codec but costs a short GPU run for each video, which is why it is not the default.
+
 ## Library UI
 
 `/library` shows uploads in flight first, then uploads and generated outputs, newest first. The page accepts drag-and-drop anywhere when a session is active. Filters cover images, videos, uploads and generated items. Selecting a tile opens a non-modal inspector at `?item=<id>`, which can be deep-linked; picking another tile swaps it in place, and Escape returns focus to the tile. The inspector shows metadata, playback, Download, Delete (with confirmation, uploads only) and the use-as links.
