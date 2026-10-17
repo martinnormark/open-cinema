@@ -46,7 +46,7 @@ def evaluate(pipeline: str, clip_id: str) -> dict | None:
     orig = json.loads((run / "result-container.json").read_text())
     keys = ["protected_psnr_median", "protected_psnr_p5",
             "protected_ssim_median", "protected_change_rate", "target_mean_abs_diff"]
-    row = {"pipeline": pipeline, "clip": clip_id, "turnaround_s": rec.get("pipeline_seconds") or rec.get("turnaround_seconds"),
+    row = {"pipeline": pipeline, "clip": clip_id, "turnaround_s": rec.get("turnaround_seconds") or rec.get("pipeline_seconds"),
            **{k: metrics.get(k) for k in keys},
            "result": "{width}x{height}@{fps:.2f} {frames}f {duration:.2f}s".format(**orig),
            "source": "{width}x{height}@{fps:.2f} {frames}f {duration:.2f}s".format(**metrics["source"]),
