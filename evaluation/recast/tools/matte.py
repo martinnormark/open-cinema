@@ -31,6 +31,12 @@ def iou(a, b) -> float:
     return inter / area if area else 0.0
 
 
+def hist(frame, mask):
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    h = cv2.calcHist([hsv], [0, 1], (mask > 0.5).astype(np.uint8), [30, 32], [0, 180, 0, 256])
+    return cv2.normalize(h, h).flatten()
+
+
 def build(clip_id: str, weights: str) -> Path:
     clip = recast.CLIPS[clip_id]
     src = recast.source_path(clip)
@@ -42,7 +48,7 @@ def build(clip_id: str, weights: str) -> Path:
     w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     writer = cv2.VideoWriter(str(out.with_suffix(".raw.mp4")), cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
     px, py = clip["target_point"][0] * w, clip["target_point"][1] * h
-    last_box, coverage, i = None, [], 0
+    last_box, signature, coverage, i = None, None, [], 0
     kernel = np.ones((25, 25), np.uint8)
     while True:
         ok, frame = cap.read()
@@ -60,7 +66,14 @@ def build(clip_id: str, weights: str) -> Path:
             else:
                 scores = [iou(b, last_box) for b in boxes]
                 pick = int(np.argmax(scores)) if max(scores) > 0.2 else None
+                if pick is None and signature is not None:
+                    # Re-acquire after an occlusion by appearance: the colour signature of the target at frame 0.
+                    sims = [cv2.compareHist(signature, hist(frame, masks[k]), cv2.HISTCMP_CORREL) for k in range(len(boxes))]
+                    if sims and max(sims) > 0.6:
+                        pick = int(np.argmax(sims))
             if pick is not None:
+                if signature is None:
+                    signature = hist(frame, masks[pick])
                 last_box = boxes[pick]
                 target = (masks[pick] > 0.5).astype(np.uint8)
         target = cv2.dilate(target, kernel, iterations=1)
