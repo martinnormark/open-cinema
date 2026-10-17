@@ -8,7 +8,8 @@ import {
 /** Cloud answered with a definite refusal (bad input), not a transport error. */
 export class MediaRejectedError extends Error {}
 
-export interface CloudMediaPart {
+/** A graph input stored in R2, streamed to Cloud when the graph runs. */
+export interface StoredMediaPart {
   name: MediaPartName;
   r2Key: string;
   mediaType: string;
@@ -22,7 +23,7 @@ export interface CloudMediaPart {
 export async function renderCloudMedia(
   env: JobsEnv,
   operation: MediaOperation,
-  parts: readonly CloudMediaPart[],
+  parts: readonly StoredMediaPart[],
   signal: AbortSignal,
   /** The source's sample aspect, when its pixels are not square. */
   pixelAspect?: number | null,
@@ -30,7 +31,7 @@ export async function renderCloudMedia(
   try {
     return await runCloudMedia({
       apiKey: env.COMFY_API_KEY ?? "",
-      baseUrl: (env as { COMFY_BASE_URL?: string }).COMFY_BASE_URL,
+      baseUrl: env.COMFY_BASE_URL,
       operation,
       parts: parts.map((part) => ({
         name: part.name,

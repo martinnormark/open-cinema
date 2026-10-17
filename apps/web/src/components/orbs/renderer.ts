@@ -6,8 +6,6 @@ import { clock, effect, frameLoop, init, surface, Uniform } from "vgpu";
 
 export type OrbState = "idle" | "thinking" | "speaking";
 
-export const ORB_STATES = ["idle", "thinking", "speaking"] as const;
-
 /**
  * Fields every orb struct declares, and the types the scene writes them as. A
  * variant that omits one — or types it differently — fails to typecheck against
@@ -81,25 +79,6 @@ export interface OrbDrive {
   paused?: boolean;
 }
 
-export const defaultValuesFor = (
-  variant: OrbVariant,
-): {
-  params: Record<string, number>;
-  colors: Record<string, string>;
-} => {
-  const params: Record<string, number> = {};
-  for (const p of variant.params) {
-    params[p.key] = p.default;
-  }
-
-  const colors: Record<string, string> = {};
-  for (const c of variant.colors) {
-    colors[c.key] = c.default;
-  }
-
-  return { colors, params };
-};
-
 /** Writes `hex` as three 0..1 floats at `out[at]`, falling back to white. */
 const writeHex = (hex: string, out: Float32Array, at: number) => {
   let h = hex.replace("#", "").trim();
@@ -121,12 +100,6 @@ const writeHex = (hex: string, out: Float32Array, at: number) => {
 
 /** Shared decode cell: colour targets are read once per colour per frame. */
 const colorTarget = new Float32Array(3);
-
-export const hexToRgb = (hex: string): [number, number, number] => {
-  writeHex(hex, colorTarget, 0);
-
-  return [colorTarget[0]!, colorTarget[1]!, colorTarget[2]!];
-};
 
 /* -------------------------------- uniforms -------------------------------- */
 

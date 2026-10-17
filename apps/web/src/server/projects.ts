@@ -10,6 +10,7 @@ import {
   type DirectionSnapshot,
   type ResolvedMention,
 } from "@open-cinema/contracts";
+import { assetUrl, posterUrl } from "@/lib/media-url";
 import { requireSameOrigin, requireSession } from "./session";
 
 const db = () => createDatabase(env.DB);
@@ -62,9 +63,14 @@ export const getProjectShots = createServerFn({ method: "GET" })
       )
       .map(({ job, request, mentions }) => {
         const output = resultOutputs(job.outputs).find((o) => o.r2Key);
-        const url = output
-          ? `/api/jobs/output?job=${encodeURIComponent(job.id)}&output=${encodeURIComponent(output.id)}`
+        const ref = output
+          ? ({
+              type: "job-output",
+              jobId: job.id,
+              outputId: output.id,
+            } as const)
           : null;
+        const url = ref ? assetUrl(ref) : null;
         const kind = job.workflowKind === "video.ltx" ? "video" : "image";
         const direction =
           request && "direction" in request.inputs
@@ -78,7 +84,7 @@ export const getProjectShots = createServerFn({ method: "GET" })
           model: job.model,
           createdAt: job.createdAt,
           url,
-          posterUrl: url && kind === "video" ? `${url}&variant=poster` : url,
+          posterUrl: ref && kind === "video" ? posterUrl(ref) : url,
           outputId: output?.id ?? null,
           direction,
           mentions: mentions.map((m) => ({

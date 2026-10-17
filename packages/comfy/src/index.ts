@@ -4,6 +4,14 @@ import {
   submissionFailure as cloudSubmissionFailure,
 } from "./cloud-workflow";
 import type { ComfyJobStatus } from "./cloud-workflow";
+import { loopbackRelay } from "./relay";
+import { FLUX_IMAGE_MODEL } from "./workflows/flux-image";
+import {
+  routerSampleOutputs,
+  type ProviderOutput,
+  type ProviderRequest,
+} from "./workflows";
+
 export type { ComfyJobStatus } from "./cloud-workflow";
 export * from "./workflows/flux-image";
 export * from "./workflows/flux-reference";
@@ -14,14 +22,6 @@ export { planSequence, readPlan, SHOT_PLANNER_MODEL } from "./shot-planner";
 export { uploadToComfyStorage } from "./storage";
 export { CloudMediaRejectedError, runCloudMedia } from "./cloud-media";
 export type { CloudMediaPart } from "./cloud-media";
-import { loopbackRelay } from "./relay";
-
-import { FLUX_IMAGE_MODEL } from "./workflows/flux-image";
-import {
-  routerSampleOutputs,
-  type ProviderOutput,
-  type ProviderRequest,
-} from "./workflows";
 export * from "./workflows";
 
 /** Legacy Router checkpoints carry no workflow kind; they ran FLUX 3 Image. */

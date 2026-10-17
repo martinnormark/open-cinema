@@ -379,16 +379,6 @@ export function effectiveLook(
   return look;
 }
 
-/** Fields this shot changed from the project look. */
-export function overriddenFields(
-  snapshot: Pick<DirectionSnapshotInput, "project" | "overrides">,
-): (keyof Look)[] {
-  const base = snapshot.project?.look ?? {};
-  return (Object.keys(snapshot.overrides ?? {}) as (keyof Look)[]).filter(
-    (key) => (snapshot.overrides?.[key] ?? "") !== (base[key] ?? ""),
-  );
-}
-
 function optionFor(
   options: readonly DirectionOption[],
   value: string | undefined,
@@ -464,11 +454,6 @@ export function withDirection(
   if (!direction) return prompt;
   const base = prompt.trim().replace(/\s+$/, "");
   return `${base}${/[.!?]$/.test(base) ? "" : "."} ${direction[0]!.toUpperCase()}${direction.slice(1)}`;
-}
-
-/** Whether a snapshot asks for anything at all. */
-export function hasDirection(snapshot: DirectionSnapshotInput | undefined) {
-  return !!snapshot && directionPrompt(snapshot, "video").length > 0;
 }
 
 /**

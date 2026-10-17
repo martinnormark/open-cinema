@@ -27,13 +27,9 @@ import {
 } from "@/features/direction/project-direction";
 import type { ProjectShot } from "@/server/projects";
 import { useElements } from "@/features/elements/store";
+import { elementTypeOrder, elementTypes } from "@/features/elements/model";
+import { assetUrl, posterUrl } from "@/lib/media-url";
 import {
-  elementTypeOrder,
-  elementTypes,
-  assetUrl as elementAssetUrl,
-} from "@/features/elements/model";
-import {
-  posterUrl,
   phaseLabels,
   replacementKinds,
   revisionKindOf,
@@ -268,9 +264,7 @@ function ProjectElements() {
                 const reference = element.references.find(
                   (r) => r.status === "approved" && !r.stateId,
                 );
-                const image = reference
-                  ? elementAssetUrl(reference.asset)
-                  : null;
+                const image = reference ? assetUrl(reference.asset) : null;
                 return (
                   <li key={element.id}>
                     <Link

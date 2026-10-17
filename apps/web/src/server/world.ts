@@ -5,16 +5,7 @@ import { readWorldManifest, WorldFormatError } from "@open-cinema/contracts";
 import { createDatabase } from "@open-cinema/database";
 import { listProjects } from "@open-cinema/database/queries";
 import { importWorld } from "@open-cinema/database/mutations";
-import { requireSameOrigin, requireSession } from "./session";
-
-async function optionalSession() {
-  try {
-    return await requireSession();
-  } catch (error) {
-    if (error instanceof Response && error.status === 401) return null;
-    throw error;
-  }
-}
+import { optionalSession, requireSameOrigin, requireSession } from "./session";
 
 export const getWorldHome = createServerFn({ method: "GET" }).handler(
   async () => {

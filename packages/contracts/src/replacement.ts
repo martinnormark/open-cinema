@@ -2,6 +2,19 @@ import { z } from "zod";
 import { assetRefSchema } from "./media";
 import { workflowKindSchema } from "./workflow-kinds";
 
+/**
+ * Kling 3.0 Omni video-edit limits (Router schema, 2026-10-16), shared by the
+ * request builders and the studio's source check.
+ */
+export const KLING_EDIT_LIMITS = {
+  minSeconds: 3,
+  maxSeconds: 10,
+  minShortSidePx: 720,
+  minFps: 23.9,
+  maxFps: 60.5,
+  maxReferenceImages: 4,
+} as const;
+
 /** Coordinates are normalized to 0..1 of the frame so they survive rescaling. */
 const unit = z.number().min(0).max(1);
 export const framePointSchema = z.object({

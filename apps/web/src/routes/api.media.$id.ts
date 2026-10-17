@@ -2,15 +2,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { env } from "cloudflare:workers";
 import {
   serveObject,
-  storePoster,
-  UploadError,
   uploadObjectKey,
   verifyMediaPath,
 } from "@open-cinema/assets";
 import { createDatabase } from "@open-cinema/database";
-import { recordPoster } from "@open-cinema/database/mutations";
 import { getMediaAsset } from "@open-cinema/database/queries";
-import { requireSameOrigin, requireSession } from "@/server/session";
+import { putPoster } from "@/server/media-items";
+import { requireSession } from "@/server/session";
 
 async function owner(request: Request, id: string) {
   const query = new URL(request.url).searchParams;
@@ -68,48 +66,22 @@ async function stream(request: Request, id: string) {
   }
 }
 
-/** Browser-rendered thumbnail for an existing upload, or a video's poster frame. */
-async function putPoster(request: Request, id: string) {
-  requireSameOrigin();
-  const session = await requireSession();
-  const asset = await getMediaAsset(
-    createDatabase(env.DB),
-    { ownerId: session.userId },
-    id,
-  );
-  if (asset?.status !== "ready")
-    return new Response("Media not found", { status: 404 });
-  try {
-    const length = Number(request.headers.get("Content-Length"));
-    if (!(length > 0 && length <= 2 * 1024 * 1024))
-      throw new UploadError("The poster is missing or too large.", 413);
-    const stored = await storePoster(
-      env.GENERATED_ASSETS,
-      uploadObjectKey(session.userId, id, "poster"),
-      session.userId,
-      await request.arrayBuffer(),
-      request.headers.get("Content-Type") ?? "",
-    );
-    await recordPoster(
-      createDatabase(env.DB),
-      { ownerId: session.userId },
-      { type: "media-asset", assetId: id },
-      { posterKey: stored.r2Key },
-    );
-    return new Response(null, { status: 204 });
-  } catch (error) {
-    return error instanceof UploadError
-      ? Response.json({ error: error.message }, { status: error.status })
-      : new Response("Storage is temporarily unavailable.", { status: 503 });
-  }
-}
-
 export const Route = createFileRoute("/api/media/$id")({
   server: {
     handlers: {
       GET: ({ request, params }) => stream(request, params.id),
       HEAD: ({ request, params }) => stream(request, params.id),
-      PUT: ({ request, params }) => putPoster(request, params.id),
+      // Browser-rendered thumbnail for an upload, or a video's poster frame.
+      PUT: ({ request, params }) =>
+        putPoster(request, async (db, scope) => {
+          const asset = await getMediaAsset(db, scope, params.id);
+          if (asset?.status !== "ready")
+            return new Response("Media not found", { status: 404 });
+          return {
+            ref: { type: "media-asset", assetId: params.id },
+            key: uploadObjectKey(scope.ownerId, params.id, "poster"),
+          };
+        }),
     },
   },
 });

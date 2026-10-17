@@ -55,13 +55,6 @@ export function ltxFrameCount(frames: number, max: number) {
   return Math.floor((capped - 1) / 8) * 8 + 1;
 }
 
-/** A width and height within `maxSide` that keep the aspect, multiples of 32. */
-export function ltxSize(width: number, height: number, maxSide: number) {
-  const scale = Math.min(1, maxSide / Math.max(width, height));
-  const round = (n: number) => Math.max(64, Math.round((n * scale) / 32) * 32);
-  return { width: round(width), height: round(height) };
-}
-
 /**
  * Loads the source clip and derives the generation grid from it: the clip
  * trimmed to 8n+1 frames, scaled to fit `maxSide`, with its frame rate and

@@ -3,6 +3,7 @@ import { formatCost, type CostUnit } from "@/features/settings/preferences";
 import { preflightSchema } from "./shot-checks";
 import {
   backgroundPipelineSchema,
+  KLING_EDIT_LIMITS,
   restageAngleSchema,
   preservedAspectSchema,
   resultOutputs,
@@ -183,20 +184,8 @@ export const revisionSubmissionSchema = z.object({
   request: z.unknown(),
   decisions: revisionDecisionsSchema,
 });
-export type RevisionSubmission = z.infer<typeof revisionSubmissionSchema>;
 
-export function assetUrl(ref: AssetRef): string {
-  return ref.type === "media-asset"
-    ? `/api/media/${encodeURIComponent(ref.assetId)}`
-    : `/api/jobs/output?job=${encodeURIComponent(ref.jobId)}&output=${encodeURIComponent(ref.outputId)}`;
-}
-
-/** A still for any upload or output: a video's poster frame, or the image. */
-export function posterUrl(ref: AssetRef): string {
-  return ref.type === "media-asset"
-    ? `${assetUrl(ref)}?variant=poster`
-    : `${assetUrl(ref)}&variant=poster`;
-}
+export { assetUrl, posterUrl } from "@/lib/media-url";
 
 /** The revision kind a stored workflow kind belongs to. */
 export function revisionKindOf(
@@ -337,14 +326,6 @@ export function formatEstimate(estimate: GenerationEstimate, unit: CostUnit) {
  */
 export const LTX_REVISION_SECONDS = 4;
 
-export const KLING_SOURCE_LIMITS = {
-  minSeconds: 3,
-  maxSeconds: 10,
-  minShortSidePx: 720,
-  minFps: 23.9,
-  maxFps: 60.5,
-} as const;
-
 export interface SourceFacts {
   seconds: number | null;
   /** Display size, as a player shows it. */
@@ -362,25 +343,25 @@ export function checkKlingSource(source: SourceFacts) {
   const problems: string[] = [];
   const notes: string[] = [];
   const { seconds, width, height, fps, pixelAspect } = source;
-  if (seconds !== null && seconds < KLING_SOURCE_LIMITS.minSeconds - 0.05)
+  if (seconds !== null && seconds < KLING_EDIT_LIMITS.minSeconds - 0.05)
     problems.push(
-      `Kling needs a clip of at least ${KLING_SOURCE_LIMITS.minSeconds} seconds; this one is ${seconds.toFixed(1)} s.`,
+      `Kling needs a clip of at least ${KLING_EDIT_LIMITS.minSeconds} seconds; this one is ${seconds.toFixed(1)} s.`,
     );
-  if (seconds !== null && seconds > KLING_SOURCE_LIMITS.maxSeconds + 0.05)
+  if (seconds !== null && seconds > KLING_EDIT_LIMITS.maxSeconds + 0.05)
     problems.push(
-      `Kling edits up to ${KLING_SOURCE_LIMITS.maxSeconds} seconds; this clip is ${seconds.toFixed(1)} s. Trim it and upload it again.`,
+      `Kling edits up to ${KLING_EDIT_LIMITS.maxSeconds} seconds; this clip is ${seconds.toFixed(1)} s. Trim it and upload it again.`,
     );
   if (
     width !== null &&
     height !== null &&
-    Math.min(width, height) < KLING_SOURCE_LIMITS.minShortSidePx
+    Math.min(width, height) < KLING_EDIT_LIMITS.minShortSidePx
   )
     problems.push(
-      `Kling needs at least ${KLING_SOURCE_LIMITS.minShortSidePx} pixels on the short side; this clip is ${width}×${height}.`,
+      `Kling needs at least ${KLING_EDIT_LIMITS.minShortSidePx} pixels on the short side; this clip is ${width}×${height}.`,
     );
   if (
     fps !== null &&
-    (fps < KLING_SOURCE_LIMITS.minFps || fps > KLING_SOURCE_LIMITS.maxFps)
+    (fps < KLING_EDIT_LIMITS.minFps || fps > KLING_EDIT_LIMITS.maxFps)
   )
     problems.push(
       `Kling takes 24 to 60 frames per second; this clip is ${Math.round(fps * 100) / 100} fps.`,

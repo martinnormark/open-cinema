@@ -10,7 +10,8 @@ import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { startSession } from "./generate";
-import { assetUrl, type Element, type ElementType } from "./model";
+import { assetUrl } from "@/lib/media-url";
+import type { Element, ElementType } from "./model";
 import "./elements.css";
 
 export const typeIcons: Record<ElementType, LucideIcon> = {

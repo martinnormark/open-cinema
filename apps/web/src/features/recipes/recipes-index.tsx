@@ -11,7 +11,7 @@ import {
 import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { assetUrl } from "@/features/elements/model";
+import { assetUrl } from "@/lib/media-url";
 import { SessionRequired } from "@/features/elements/visuals";
 import { BUILTIN_RECIPES, type BuiltinRecipe } from "./collection";
 import { useRecipes } from "./store";

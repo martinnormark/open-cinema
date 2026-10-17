@@ -1,4 +1,5 @@
 import {
+  KLING_EDIT_LIMITS,
   withDirection,
   type AssetRef,
   type WorkflowInputs,
@@ -8,12 +9,9 @@ import {
   backgroundLockStage,
   backgroundMatteStage,
   backgroundReplaceOutputs,
-  DEFAULT_BACKGROUND_PIPELINE,
-  BACKGROUND_REPLACE_MODELS,
+  BACKGROUND_REPLACE_MODEL,
   klingBackgroundRequest,
-  KLING_EDIT_LIMITS,
   locationReferences,
-  switchxBackgroundRequest,
 } from "./background-replace";
 import { MAX_REFERENCE_IMAGES } from "./flux-reference";
 import {
@@ -112,13 +110,17 @@ function withSheetGuide(prompt: string, context: BuildContext) {
     : prompt;
 }
 
-/** Explicit references first, then each mention's approved sheet, deduplicated. */
+/**
+ * Each mention's approved references in the server's order (a Character's
+ * close portrait first), then any other explicit references, deduplicated.
+ * The composer sends its mentions' references too, so they must not lead.
+ */
 function referenceRefs(explicit: readonly AssetRef[], context: BuildContext) {
   const seen = new Set<string>();
   const refs: AssetRef[] = [];
   for (const ref of [
-    ...explicit,
     ...mentionReferences(context).map((r) => r.asset),
+    ...explicit,
   ]) {
     const key = JSON.stringify(ref);
     if (seen.has(key)) continue;
@@ -278,23 +280,19 @@ export const backgroundReplaceWorkflow: WorkflowDefinition<"video.background-rep
   {
     kind: "video.background-replace",
     displayModel: (inputs) =>
-      inputs.pipeline === "ltx-alpha"
-        ? "LTX 2.5 Alpha Gen"
-        : DEFAULT_BACKGROUND_PIPELINE === "kling"
-          ? "Kling 3.0 Omni"
-          : "Beeble SwitchX",
+      inputs.pipeline === "ltx-alpha" ? "LTX 2.5 Alpha Gen" : "Kling 3.0 Omni",
     deadlineMs: 60 * 60_000,
     model: (inputs) =>
       inputs.pipeline === "ltx-alpha"
         ? LTX_ALPHA_MODEL_ID
-        : BACKGROUND_REPLACE_MODELS[DEFAULT_BACKGROUND_PIPELINE],
+        : BACKGROUND_REPLACE_MODEL,
     provider: (inputs) =>
       inputs.pipeline === "ltx-alpha" ? "cloud-workflow" : "router",
     cloudOutputNodes: LTX_ALPHA_OUTPUT_NODES,
     async build(inputs, context) {
       if (inputs.pipeline === "ltx-alpha")
         return ltxAlphaBackgroundRequest(inputs, context);
-      // Kling and SwitchX fetch the source clip by URL only.
+      // Kling fetches the source clip by URL only.
       const source = await context.asset(inputs.source);
       const videoUrl = await source.fetchableUrl();
       const location = context.mentions.find(
@@ -309,36 +307,21 @@ export const backgroundReplaceWorkflow: WorkflowDefinition<"video.background-rep
           const asset = await context.asset(ref);
           if (asset.publicUrl) return asset.publicUrl;
           // Kling takes bare base64 and rejects a data: URI with provider_error.
-          return DEFAULT_BACKGROUND_PIPELINE === "kling"
-            ? await asset.base64()
-            : await asset.dataUri();
+          return await asset.base64();
         }),
       );
-      const media = { videoUrl, referenceImages };
-      if (DEFAULT_BACKGROUND_PIPELINE === "switchx") {
-        const matte =
-          inputs.target.type === "mask"
-            ? await (await context.asset(inputs.target.mask)).fetchableUrl()
-            : null;
-        return switchxBackgroundRequest(inputs, location, {
-          ...media,
-          matteUrl: matte ?? undefined,
-        });
-      }
-      return klingBackgroundRequest(inputs, location, media);
+      return klingBackgroundRequest(inputs, location, {
+        videoUrl,
+        referenceImages,
+      });
     },
     outputs: backgroundReplaceOutputs,
-    // SwitchX keeps its matted subject itself; Kling's edit gets the lock.
-    // The alpha composite already keeps the take's own pixels.
-    ...(DEFAULT_BACKGROUND_PIPELINE === "kling"
-      ? {
-          label: "Replacing the background",
-          stages: (inputs) =>
-            inputs.pipeline === "ltx-alpha"
-              ? []
-              : [backgroundMatteStage, backgroundLockStage],
-        }
-      : {}),
+    label: "Replacing the background",
+    // Kling's edit gets the lock; the alpha composite already keeps the take's own pixels.
+    stages: (inputs) =>
+      inputs.pipeline === "ltx-alpha"
+        ? []
+        : [backgroundMatteStage, backgroundLockStage],
   };
 
 /**

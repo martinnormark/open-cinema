@@ -81,6 +81,16 @@ export async function requireSession(): Promise<Session> {
   return unauthorized("Authentication is not configured for this deployment.");
 }
 
+/** The session, or null when nobody is signed in. */
+export async function optionalSession(): Promise<Session | null> {
+  try {
+    return await requireSession();
+  } catch (error) {
+    if (error instanceof Response && error.status === 401) return null;
+    throw error;
+  }
+}
+
 /**
  * Explicit POST setup. Locally this mints a signed cookie; behind Cloudflare
  * Access the identity already exists, so it only verifies it. Never accepts a

@@ -105,12 +105,6 @@ export const jobSchema = z.object({
   outputs: z.array(jobOutputSchema),
 });
 export type Job = z.infer<typeof jobSchema>;
-export const generationCommandSchema = z.object({
-  idempotencyKey: z.string().min(1).max(128),
-  workflowId: z.string().min(1),
-  inputs: z.record(z.string(), z.unknown()),
-});
-export type GenerationCommand = z.infer<typeof generationCommandSchema>;
 export const promptCommandSchema = z.object({
   idempotencyKey: z.string().uuid(),
   prompt: z.string().trim().min(3).max(2000),

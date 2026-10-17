@@ -10,6 +10,7 @@ import {
   shouldShowEstimate,
   type CostPreferences,
 } from "@/features/settings/preferences";
+import { assetUrl } from "@/lib/media-url";
 import { beginLocalSession } from "@/server/functions";
 import { submitWorkflow } from "@/server/generation";
 import {
@@ -57,7 +58,11 @@ export function useJobViews(): {
             ? {
                 jobId: job.id,
                 outputId: output.id,
-                url: `/api/jobs/output?job=${encodeURIComponent(job.id)}&output=${encodeURIComponent(output.id)}`,
+                url: assetUrl({
+                  type: "job-output",
+                  jobId: job.id,
+                  outputId: output.id,
+                }),
               }
             : null,
         error: job.error,

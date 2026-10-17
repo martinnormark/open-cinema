@@ -15,7 +15,6 @@ export {
   markMediaAssetFailed,
   markMediaAssetReady,
   recordPoster,
-  updateMediaAssetMetadata,
 } from "./media";
 export {
   addElementReference,

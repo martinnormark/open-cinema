@@ -41,8 +41,8 @@ import {
   type JobView,
   type PendingView,
 } from "./generate";
+import { assetUrl } from "@/lib/media-url";
 import {
-  assetUrl,
   elementTypes,
   guessView,
   reviewSheet,

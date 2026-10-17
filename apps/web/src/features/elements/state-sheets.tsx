@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
+import { assetUrl } from "@/lib/media-url";
 import {
-  assetUrl,
   stateHandle,
   stateSheets,
   type Element,

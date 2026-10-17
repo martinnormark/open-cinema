@@ -12,6 +12,7 @@ import type {
 import {
   approvedReferences,
   generationRequestSchema,
+  toStateHandle,
 } from "@open-cinema/contracts";
 import type {
   ImageAspectRatio,
@@ -27,7 +28,10 @@ export type {
   ElementType,
   ReferenceView,
 } from "@open-cinema/contracts";
-export { toElementHandle as toHandle } from "@open-cinema/contracts";
+export {
+  toElementHandle as toHandle,
+  toStateHandle,
+} from "@open-cinema/contracts";
 
 export interface GuidanceSlot {
   id: ReferenceView;
@@ -238,24 +242,7 @@ export const elementTypeOrder: ElementType[] = [
   "thing",
 ];
 
-/** `Rain soaked` → `rain-soaked`. */
-export function toStateHandle(name: string): string {
-  return name
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .split(/[^\p{L}\p{N}]+/u)
-    .filter(Boolean)
-    .join("-")
-    .slice(0, 40);
-}
-
-/** Where the browser loads an owned image; providers get signed URLs server-side. */
-export function assetUrl(asset: AssetRef): string {
-  return asset.type === "media-asset"
-    ? `/api/media/${encodeURIComponent(asset.assetId)}`
-    : `/api/jobs/output?job=${encodeURIComponent(asset.jobId)}&output=${encodeURIComponent(asset.outputId)}`;
-}
+export { assetUrl } from "@/lib/media-url";
 
 export function stateHandle(state: Pick<ElementState, "name">): string {
   return toStateHandle(state.name);

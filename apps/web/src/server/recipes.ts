@@ -1,12 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
-import { env } from "cloudflare:workers";
 import { z } from "zod";
-import { createDatabase, type DatabaseContext } from "@open-cinema/database";
-import {
-  getJobContext,
-  getRecipe,
-  listRecipes,
-} from "@open-cinema/database/queries";
+import { getJobContext, listRecipes } from "@open-cinema/database/queries";
 import {
   createRecipe,
   deleteRecipe,
@@ -18,27 +12,14 @@ import {
   resultOutputs,
   updateRecipeInputSchema,
   type AssetRef,
-  type OwnerScope,
   type Recipe,
   type RecipeSpec,
 } from "@open-cinema/contracts";
-import { requireSameOrigin, requireSession } from "./session";
+import { assetUrl, posterUrl } from "@/lib/media-url";
+import { saveFailure, mutate, owner } from "./scope";
 
-async function owner(): Promise<{ db: DatabaseContext; scope: OwnerScope }> {
-  const session = await requireSession();
-  return { db: createDatabase(env.DB), scope: { ownerId: session.userId } };
-}
-async function mutate() {
-  requireSameOrigin();
-  return owner();
-}
 function failure(error: unknown): never {
-  if (error instanceof Response) throw error;
-  throw new Error(
-    error instanceof Error && error.message
-      ? error.message
-      : "Your recipe could not be saved. Try again.",
-  );
+  return saveFailure(error, "Your recipe could not be saved. Try again.");
 }
 
 export const listMyRecipes = createServerFn({ method: "GET" }).handler(
@@ -55,13 +36,6 @@ export const listMyRecipes = createServerFn({ method: "GET" }).handler(
     };
   },
 );
-
-export const getMyRecipe = createServerFn({ method: "GET" })
-  .validator(z.object({ id: z.string().min(1).max(100) }))
-  .handler(async ({ data }) => {
-    const { db, scope } = await owner();
-    return getRecipe(db, scope, data.id);
-  });
 
 export const saveNewRecipe = createServerFn({ method: "POST" })
   .validator(createRecipeInputSchema)
@@ -110,14 +84,22 @@ export const draftRecipeFromJob = createServerFn({ method: "GET" })
       const name = /First made with (.+)\.$/.exec(slot.hint)?.[1];
       if (name) examples[slot.key] = name;
     }
+    const cover = output
+      ? ({
+          type: "job-output",
+          jobId: context.job.id,
+          outputId: output.id,
+        } as const)
+      : null;
     return {
       spec,
-      cover: output
-        ? { type: "job-output", jobId: context.job.id, outputId: output.id }
-        : null,
-      coverUrl: output
-        ? `/api/jobs/output?job=${encodeURIComponent(context.job.id)}&output=${encodeURIComponent(output.id)}${output.mediaType.startsWith("video/") ? "&variant=poster" : ""}`
-        : null,
+      cover,
+      coverUrl:
+        cover && output
+          ? output.mediaType.startsWith("video/")
+            ? posterUrl(cover)
+            : assetUrl(cover)
+          : null,
       prompt: context.job.prompt,
       examples,
     };

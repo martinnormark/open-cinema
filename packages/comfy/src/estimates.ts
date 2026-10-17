@@ -52,6 +52,13 @@ function ltxEstimate(inputs: LtxVideoInputs): GenerationEstimate {
  * a cold worker spends most of them loading weights.
  */
 export const CLOUD_GRAPH_ESTIMATES = {
+  alpha: {
+    // Not yet measured: one 8-step distilled pass of the 22B model on a
+    // Cloud GPU, plus model loading on a cold worker.
+    seconds: [60, 900],
+    basis: "heuristic",
+    note: "Runs LTX 2.5 Alpha Gen on Comfy Cloud, billed by GPU time. Mattes the first 5 seconds (121 frames) of the take.",
+  },
   camera: {
     seconds: [45, 600],
     note: "Runs LTX-2 with a camera-control LoRA on Comfy Cloud, billed by GPU time.",
@@ -73,12 +80,59 @@ export const CLOUD_GRAPH_ESTIMATES = {
 export function cloudEstimate(
   graph: keyof typeof CLOUD_GRAPH_ESTIMATES,
 ): GenerationEstimate {
-  const { seconds, note } = CLOUD_GRAPH_ESTIMATES[graph];
+  const entry: {
+    seconds: readonly [number, number];
+    basis?: GenerationEstimate["basis"];
+    note: string;
+  } = CLOUD_GRAPH_ESTIMATES[graph];
   return {
     credits: null,
+    seconds: round(entry.seconds[0], entry.seconds[1]),
+    basis: entry.basis ?? "observed",
+    note: entry.note,
+  };
+}
+
+/** Kling 3.0 Omni std edit: 5.4 Kling credits (29.54 Router credits each) for a 6 s 720p clip in Phase 0. */
+const KLING_EDIT_CREDITS_PER_SECOND = 27;
+/** Bria's matte for the background foreground lock: about $0.05 per source second. */
+const MATTE_CREDITS_PER_SECOND = 10.5;
+
+/**
+ * Router edits that bill per second of the source clip. Background replacement
+ * is Kling's std (720p) edit plus the foreground lock's matte; a recast is
+ * Kling's pro (1080p) edit, 6 Kling credits (~177 credits / $0.84) per 5 s clip
+ * in Phase 0. Provider time was minutes; the shared Router queue dominated.
+ */
+export const SOURCE_EDIT_ESTIMATES = {
+  "video.background-replace": {
+    creditsPerSecond: KLING_EDIT_CREDITS_PER_SECOND + MATTE_CREDITS_PER_SECOND,
+    seconds: [150, 1800],
+  },
+  "video.character-replace": { creditsPerSecond: 35, seconds: [180, 2400] },
+} as const;
+
+/** Credits per source second as creators read them, e.g. "About 38 credits". */
+export function sourceEditRate(kind: keyof typeof SOURCE_EDIT_ESTIMATES) {
+  return Math.round(SOURCE_EDIT_ESTIMATES[kind].creditsPerSecond);
+}
+
+/** A per-source-second edit; credits are unknown until the clip length is. */
+export function sourceEditEstimate(
+  kind: keyof typeof SOURCE_EDIT_ESTIMATES,
+  sourceSeconds: number | null,
+): GenerationEstimate {
+  const { creditsPerSecond, seconds } = SOURCE_EDIT_ESTIMATES[kind];
+  return {
+    credits:
+      sourceSeconds === null
+        ? null
+        : {
+            min: creditsPerSecond * sourceSeconds * 0.9,
+            max: creditsPerSecond * sourceSeconds * 1.1,
+          },
     seconds: round(seconds[0], seconds[1]),
     basis: "observed",
-    note,
   };
 }
 
@@ -122,33 +176,16 @@ export function estimateGeneration(
     }
     case "video.background-replace":
       if (request.inputs.pipeline === "ltx-alpha")
-        return {
-          // Not yet measured: one 8-step distilled pass of the 22B model on a
-          // Cloud GPU, plus model loading on a cold worker.
-          credits: null,
-          seconds: round(60, 900),
-          basis: "heuristic",
-          note: "Runs LTX 2.5 Alpha Gen on Comfy Cloud, billed by GPU time. Mattes the first 5 seconds (121 frames) of the take.",
-        };
+        return cloudEstimate("alpha");
+      // The clip length is unknown here.
       return {
-        // Kling 3.0 Omni std edit: 5.4 Kling credits for a 6 s 720p clip in Phase 0
-        // (29.54 Router credits each), so ~27 credits per source second. Length is
-        // unknown here. Provider time was 2–4 min; the shared queue added the rest.
-        // The foreground lock's Bria matte adds ~10.5 credits per second.
-        credits: null,
-        seconds: round(150, 1800),
-        basis: "observed",
-        note: "About 38 credits per second of source video (Kling 3.0 Omni at 720p, plus the matte for the foreground lock).",
+        ...sourceEditEstimate(request.workflowKind, null),
+        note: `About ${sourceEditRate(request.workflowKind)} credits per second of source video (Kling 3.0 Omni at 720p, plus the matte for the foreground lock).`,
       };
     case "video.character-replace":
       return {
-        // Kling 3.0 Omni pro edit: 6 Kling credits (29.54 Router credits each,
-        // ~177 credits / $0.84) per 5 s clip in Phase 0, so ~35 credits per source
-        // second. Length is unknown here. The shared Router queue dominated time.
-        credits: null,
-        seconds: round(180, 2400),
-        basis: "observed",
-        note: "About 35 credits per second of source video (Kling 3.0 Omni, 1080p).",
+        ...sourceEditEstimate(request.workflowKind, null),
+        note: `About ${sourceEditRate(request.workflowKind)} credits per second of source video (Kling 3.0 Omni, 1080p).`,
       };
     case "video.performance-transfer":
       return {

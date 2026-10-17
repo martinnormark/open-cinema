@@ -3,7 +3,11 @@ import type {
   ResolvedMention,
 } from "@open-cinema/contracts";
 import { expandMentions, httpsUrl, mediaTypeFromUrl } from "./results";
-import { LOCK_STAGE, revisionDirectionPrompt } from "@open-cinema/contracts";
+import {
+  KLING_EDIT_LIMITS,
+  LOCK_STAGE,
+  revisionDirectionPrompt,
+} from "@open-cinema/contracts";
 import type {
   MediaStage,
   ProviderOutput,
@@ -12,27 +16,11 @@ import type {
 } from "./types";
 
 /**
- * Background replacement pipelines measured in Phase 0 (docs/phase0-background.md).
+ * The Router background replacement chosen in Phase 0 (docs/phase0-background.md).
  * Kling 3.0 Omni edits the source clip with the Location's reference images and
- * keeps the take's performance and camera path; SwitchX keeps the matted subject,
- * regenerates the rest from one reference, and returns its matte.
+ * keeps the take's performance and camera path.
  */
-export const BACKGROUND_REPLACE_MODELS = {
-  kling: "kling/kling-v3-omni",
-  switchx: "beeble/switchx",
-} as const;
-export type BackgroundPipeline = keyof typeof BACKGROUND_REPLACE_MODELS;
-export const DEFAULT_BACKGROUND_PIPELINE: BackgroundPipeline = "kling";
-
-/** Kling's video-edit limits (Router schema, 2026-10-16). */
-export const KLING_EDIT_LIMITS = {
-  minSeconds: 3,
-  maxSeconds: 10,
-  minSidePx: 720,
-  maxReferenceImages: 4,
-} as const;
-/** SwitchX accepts at most 240 frames of up to ~2.77 MP each. */
-export const SWITCHX_MAX_FRAMES = 240;
+export const BACKGROUND_REPLACE_MODEL = "kling/kling-v3-omni";
 
 /** Establishing and layout views describe a place best; details last. */
 const VIEW_ORDER = ["establishing", "alternate-angle", "landmark", "detail"];
@@ -98,7 +86,7 @@ export function backgroundEditPrompt(
 }
 
 export interface BackgroundRequestMedia {
-  /** Short-lived https URL of the source clip; both models fetch video by URL. */
+  /** Short-lived https URL of the source clip; Kling fetches video by URL. */
   videoUrl: string;
   /** Location references as https URLs or `data:` URIs, best first. */
   referenceImages: readonly string[];
@@ -119,7 +107,7 @@ export function klingBackgroundRequest(
     ? images.map((_, i) => `<<<image_${i + 1}>>>`).join(" and ")
     : null;
   return {
-    model: BACKGROUND_REPLACE_MODELS.kling,
+    model: BACKGROUND_REPLACE_MODEL,
     input: {
       prompt: backgroundEditPrompt(inputs, location, token).replace(
         "Replace only the background",
@@ -144,31 +132,6 @@ export function klingBackgroundRequest(
   };
 }
 
-/** SwitchX: keeps the auto-matted subject (or a supplied matte) and regenerates the rest. */
-export function switchxBackgroundRequest(
-  inputs: Pick<BackgroundReplaceInputs, "prompt" | "preservation">,
-  location: ResolvedMention | undefined,
-  media: BackgroundRequestMedia & { matteUrl?: string | undefined },
-): ProviderRequest {
-  const [reference] = media.referenceImages;
-  return {
-    model: BACKGROUND_REPLACE_MODELS.switchx,
-    input: {
-      generation_type: "video",
-      source_uri: media.videoUrl,
-      alpha_mode: media.matteUrl ? "custom" : "auto",
-      ...(media.matteUrl ? { alpha_uri: media.matteUrl } : {}),
-      ...(reference ? { reference_image_uri: reference } : {}),
-      prompt:
-        `The same people, unchanged, in ${settingText(inputs, location)}.`.slice(
-          0,
-          2000,
-        ),
-      max_resolution: 1080,
-    },
-  };
-}
-
 function at(value: unknown, ...path: (string | number)[]): unknown {
   let v = value;
   for (const key of path) {
@@ -178,41 +141,19 @@ function at(value: unknown, ...path: (string | number)[]): unknown {
   return v;
 }
 
-/**
- * Kling returns `data.task_result.videos[0].url`; SwitchX returns `output.render`
- * plus the matte it used at `output.alpha`, kept so a revision can be refined or
- * composited later without matting again.
- */
+/** Kling returns the edited clip at `data.task_result.videos[0].url`. */
 export function backgroundReplaceOutputs(data: unknown): ProviderOutput[] {
   const kling = at(data, "data", "task_result", "videos", 0);
-  const klingUrl = httpsUrl(at(kling, "url"));
-  if (klingUrl) {
-    return [
-      {
-        providerAssetId: String(at(kling, "id") ?? "video"),
-        url: klingUrl,
-        mediaType: mediaTypeFromUrl(klingUrl, "video/mp4"),
-      },
-    ];
-  }
-  const render = httpsUrl(at(data, "output", "render"));
-  if (!render) return [];
-  const outputs: ProviderOutput[] = [
-    {
-      providerAssetId: "render",
-      url: render,
-      mediaType: mediaTypeFromUrl(render, "video/mp4"),
-    },
-  ];
-  const alpha = httpsUrl(at(data, "output", "alpha"));
-  if (alpha) {
-    outputs.push({
-      providerAssetId: "alpha",
-      url: alpha,
-      mediaType: mediaTypeFromUrl(alpha, "video/mp4"),
-    });
-  }
-  return outputs;
+  const url = httpsUrl(at(kling, "url"));
+  return url
+    ? [
+        {
+          providerAssetId: String(at(kling, "id") ?? "video"),
+          url,
+          mediaType: mediaTypeFromUrl(url, "video/mp4"),
+        },
+      ]
+    : [];
 }
 
 /**

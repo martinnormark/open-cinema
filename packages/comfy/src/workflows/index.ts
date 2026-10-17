@@ -70,8 +70,7 @@ export {
 } from "./character-replace";
 export {
   BACKGROUND_MATTE_MODEL,
-  BACKGROUND_REPLACE_MODELS,
-  DEFAULT_BACKGROUND_PIPELINE,
+  BACKGROUND_REPLACE_MODEL,
   MATTE_STAGE,
   backgroundLockStage,
   backgroundMatteOutputs,
@@ -80,7 +79,6 @@ export {
   backgroundEditPrompt,
   backgroundReplaceOutputs,
   klingBackgroundRequest,
-  switchxBackgroundRequest,
 } from "./background-replace";
 
 export {
@@ -125,8 +123,10 @@ export function getWorkflowDefinition<K extends WorkflowKind>(
   return (registry[kind] as WorkflowDefinition<K> | undefined) ?? null;
 }
 
-/** Stage 0 is the definition's own request; stage n is `stages[n - 1]`. */
-/** The stages that follow the first request for these inputs. */
+/**
+ * The stages that follow the first request for these inputs. Stage 0 is the
+ * definition's own request; stage n is `stages[n - 1]`.
+ */
 export function workflowStages(
   kind: WorkflowKind,
   inputs: unknown,
@@ -144,10 +144,6 @@ export function workflowStage(
 ): WorkflowStage | null {
   if (stage <= 0) return null;
   return workflowStages(kind, inputs)[stage - 1] ?? null;
-}
-
-export function availableWorkflowKinds(): WorkflowKind[] {
-  return Object.keys(registry) as WorkflowKind[];
 }
 export {
   graphModels,

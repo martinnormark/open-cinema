@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { generateViews, useJobViews } from "./generate";
+import { assetUrl } from "@/lib/media-url";
 import {
-  assetUrl,
   elementTypeOrder,
   elementTypes,
   guessView,

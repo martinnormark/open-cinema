@@ -27,7 +27,6 @@ import {
   addShot,
   addTake,
   createSequence,
-  deleteSequence,
   deleteShot,
   moveShot,
   setTakeStatus,
@@ -35,24 +34,10 @@ import {
   updateShot,
 } from "@open-cinema/database/mutations";
 import { getCoordinator } from "./jobs";
-import { requireSameOrigin, requireSession } from "./session";
+import { saveFailure, mutationScope } from "./scope";
+import { optionalSession } from "./session";
 
 const db = () => createDatabase(env.DB);
-
-async function optionalSession() {
-  try {
-    return await requireSession();
-  } catch (error) {
-    if (error instanceof Response && error.status === 401) return null;
-    throw error;
-  }
-}
-
-async function mutate() {
-  requireSameOrigin();
-  const session = await requireSession();
-  return { ownerId: session.userId };
-}
 
 function found(sequence: Sequence | null): Sequence {
   if (!sequence) throw new Error("This sequence is no longer available.");
@@ -60,12 +45,7 @@ function found(sequence: Sequence | null): Sequence {
 }
 
 function failure(error: unknown): never {
-  if (error instanceof Response) throw error;
-  throw new Error(
-    error instanceof Error && error.message
-      ? error.message
-      : "The sequence could not be saved. Try again.",
-  );
+  return saveFailure(error, "The sequence could not be saved. Try again.");
 }
 
 export const getSequencesHome = createServerFn({ method: "GET" }).handler(
@@ -109,7 +89,7 @@ export const getSequenceView = createServerFn({ method: "GET" })
 export const planMySequence = createServerFn({ method: "POST" })
   .validator(planSequenceInputSchema)
   .handler(async ({ data }) => {
-    const scope = await mutate();
+    const scope = await mutationScope();
     using plan = await getCoordinator(scope.ownerId).planSequence(scope, data);
     return sequencePlanSchema.parse(plan);
   });
@@ -117,53 +97,53 @@ export const planMySequence = createServerFn({ method: "POST" })
 export const createMySequence = createServerFn({ method: "POST" })
   .validator(createSequenceInputSchema)
   .handler(async ({ data }) =>
-    createSequence(db(), await mutate(), data).catch(failure),
+    createSequence(db(), await mutationScope(), data).catch(failure),
   );
 
 export const updateMySequence = createServerFn({ method: "POST" })
   .validator(updateSequenceInputSchema)
   .handler(async ({ data }) =>
-    found(await updateSequence(db(), await mutate(), data).catch(failure)),
+    found(
+      await updateSequence(db(), await mutationScope(), data).catch(failure),
+    ),
   );
-
-export const deleteMySequence = createServerFn({ method: "POST" })
-  .validator(z.object({ id: z.string().min(1) }))
-  .handler(async ({ data }) => ({
-    deleted: await deleteSequence(db(), await mutate(), data.id),
-  }));
 
 export const addMyShot = createServerFn({ method: "POST" })
   .validator(addShotInputSchema)
   .handler(async ({ data }) =>
-    found(await addShot(db(), await mutate(), data).catch(failure)),
+    found(await addShot(db(), await mutationScope(), data).catch(failure)),
   );
 
 export const updateMyShot = createServerFn({ method: "POST" })
   .validator(updateShotInputSchema)
   .handler(async ({ data }) =>
-    found(await updateShot(db(), await mutate(), data).catch(failure)),
+    found(await updateShot(db(), await mutationScope(), data).catch(failure)),
   );
 
 export const moveMyShot = createServerFn({ method: "POST" })
   .validator(moveShotInputSchema)
   .handler(async ({ data }) =>
-    found(await moveShot(db(), await mutate(), data).catch(failure)),
+    found(await moveShot(db(), await mutationScope(), data).catch(failure)),
   );
 
 export const deleteMyShot = createServerFn({ method: "POST" })
   .validator(z.object({ id: z.string().min(1) }))
   .handler(async ({ data }) =>
-    found(await deleteShot(db(), await mutate(), data.id).catch(failure)),
+    found(
+      await deleteShot(db(), await mutationScope(), data.id).catch(failure),
+    ),
   );
 
 export const addMyTake = createServerFn({ method: "POST" })
   .validator(addTakeInputSchema)
   .handler(async ({ data }) =>
-    found(await addTake(db(), await mutate(), data).catch(failure)),
+    found(await addTake(db(), await mutationScope(), data).catch(failure)),
   );
 
 export const setMyTakeStatus = createServerFn({ method: "POST" })
   .validator(setTakeStatusInputSchema)
   .handler(async ({ data }) =>
-    found(await setTakeStatus(db(), await mutate(), data).catch(failure)),
+    found(
+      await setTakeStatus(db(), await mutationScope(), data).catch(failure),
+    ),
   );

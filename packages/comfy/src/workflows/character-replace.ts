@@ -1,11 +1,11 @@
 import {
   CONFORM_STAGE,
+  KLING_EDIT_LIMITS,
   type CharacterReplaceInputs,
   type ReferenceView,
   type ResolvedMention,
   type TargetSelection,
 } from "@open-cinema/contracts";
-import { KLING_EDIT_LIMITS } from "./background-replace";
 import type { BuildContext, MediaStage, ProviderRequest } from "./types";
 
 /**
@@ -124,7 +124,10 @@ export function describeTarget(target: TargetSelection): string {
 
 export interface CharacterReplacePromptOptions {
   target: string;
-  character: Pick<ResolvedMention, "name" | "description" | "stateName">;
+  character: Pick<
+    ResolvedMention,
+    "name" | "description" | "stateName" | "stateDescription"
+  >;
   /** True when the creator asked to keep the source person's clothing. */
   keepSourceWardrobe: boolean;
   imageTags: readonly string[];
@@ -145,7 +148,12 @@ export function characterReplacePrompt(o: CharacterReplacePromptOptions) {
   const wardrobe = o.keepSourceWardrobe
     ? "Keep the original clothing of the replaced person exactly as in the source video; change only the person (face, hair, skin, build)."
     : "Dress the new person in their reference outfit from the reference images.";
-  const identity = o.character.description.trim().replace(/[.\s]+$/, "");
+  // The state's own description says what it changes ("soaked through, hair
+  // plastered flat"), as every other kind words it.
+  const identity = [o.character.description, o.character.stateDescription]
+    .map((text) => text?.trim().replace(/[.\s]+$/, "") ?? "")
+    .filter(Boolean)
+    .join(". ");
   return [
     `In <<<video_1>>>, replace ${o.target} with the person shown in ${o.imageTags.join(", ")}: ${who}${identity ? `, ${identity}` : ""}.`,
     o.guide ?? "",

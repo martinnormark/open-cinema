@@ -77,24 +77,6 @@ export async function markMediaAssetFailed(
   });
 }
 
-/** Display metadata measured client-side after upload (dimensions, duration). */
-export async function updateMediaAssetMetadata(
-  db: DatabaseContext,
-  scope: OwnerScope,
-  id: string,
-  metadata: {
-    width?: number;
-    height?: number;
-    durationMs?: number;
-    fps?: number;
-  },
-): Promise<void> {
-  await getClient(db).mediaAsset.updateMany({
-    where: { id, ownerId: scope.ownerId },
-    data: metadata,
-  });
-}
-
 /**
  * Removes the record; the caller deletes the R2 bytes. Element references and
  * revisions hold typed refs, not foreign keys, so they resolve to null after.

@@ -32,14 +32,12 @@ import {
   type RevisionEntry,
 } from "@/server/revisions";
 import { useElements } from "@/features/elements/store";
-import { assetUrl as elementAssetUrl } from "@/features/elements/model";
+import { assetUrl, posterUrl } from "@/lib/media-url";
 import { CompareViewer, Segmented } from "./compare-viewer";
 import { ResultChecksPanel } from "./result-checks";
 import { requestResultChecks } from "./shot-checks-client";
 import type { ResultChecks } from "./shot-checks";
 import {
-  assetUrl,
-  posterUrl,
   phaseLabels,
   preservedLabels,
   replacementKinds,
@@ -155,8 +153,12 @@ export function RevisionView({
       return;
     }
     if (kind !== "character" || !decisions?.targetPoint) return;
-    const state = character?.states.find(
-      (s) => s.name === decisions.element?.stateName,
+    // By id where the decisions kept it: a renamed state still finds itself.
+    const stateId = decisions.draft?.stateId;
+    const state = character?.states.find((s) =>
+      stateId !== undefined
+        ? s.id === stateId
+        : s.name === decisions.element?.stateName,
     );
     const faces = character
       ? approvedReferences(character, state?.id).filter(
@@ -177,7 +179,7 @@ export function RevisionView({
       sourceUrl: assetUrl(revision.source),
       resultUrl: assetUrl(result),
       mark: decisions.targetPoint,
-      referenceUrls: faces.slice(0, 4).map((r) => elementAssetUrl(r.asset)),
+      referenceUrls: faces.slice(0, 4).map((r) => assetUrl(r.asset)),
       save: (next) =>
         saveRevisionChecks({ data: { revisionId: revision.id, checks: next } }),
     });

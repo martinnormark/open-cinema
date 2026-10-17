@@ -20,6 +20,8 @@
  * removed. See https://docs.ltx.io/open-source-model/vfx-post-production/alpha-gen.
  */
 
+import { LTX_DISTILLED_SIGMAS, type Graph, type Link } from "./ltx-graph";
+
 export const LTX_ALPHA_MODELS = {
   transformer: "ltx-2.5-22b-distilled-transformer-bf16.safetensors",
   textEncoder: "gemma4-12b-with-proj-ltx-2.5-bf16.safetensors",
@@ -47,10 +49,6 @@ export const LTX_ALPHA_LIMITS = {
   maxSourceBytes: 100 * 1024 * 1024,
 } as const;
 
-/** The distilled model's eight-step schedule from the Lightricks workflow. */
-const DISTILLED_SIGMAS =
-  "1.0, 0.99375, 0.9875, 0.98125, 0.975, 0.909375, 0.725, 0.421875, 0.0";
-
 /** API-graph node ids whose file inputs are filled with uploaded media at submission. */
 export const LTX_ALPHA_MEDIA_INPUTS = {
   source: { node: "source", field: "file" },
@@ -65,16 +63,6 @@ export interface LtxAlphaGraphOptions {
   background: "image" | "video";
   seed: number;
 }
-
-type Link = [string, number];
-type Graph = Record<
-  string,
-  {
-    class_type: string;
-    inputs: Record<string, unknown>;
-    _meta?: { title: string };
-  }
->;
 
 /**
  * The API-format graph. File inputs are left empty; the Cloud client sets them
@@ -235,7 +223,7 @@ export function ltxAlphaBackgroundGraph(options: LtxAlphaGraphOptions): Graph {
     },
     sigmas: {
       class_type: "ManualSigmas",
-      inputs: { sigmas: DISTILLED_SIGMAS },
+      inputs: { sigmas: LTX_DISTILLED_SIGMAS },
     },
     sample: {
       class_type: "SamplerCustomAdvanced",

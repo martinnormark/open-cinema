@@ -28,6 +28,7 @@ import type {
   ReferenceView,
   ResolvedMention,
 } from "@open-cinema/contracts";
+import { LTX23_MODELS, type Graph, type Link } from "./ltx-graph";
 import { expandMentions } from "./results";
 
 export const LTX_PERFORMANCE_MODELS = {
@@ -35,10 +36,10 @@ export const LTX_PERFORMANCE_MODELS = {
    * Union Control is trained on LTX 2.3 22B, not 2.5. One fp8 file holds the
    * distilled transformer, both VAEs and the text projection.
    */
-  checkpoint: "ltx-2.3-22b-distilled-fp8.safetensors",
-  textEncoder: "gemma_3_12B_it_fp4_mixed.safetensors",
+  checkpoint: LTX23_MODELS.checkpoint,
+  textEncoder: LTX23_MODELS.textEncoder,
   /** Depth, pose and edges in one adapter; guides are read at half resolution. */
-  unionControlLora: "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors",
+  unionControlLora: LTX23_MODELS.unionControl,
   depthModel: "depth_anything_v2_vitl.pth",
 } as const;
 
@@ -84,16 +85,6 @@ export interface LtxPerformanceGraphOptions {
   keyframeStrength: number | null;
   seed: number;
 }
-
-type Link = [string, number];
-type Graph = Record<
-  string,
-  {
-    class_type: string;
-    inputs: Record<string, unknown>;
-    _meta?: { title: string };
-  }
->;
 
 /** Sides scaled to fit maxSide, rounded to the adapter's multiple. */
 function sideExpression(side: "a" | "b") {

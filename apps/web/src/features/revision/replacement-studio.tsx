@@ -43,8 +43,8 @@ import {
 import { acceptSnapshot, useGeneration } from "@/features/generation/store";
 import { startSession } from "@/features/elements/generate";
 import { useElements } from "@/features/elements/store";
+import { assetUrl } from "@/lib/media-url";
 import {
-  assetUrl as elementAssetUrl,
   stateHandle,
   type Element,
   type ElementState,
@@ -1645,7 +1645,7 @@ function ElementChoice({
   const selected = candidates.find((e) => e.id === elementId) ?? null;
   const cover = (element: Element, state: ElementState | null) => {
     const reference = approvedReferences(element, state?.id)[0];
-    return reference ? elementAssetUrl(reference.asset) : null;
+    return reference ? assetUrl(reference.asset) : null;
   };
   return (
     <fieldset>

@@ -1,5 +1,4 @@
 import { createServerFn } from "@tanstack/react-start";
-import { env } from "cloudflare:workers";
 import { z } from "zod";
 import {
   addElementReferenceInputSchema,
@@ -9,9 +8,7 @@ import {
   updateElementStateInputSchema,
   updateElementReferenceInputSchema,
   type Element,
-  type OwnerScope,
 } from "@open-cinema/contracts";
-import { createDatabase, type DatabaseContext } from "@open-cinema/database";
 import { listElements, resolveAssetRef } from "@open-cinema/database/queries";
 import {
   addElementReference,
@@ -24,28 +21,14 @@ import {
   updateElementReference,
   updateElementState,
 } from "@open-cinema/database/mutations";
-import { requireSameOrigin, requireSession } from "./session";
+import { saveFailure, mutate, owner } from "./scope";
 
-async function owner(): Promise<{ db: DatabaseContext; scope: OwnerScope }> {
-  const session = await requireSession();
-  return { db: createDatabase(env.DB), scope: { ownerId: session.userId } };
-}
-async function mutate() {
-  requireSameOrigin();
-  return owner();
-}
 function found(element: Element | null): Element {
   if (!element) throw new Error("This Element is no longer available.");
   return element;
 }
-/** Owner-scoped errors become messages the creator can act on. */
 function failure(error: unknown): never {
-  if (error instanceof Response) throw error;
-  throw new Error(
-    error instanceof Error && error.message
-      ? error.message
-      : "Your Elements could not be saved. Try again.",
-  );
+  return saveFailure(error, "Your Elements could not be saved. Try again.");
 }
 
 export const listMyElements = createServerFn({ method: "GET" }).handler(

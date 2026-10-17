@@ -397,11 +397,7 @@ export const WORKFLOW_DESCRIPTORS = {
     kind: "video.background-replace",
     label: "Replace background",
     output: "video",
-    models: [
-      "kling/kling-v3-omni",
-      "beeble/switchx",
-      "comfy-cloud/ltx-2.5-alpha-gen",
-    ],
+    models: ["kling/kling-v3-omni", "comfy-cloud/ltx-2.5-alpha-gen"],
   },
   "video.character-replace": {
     kind: "video.character-replace",

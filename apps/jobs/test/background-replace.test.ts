@@ -105,7 +105,7 @@ it("sends the source by Comfy storage URL and references as bare base64 when the
   });
 });
 
-it("reads Kling and SwitchX result documents as recorded in Phase 0", () => {
+it("reads Kling result documents as recorded in Phase 0", () => {
   // Shapes copied from live Router results (URLs shortened).
   expect(
     backgroundReplaceOutputs({
@@ -129,17 +129,6 @@ it("reads Kling and SwitchX result documents as recorded in Phase 0", () => {
       mediaType: "video/mp4",
     },
   ]);
-  expect(
-    backgroundReplaceOutputs({
-      id: "swx_1",
-      status: "completed",
-      output: {
-        render: "https://cdn.beeble.ai/switchx/a/render.mp4?s=1",
-        alpha: "https://cdn.beeble.ai/switchx/a/alpha.mp4?s=1",
-        source: "https://cdn.beeble.ai/switchx/a/source.mp4?s=1",
-      },
-    }).map((o) => o.providerAssetId),
-  ).toEqual(["render", "alpha"]);
   expect(
     backgroundReplaceOutputs({
       code: 0,

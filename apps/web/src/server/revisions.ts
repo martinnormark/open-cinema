@@ -35,18 +35,9 @@ import {
 } from "@/features/revision/shot-checks";
 import { stampDirection } from "./direction";
 import { getCoordinator } from "./jobs";
-import { requireSameOrigin, requireSession } from "./session";
+import { optionalSession, requireSameOrigin, requireSession } from "./session";
 
 const db = () => createDatabase(env.DB);
-
-async function optionalSession() {
-  try {
-    return await requireSession();
-  } catch (error) {
-    if (error instanceof Response && error.status === 401) return null;
-    throw error;
-  }
-}
 
 /** Decisions sit beside the D1 row so history can explain how a result was made. */
 const decisionsKey = (ownerId: string, revisionId: string) =>

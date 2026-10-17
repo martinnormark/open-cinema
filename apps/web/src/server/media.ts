@@ -5,17 +5,8 @@ import { createDatabase } from "@open-cinema/database";
 import { deleteMediaAsset } from "@open-cinema/database/mutations";
 import { deleteUploadObjects } from "@open-cinema/assets";
 import type { MediaItem } from "@/features/library/model";
-import { requireSameOrigin, requireSession } from "./session";
+import { optionalSession, requireSameOrigin, requireSession } from "./session";
 import { listForOwner } from "./media-items";
-
-async function optionalSession() {
-  try {
-    return await requireSession();
-  } catch (error) {
-    if (error instanceof Response && error.status === 401) return null;
-    throw error;
-  }
-}
 
 /** Ready uploads and saved generated outputs, newest first. */
 export const listMedia = createServerFn({ method: "GET" }).handler(
