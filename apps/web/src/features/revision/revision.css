@@ -103,44 +103,13 @@
   }
 }
 
-/* Generating: a slow light sweep over the source frame, transform only. */
-.generating-sweep {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-.generating-sweep::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 40%;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in oklab, var(--tungsten), transparent 82%),
-    transparent
-  );
-  will-change: transform;
-  animation: generating-sweep 2.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
-}
-@keyframes generating-sweep {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(250%);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .revision-reveal,
   .target-marker,
   .target-person,
   .shot-check,
   .shot-check-spin,
-  .result-reveal,
-  .generating-sweep::before {
+  .result-reveal {
     animation: none;
   }
 }

@@ -101,6 +101,8 @@
   }
   html {
     background: var(--background);
+    /* Pages that grow past the fold must not nudge the layout sideways. */
+    scrollbar-gutter: stable;
   }
   body {
     @apply m-0 bg-background font-sans text-foreground antialiased;
@@ -213,6 +215,23 @@
 .generation-orb:hover {
   background: var(--hover);
 }
+/* On phones the Orb keeps only its sphere so it never covers the controls;
+   its words stay available to assistive technology. */
+@media (max-width: 39.99rem) {
+  .generation-orb {
+    right: 1rem;
+    min-width: 0;
+    padding: 0.25rem;
+  }
+  .generation-orb > span:last-child {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
 .orb-fallback {
   position: absolute;
   inset: 8px;
@@ -227,4 +246,108 @@
 textarea::selection {
   background: oklch(0.8 0.13 70 / 0.35);
   color: var(--foreground);
+}
+
+/* Generation, shared by Studio, Activity and the revision studio. */
+/* Generating: a slow light sweep over the frame, transform only. */
+.generating-sweep {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.generating-sweep::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--tungsten), transparent 82%),
+    transparent
+  );
+  will-change: transform;
+  animation: generating-sweep 2.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes generating-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+
+/* The frame a result will land in: same shape, so nothing jumps. */
+.job-frame {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background: var(--surface);
+}
+.job-frame-track {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 2px;
+  background: var(--secondary);
+}
+.job-frame-fill {
+  position: absolute;
+  inset: 0;
+  background: var(--tungsten);
+  transform-origin: left;
+  transition: transform var(--duration-slow) var(--ease-smooth-out);
+}
+/* A finished picture resolves over the frame (skeleton reveal). */
+.job-image {
+  opacity: 0;
+  filter: blur(2px);
+  transition:
+    opacity var(--duration-slow) ease-in-out,
+    filter var(--duration-slow) ease-in-out;
+}
+.job-image[data-loaded="true"] {
+  opacity: 1;
+  filter: none;
+}
+/* State reads from the word; the dot only repeats it. */
+.job-status {
+  color: var(--muted-foreground);
+}
+.job-status-dot {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 999px;
+  background: var(--subtle-foreground);
+}
+.job-status[data-tone="live"] {
+  color: var(--foreground);
+}
+.job-status[data-tone="live"] .job-status-dot {
+  background: var(--tungsten);
+  animation: job-live 1.6s ease-in-out infinite;
+}
+.job-status[data-tone="ready"] {
+  color: var(--foreground);
+}
+.job-status[data-tone="ready"] .job-status-dot {
+  background: var(--success);
+}
+.job-status[data-tone="failed"] {
+  color: var(--destructive);
+}
+.job-status[data-tone="failed"] .job-status-dot {
+  background: var(--destructive);
+}
+.job-status[data-tone="attention"] {
+  color: var(--warning);
+}
+.job-status[data-tone="attention"] .job-status-dot {
+  background: var(--warning);
+}
+@keyframes job-live {
+  50% {
+    opacity: 0.35;
+  }
 }

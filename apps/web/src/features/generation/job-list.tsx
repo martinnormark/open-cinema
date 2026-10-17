@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { isActiveJob, type Job } from "@open-cinema/contracts";
+import { BookOpen, ExternalLink } from "lucide-react";
+import { isActiveJob, resultOutputs, type Job } from "@open-cinema/contracts";
 import { cancelGeneration, reconcileGeneration } from "@/server/functions";
 import { Button } from "@/components/ui/button";
 import { repairVideoPoster } from "@/features/library";
@@ -16,6 +17,31 @@ const labels: Record<Job["state"], string> = {
   cancelled: "Cancelled",
   needs_attention: "Needs attention",
 };
+type Tone = "live" | "ready" | "failed" | "attention" | "quiet";
+function tone(state: Job["state"]): Tone {
+  if (isActiveJob(state)) return "live";
+  if (state === "succeeded") return "ready";
+  if (state === "failed") return "failed";
+  if (state === "needs_attention") return "attention";
+  return "quiet";
+}
+
+/**
+ * The frame a job was asked for, so its placeholder holds the result's shape
+ * and the picture lands without the list jumping. Kept for this tab only;
+ * after a reload, images fall back to 16:9 until they arrive.
+ */
+const frames = new Map<string, string>();
+export function rememberJobFrames(
+  jobIds: readonly string[],
+  aspectRatio: string,
+) {
+  for (const id of jobIds) frames.set(id, aspectRatio.replace(":", " / "));
+}
+function frameOf(job: Job) {
+  return frames.get(job.id) ?? "16 / 9";
+}
+
 export function JobList({ jobs }: { jobs: readonly Job[] }) {
   return (
     <div className="divide-y divide-border">
@@ -44,13 +70,20 @@ function JobRow({ job }: { job: Job }) {
       setPending(false);
     }
   }
+  const live = isActiveJob(job.state);
+  const results = resultOutputs(job.outputs).filter((output) => output.r2Key);
   return (
-    <article className="py-6">
+    <article className="job-row py-6">
       <div className="flex items-start justify-between gap-4">
         <JobPrompt prompt={job.prompt} />
-        <span className="shrink-0 text-xs font-medium" role="status">
+        <span
+          className="job-status tabular inline-flex shrink-0 items-center gap-2 text-xs font-medium"
+          data-tone={tone(job.state)}
+          role="status"
+        >
+          <span className="job-status-dot" aria-hidden="true" />
           {labels[job.state]}
-          {job.progress !== null && isActiveJob(job.state)
+          {job.progress !== null && live
             ? ` · ${Math.round(job.progress * 100)}%`
             : ""}
         </span>
@@ -59,19 +92,54 @@ function JobRow({ job }: { job: Job }) {
         {job.model}
         {job.seed !== null ? ` · Seed ${job.seed}` : ""}
       </p>
-      {job.outputs
-        .filter((output) => output.r2Key)
-        .map((output) => (
+      {live && !results.length && (
+        <div
+          className="job-frame mt-4 max-w-xl"
+          style={{
+            aspectRatio: job.workflowKind.startsWith("video.")
+              ? "16 / 9"
+              : frameOf(job),
+          }}
+          aria-hidden="true"
+        >
+          <div className="generating-sweep" />
+          <span className="absolute bottom-3 left-3.5 text-xs text-muted-foreground">
+            {job.stage ?? labels[job.state]}
+          </span>
+          {job.progress !== null && (
+            <span className="job-frame-track">
+              <span
+                className="job-frame-fill"
+                style={{ transform: `scaleX(${job.progress})` }}
+              />
+            </span>
+          )}
+        </div>
+      )}
+      {results.map((output) => {
+        const src = `/api/jobs/output?job=${encodeURIComponent(job.id)}&output=${encodeURIComponent(output.id)}`;
+        const image = output.mediaType.startsWith("image/");
+        const video = output.mediaType.startsWith("video/");
+        return (
           <figure key={output.id} className="mt-4 max-w-xl">
-            {output.mediaType.startsWith("image/") && (
+            {image && (
               <img
-                src={`/api/jobs/output?job=${encodeURIComponent(job.id)}&output=${encodeURIComponent(output.id)}`}
+                src={src}
                 alt={job.prompt}
                 // Older results without a recorded size keep their natural shape.
                 width={output.width ?? undefined}
                 height={output.height ?? undefined}
                 loading="lazy"
-                className="h-auto max-h-[36rem] w-auto max-w-full rounded-lg"
+                decoding="async"
+                className="job-image h-auto max-h-[36rem] w-auto max-w-full rounded-lg bg-surface"
+                // Fades in once decoded; an already cached image shows at once.
+                ref={(node) => {
+                  if (node?.complete && node.naturalWidth)
+                    node.dataset.loaded = "true";
+                }}
+                onLoad={(event) => {
+                  event.currentTarget.dataset.loaded = "true";
+                }}
                 onError={(event) => {
                   event.currentTarget.hidden = true;
                   event.currentTarget.nextElementSibling?.removeAttribute(
@@ -80,11 +148,11 @@ function JobRow({ job }: { job: Job }) {
                 }}
               />
             )}
-            {output.mediaType.startsWith("video/") && (
+            {video && (
               <video
                 ref={repairVideoPoster}
-                src={`/api/jobs/output?job=${encodeURIComponent(job.id)}&output=${encodeURIComponent(output.id)}`}
-                poster={`/api/jobs/output?job=${encodeURIComponent(job.id)}&output=${encodeURIComponent(output.id)}&variant=poster`}
+                src={src}
+                poster={`${src}&variant=poster`}
                 controls
                 playsInline
                 preload="metadata"
@@ -93,49 +161,49 @@ function JobRow({ job }: { job: Job }) {
               />
             )}
             <figcaption hidden className="text-sm text-muted-foreground">
-              Saved image temporarily unavailable. Reload to try again.
+              Saved {image ? "image" : "file"} temporarily unavailable. Reload
+              to try again.
             </figcaption>
-            <a
-              className="mt-2 inline-block text-sm underline underline-offset-4"
-              href={`/api/jobs/output?job=${encodeURIComponent(job.id)}&output=${encodeURIComponent(output.id)}`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {output.mediaType.startsWith("image/")
-                ? "Open image"
-                : output.mediaType.startsWith("video/")
-                  ? "Open video"
-                  : "Open asset"}
-            </a>
-            {job.state === "succeeded" && (
-              <Link
-                to="/recipes/new"
-                search={{ job: job.id }}
-                className="mt-2 ml-4 inline-block text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
-              >
-                Save as recipe
-              </Link>
-            )}
+            <div className="mt-2 -ml-2.5 flex flex-wrap gap-1">
+              <Button asChild variant="ghost" size="sm">
+                <a href={src} target="_blank" rel="noreferrer">
+                  <ExternalLink aria-hidden="true" />
+                  {image ? "Open image" : video ? "Open video" : "Open asset"}
+                </a>
+              </Button>
+              {job.state === "succeeded" && (
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground"
+                >
+                  <Link to="/recipes/new" search={{ job: job.id }}>
+                    <BookOpen aria-hidden="true" />
+                    Save as recipe
+                  </Link>
+                </Button>
+              )}
+            </div>
           </figure>
-        ))}
+        );
+      })}
       {(job.error || error) && (
         <p role="alert" className="mt-3 max-w-2xl text-sm text-destructive">
           {error || job.error}
         </p>
       )}
-      {isActiveJob(job.state) &&
-        job.state !== "cancelling" &&
-        job.state !== "persisting" && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="mt-3"
-            disabled={pending}
-            onClick={() => void action("cancel")}
-          >
-            Cancel
-          </Button>
-        )}
+      {live && job.state !== "cancelling" && job.state !== "persisting" && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="mt-3"
+          disabled={pending}
+          onClick={() => void action("cancel")}
+        >
+          Cancel
+        </Button>
+      )}
       {job.state === "needs_attention" && (
         <>
           <div className="mt-3 flex gap-4">

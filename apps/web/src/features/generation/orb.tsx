@@ -22,9 +22,13 @@ export function GenerationOrb() {
     : "Syncing";
   const status = snapshot?.jobs.some((j) => j.state === "needs_attention")
     ? "Needs attention"
-    : connection !== "live"
-      ? "Reconnecting"
-      : "View activity";
+    : connection === "live"
+      ? "View activity"
+      : connection === "reconnecting"
+        ? "Reconnecting"
+        : connection === "unavailable"
+          ? "Offline"
+          : "Connecting";
   return (
     <Link
       to="/activity"
