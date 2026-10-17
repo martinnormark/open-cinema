@@ -233,12 +233,12 @@ export const submitRevision = createServerFn({ method: "POST" })
     );
     const result = commandResultSchema.parse(submitted);
     if (!result.ok) return { ok: false, error: result.error };
-    // A revision shares its job's ID. Retries replay the same job, so the
-    // newest job of this kind with this intent is the one just accepted.
-    const job = result.snapshot.jobs.find(
-      (j) =>
-        j.workflowKind === command.request.workflowKind &&
-        j.prompt === (requestPrompt(command.request) || data.intent),
+    // A revision shares its job's ID; retries map to the same job.
+    const job = result.snapshot.jobs.find((j) =>
+      result.jobId
+        ? j.id === result.jobId
+        : j.workflowKind === command.request.workflowKind &&
+          j.prompt === (requestPrompt(command.request) || data.intent),
     );
     if (!job)
       return {
@@ -267,17 +267,4 @@ export const submitRevision = createServerFn({ method: "POST" })
       { httpMetadata: { contentType: "application/json" } },
     );
     return { ok: true, revisionId: revision.id, result };
-  });
-
-/** Studio generations as typed requests, so mentions carry Elements and references. */
-export const submitStudioRequest = createServerFn({ method: "POST" })
-  .validator(workflowCommandSchema)
-  .handler(async ({ data }) => {
-    requireSameOrigin();
-    const session = await requireSession();
-    using result = await getCoordinator(session.userId).submit(
-      { ownerId: session.userId },
-      data,
-    );
-    return commandResultSchema.parse(result);
   });

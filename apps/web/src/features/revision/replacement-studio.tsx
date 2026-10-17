@@ -197,9 +197,12 @@ export function ReplacementStudio({
       ? `@${element.handle}${state ? `:${stateHandle(state)}` : ""}`
       : null;
     if (kind === "background") {
-      const where = mention ? `Move this shot to ${mention}` : "Move this shot";
-      const how = direction.trim();
-      return `${where}${how ? `: ${how}` : ""}, keeping the performers and action.`;
+      const how = direction.trim().replace(/[.\s]+$/, "");
+      if (!mention)
+        return how
+          ? `Move this shot to ${how}, keeping the performers and action.`
+          : "Move this shot to a new setting, keeping the performers and action.";
+      return `Move this shot to ${mention}, keeping the performers and action.${how ? ` ${how[0]!.toUpperCase()}${how.slice(1)}.` : ""}`;
     }
     const who = targetNote.trim() || "the marked person";
     const dress =
@@ -612,7 +615,9 @@ export function ReplacementStudio({
             <dd>
               {[...new Set([...LOCKED[kind], ...preserved])]
                 .filter((a) => OFFERED[kind].includes(a))
-                .map((a) => preservedLabels[a].toLowerCase())
+                .map((a) =>
+                  preservedLabels[a].toLowerCase().replace("things", "Things"),
+                )
                 .join(", ")}
             </dd>
             <dt className="text-muted-foreground">Cost</dt>

@@ -8,7 +8,7 @@ import { estimateGeneration } from "@open-cinema/comfy/estimates";
 import { Shuffle, ArrowUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { beginLocalSession } from "@/server/functions";
-import { submitStudioRequest } from "@/server/revisions";
+import { submitWorkflow } from "@/server/generation";
 import {
   MentionSummary,
   MentionTextarea,
@@ -67,7 +67,7 @@ export function PromptStudio({ introduction }: { introduction: ReactNode }) {
     // Keep the same key until a definite response arrives, even if the request disconnects.
     setUncertain(command);
     try {
-      const result = await submitStudioRequest({ data: command });
+      const result = await submitWorkflow({ data: command });
       setUncertain(null);
       if (result.ok) acceptSnapshot(result.snapshot);
       else setError(result.error);
