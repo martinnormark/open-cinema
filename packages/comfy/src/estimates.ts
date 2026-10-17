@@ -88,10 +88,11 @@ export function estimateGeneration(
         // Kling 3.0 Omni std edit: 5.4 Kling credits for a 6 s 720p clip in Phase 0
         // (29.54 Router credits each), so ~27 credits per source second. Length is
         // unknown here. Provider time was 2–4 min; the shared queue added the rest.
+        // The foreground lock's Bria matte adds ~10.5 credits per second.
         credits: null,
         seconds: round(150, 1800),
         basis: "observed",
-        note: "About 27 credits per second of source video (Kling 3.0 Omni, 720p).",
+        note: "About 38 credits per second of source video (Kling 3.0 Omni at 720p, plus the matte for the foreground lock).",
       };
     case "video.character-replace":
       return {

@@ -5,6 +5,10 @@ import type { GenerationEstimate } from "@open-cinema/contracts";
  * credits for 6 s at 720p in Phase 0); see `@open-cinema/comfy/estimates`.
  */
 const KLING_CREDITS_PER_SECOND = 27;
+/** Bria's matte for the foreground lock: about $0.05 per source second. */
+const MATTE_CREDITS_PER_SECOND = 10.5;
+const BACKGROUND_CREDITS_PER_SECOND =
+  KLING_CREDITS_PER_SECOND + MATTE_CREDITS_PER_SECOND;
 
 /**
  * Replacement estimates need the clip length, which the shared estimator does
@@ -21,14 +25,14 @@ export function estimateReplacement(
         clip === null
           ? null
           : {
-              min: KLING_CREDITS_PER_SECOND * clip * 0.9,
-              max: KLING_CREDITS_PER_SECOND * clip * 1.1,
+              min: BACKGROUND_CREDITS_PER_SECOND * clip * 0.9,
+              max: BACKGROUND_CREDITS_PER_SECOND * clip * 1.1,
             },
       // Provider time was 2–4 min; the shared Router queue can add much more.
       seconds: { min: 150, max: 1800 },
       basis: "observed",
       ...(clip === null
-        ? { note: "About 27 credits per second of source video." }
+        ? { note: "About 38 credits per second of source video." }
         : {}),
     };
   }
