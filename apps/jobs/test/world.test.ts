@@ -120,8 +120,9 @@ it("carries a project's world to another studio and adapts what does not fit", a
   expect(raw.elements!.map((e) => e.name).sort()).toEqual(["Lantern", "Mara"]);
   // The rejected reference stays behind; the three others travel.
   expect(files).toHaveLength(3);
-  expect(files.every((f) => f.r2Key.startsWith(`uploads/${source.ownerId}/`)))
-    .toBe(true);
+  expect(
+    files.every((f) => f.r2Key.startsWith(`uploads/${source.ownerId}/`)),
+  ).toBe(true);
   expect(await collectWorld(db, target, { projectId: project.id })).toBeNull();
 
   // What another studio would read: JSON, plus a recipe and a result it can't run.
@@ -181,9 +182,9 @@ it("carries a project's world to another studio and adapts what does not fit", a
     "face-closeup",
     "sheet",
   ]);
-  expect(
-    imported.references.find((r) => r.view === "sheet")!.stateId,
-  ).toBe(imported.states.find((s) => s.name === "wet")!.id);
+  expect(imported.references.find((r) => r.view === "sheet")!.stateId).toBe(
+    imported.states.find((s) => s.name === "wet")!.id,
+  );
   expect(
     (await listRecipes(db, target)).find((r) => r.name === "Hologram")!.spec
       .capabilities,

@@ -168,7 +168,9 @@ export async function collectWorld(
       history: recipe.history,
       cover: recipe.cover ? await include(recipe.cover) : null,
       // Personal recipes' ids mean nothing elsewhere; built-ins ship everywhere.
-      parentId: recipe.parentId?.startsWith("builtin:") ? recipe.parentId : null,
+      parentId: recipe.parentId?.startsWith("builtin:")
+        ? recipe.parentId
+        : null,
     });
 
   const worldSequences = [];
@@ -220,7 +222,11 @@ export async function collectWorld(
         capabilities: [...capabilityIdSchema.options],
       },
       project: project
-        ? { name: project.name, direction: project.direction, look: project.look }
+        ? {
+            name: project.name,
+            direction: project.direction,
+            look: project.look,
+          }
         : null,
       elements: worldElements,
       recipes: worldRecipes,

@@ -239,7 +239,10 @@ export function worldAdaptations(
   const notes: WorldAdaptation[] = [];
   const gone = new Map<string, number>();
   for (const media of manifest.media)
-    if (media.origin.type === "generated" && !kinds.has(media.origin.workflowKind))
+    if (
+      media.origin.type === "generated" &&
+      !kinds.has(media.origin.workflowKind)
+    )
       gone.set(
         media.origin.workflowKind,
         (gone.get(media.origin.workflowKind) ?? 0) + 1,
@@ -307,7 +310,10 @@ export type WorldImportResult = z.infer<typeof worldImportResultSchema>;
  * when one stored file has gone missing.
  */
 export function pruneWorldMedia<
-  M extends Pick<WorldManifestInput, "elements" | "recipes" | "sequences" | "media">,
+  M extends Pick<
+    WorldManifestInput,
+    "elements" | "recipes" | "sequences" | "media"
+  >,
 >(manifest: M, keep: ReadonlySet<string>): M {
   return {
     ...manifest,

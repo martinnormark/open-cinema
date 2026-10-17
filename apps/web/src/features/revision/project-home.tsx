@@ -1,6 +1,12 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowLeft, Clapperboard, PackageOpen, Plus, Wand2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Clapperboard,
+  PackageOpen,
+  Plus,
+  Wand2,
+} from "lucide-react";
 import {
   assetRefKey,
   type Project,
