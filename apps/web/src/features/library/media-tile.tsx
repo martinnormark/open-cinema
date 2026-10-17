@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Film, ImageIcon, RotateCcw, X } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
@@ -56,20 +57,25 @@ function describe(item: MediaItem) {
   return parts.join(" · ");
 }
 
-export function MediaTile({
+/**
+ * Memoized: opening the detail changes the URL and re-renders the page, which
+ * must not re-render every tile. Clicks are handled by `LibraryGrid` through
+ * `data-media-id`, so tiles take no callbacks.
+ */
+export const MediaTile = memo(function MediaTile({
   item,
   selected,
-  onOpen,
+  hidden,
 }: {
   item: MediaItem;
-  selected?: boolean;
-  onOpen: (item: MediaItem) => void;
+  selected?: boolean | undefined;
+  hidden?: boolean | undefined;
 }) {
   return (
-    <li className="library-tile">
+    <li className="library-tile" hidden={hidden}>
       <button
         type="button"
-        onClick={() => onOpen(item)}
+        data-media-id={item.id}
         aria-pressed={selected}
         className="group block w-full rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background"
       >
@@ -83,7 +89,7 @@ export function MediaTile({
             )}
           />
           {item.kind === "video" && (
-            <span className="tabular absolute right-2 bottom-2 flex items-center gap-1 rounded-sm bg-background/80 px-1.5 py-0.5 text-xs font-medium">
+            <span className="tabular absolute right-2 bottom-2 flex items-center gap-1 rounded-sm bg-background/90 px-1.5 py-0.5 text-xs font-medium">
               <Film aria-hidden="true" className="size-3" />
               {formatDuration(item.durationSeconds) || "Video"}
             </span>
@@ -98,7 +104,7 @@ export function MediaTile({
       </button>
     </li>
   );
-}
+});
 
 const phaseLabel: Record<UploadEntry["phase"], string> = {
   preparing: "Preparing",
@@ -131,7 +137,7 @@ export function UploadTile({ uploadKey }: { uploadKey: string }) {
           )}
         </div>
         <div className="absolute top-2 right-2 flex gap-1">
-          {failed && (
+          {failed && entry.retryable && (
             <button
               type="button"
               onClick={() => retryUpload(entry.key)}

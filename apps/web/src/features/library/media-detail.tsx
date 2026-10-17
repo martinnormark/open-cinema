@@ -30,6 +30,12 @@ function typeLabel(mediaType: string) {
   );
 }
 
+// The sheet opens from a URL change, not a Radix trigger, so return focus by hand.
+let opener: HTMLElement | null = null;
+export function rememberOpener(element: HTMLElement) {
+  opener = element;
+}
+
 export function MediaDetailSheet({
   item,
   onClose,
@@ -38,9 +44,24 @@ export function MediaDetailSheet({
   onClose: () => void;
 }) {
   return (
-    <Sheet open={!!item} onOpenChange={(open) => !open && onClose()}>
+    // Non-modal: an inspector beside the grid. Picking another tile swaps the
+    // item in place, and skipping the scroll lock avoids a full style recalc.
+    <Sheet
+      modal={false}
+      open={!!item}
+      onOpenChange={(open) => !open && onClose()}
+    >
       <SheetContent
         showCloseButton={false}
+        onInteractOutside={(event) => {
+          if ((event.target as Element).closest("[data-media-id]"))
+            event.preventDefault();
+        }}
+        onCloseAutoFocus={(event) => {
+          if (!opener?.isConnected) return;
+          event.preventDefault();
+          opener.focus();
+        }}
         className="w-full gap-0 overflow-y-auto bg-elevated sm:max-w-md md:max-w-lg"
       >
         {item && <Detail key={item.id} item={item} onClose={onClose} />}

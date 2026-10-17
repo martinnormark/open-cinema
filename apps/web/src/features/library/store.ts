@@ -21,6 +21,8 @@ export interface UploadEntry {
   progress: number;
   previewUrl: string | null;
   error: string | null;
+  /** False when the file itself can never be accepted. */
+  retryable: boolean;
 }
 export interface LibraryState {
   status: "idle" | "loading" | "ready" | "signed-out" | "error";
@@ -121,6 +123,7 @@ export function addUploads(files: Iterable<File>): string[] {
       progress: 0,
       previewUrl: null,
       error,
+      retryable: !error,
     });
   }
   if (!entries.length) return [];
@@ -196,6 +199,7 @@ async function run(entry: UploadEntry) {
     requests.delete(entry.key);
     patchUpload(entry.key, {
       phase: "failed",
+      retryable: false,
       error: `Videos can be up to ${MAX_VIDEO_SECONDS / 60} minutes. Trim it and try again.`,
     });
     settle(entry.key, null);

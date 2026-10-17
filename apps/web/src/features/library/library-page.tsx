@@ -73,7 +73,6 @@ export function LibraryPage({
   const [filter, setFilter] = useState<LibraryFilter>("all");
   const [starting, setStarting] = useState(false);
   const drop = useFileDrop(addUploads);
-  const visible = items.filter((item) => matchesFilter(item, filter));
   const selected = items.find((item) => item.id === selectedId) ?? null;
   const counts = Object.fromEntries(
     filters.map((f) => [
@@ -194,7 +193,7 @@ export function LibraryPage({
               value && setFilter(value as LibraryFilter)
             }
             aria-label="Show"
-            className="mt-8 max-w-full overflow-x-auto"
+            className="mt-8 max-w-full overflow-x-auto [scrollbar-width:none]"
           >
             {filters.map((f) => (
               <ToggleGroupItem
@@ -211,13 +210,14 @@ export function LibraryPage({
           </ToggleGroup>
           <div className="mt-6">
             <LibraryGrid
-              items={visible}
+              items={items}
+              filter={filter}
               selectedId={selectedId}
               onOpen={(item: MediaItem) => onSelect(item.id)}
               label="Library items"
               showUploads={filter === "all" || filter === "upload"}
             />
-            {!visible.length && !hasUploads && (
+            {!counts[filter] && !hasUploads && (
               <p className="mt-2 text-sm text-muted-foreground">
                 Nothing here yet.
               </p>
