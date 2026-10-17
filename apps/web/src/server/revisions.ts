@@ -247,7 +247,7 @@ export type SubmitRevisionResult =
   | { ok: true; revisionId: string; result: CommandResult }
   | { ok: false; error: string };
 
-/** Starts a background replacement or recast and records it as a revision of its source. */
+/** Starts a revision (background, recast, swap, restyle or re-stage) and records it against its source. */
 export const submitRevision = createServerFn({ method: "POST" })
   .validator(revisionSubmissionSchema)
   .handler(async ({ data }): Promise<SubmitRevisionResult> => {
@@ -255,16 +255,15 @@ export const submitRevision = createServerFn({ method: "POST" })
     const session = await requireSession();
     const scope = { ownerId: session.userId };
     const request = generationRequestSchema.safeParse(data.request);
-    if (
-      !request.success ||
-      (request.data.workflowKind !== "video.background-replace" &&
-        request.data.workflowKind !== "video.character-replace")
-    )
+    const source =
+      request.success && "source" in request.data.inputs
+        ? request.data.inputs.source
+        : null;
+    if (!request.success || !source)
       return {
         ok: false,
         error: "Choose a clip and what should change, then try again.",
       };
-    const source = request.data.inputs.source;
     if (!(await resolveAssetRef(db(), scope, source)))
       return {
         ok: false,

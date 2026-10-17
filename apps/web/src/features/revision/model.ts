@@ -3,6 +3,7 @@ import { formatCost, type CostUnit } from "@/features/settings/preferences";
 import { preflightSchema } from "./shot-checks";
 import {
   backgroundPipelineSchema,
+  restageAngleSchema,
   preservedAspectSchema,
   resultOutputs,
   type AssetRef,
@@ -16,7 +17,8 @@ import {
 } from "@open-cinema/contracts";
 
 /** Browser-safe vocabulary for the revision studio. */
-export type ReplacementKind = "background" | "character";
+export type ReplacementKind =
+  "background" | "character" | "object" | "restyle" | "camera";
 
 export const replacementKinds = {
   background: {
@@ -32,6 +34,27 @@ export const replacementKinds = {
     label: "Recast a character",
     verb: "Recast this shot",
     changes: "One person, face and body, with the wardrobe you choose.",
+  },
+  object: {
+    kind: "object",
+    workflowKind: "video.object-swap",
+    label: "Swap an object",
+    verb: "Swap this object",
+    changes: "One object becomes a Thing from your library.",
+  },
+  restyle: {
+    kind: "restyle",
+    workflowKind: "video.restyle",
+    label: "Restyle",
+    verb: "Restyle this shot",
+    changes: "The whole look, from a Location or style reference.",
+  },
+  camera: {
+    kind: "camera",
+    workflowKind: "video.restage",
+    label: "Re-stage the camera",
+    verb: "Re-stage this shot",
+    changes: "The same take from a new camera angle.",
   },
 } as const satisfies Record<
   ReplacementKind,
@@ -106,7 +129,7 @@ export type WardrobeIntent = keyof typeof wardrobeIntents;
  * result. Elements live in the browser for now, so names travel with the ids.
  */
 export const revisionDecisionsSchema = z.object({
-  kind: z.enum(["background", "character"]),
+  kind: z.enum(["background", "character", "object", "restyle", "camera"]),
   sourceTitle: z.string().max(300),
   element: z
     .object({
@@ -141,6 +164,12 @@ export const revisionDecisionsSchema = z.object({
       pipeline: backgroundPipelineSchema,
       /** `assetRefKey` of the chosen plate, for the alpha composite. */
       plate: z.string().max(400).nullable(),
+      /** Re-staging: the new angle. */
+      angle: restageAngleSchema.nullable().optional(),
+      /** Object Swap: what the Thing replaces, in the creator's words. */
+      original: z.string().max(200).nullable().optional(),
+      /** Restyle: `assetRefKey` of an explicit style reference image. */
+      styleImage: z.string().max(400).nullable().optional(),
     })
     .optional(),
 });
@@ -167,6 +196,24 @@ export function posterUrl(ref: AssetRef): string {
   return ref.type === "media-asset"
     ? `${assetUrl(ref)}?variant=poster`
     : `${assetUrl(ref)}&variant=poster`;
+}
+
+/** The revision kind a stored workflow kind belongs to. */
+export function revisionKindOf(
+  workflowKind: Revision["workflowKind"],
+): ReplacementKind {
+  switch (workflowKind) {
+    case "video.character-replace":
+      return "character";
+    case "video.object-swap":
+      return "object";
+    case "video.restyle":
+      return "restyle";
+    case "video.restage":
+      return "camera";
+    default:
+      return "background";
+  }
 }
 
 /** The result a revision shows: its stored result, or the finished job's first video. */
@@ -284,6 +331,12 @@ export function formatEstimate(estimate: GenerationEstimate, unit: CostUnit) {
  * docs/phase0-recast.md). Outside it Kling answers with a bare provider_error
  * after the run is queued, so the studio refuses first and says why.
  */
+/**
+ * The open-weights revisions (Object Swap, Restyle, re-staging) run on the
+ * first 97 frames of a take, about four seconds at 24 or 25 fps.
+ */
+export const LTX_REVISION_SECONDS = 4;
+
 export const KLING_SOURCE_LIMITS = {
   minSeconds: 3,
   maxSeconds: 10,
