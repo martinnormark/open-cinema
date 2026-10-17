@@ -2,8 +2,13 @@ import { useState, type ReactNode } from "react";
 import {
   CAMERA_MOVES,
   WORKFLOW_DESCRIPTORS,
+  type DirectionSnapshot,
   type CameraMove,
   type GenerationRequest,
+  type ImageAspectRatio,
+  type Look,
+  type Project,
+  type ShotDirection,
   type WorkflowCommandInput,
 } from "@open-cinema/contracts";
 import { estimateGeneration } from "@open-cinema/comfy/estimates";
@@ -24,7 +29,15 @@ import {
   shouldShowEstimate,
   useCostPreferences,
 } from "@/features/settings/preferences";
+import { StudioDirection } from "@/features/direction/studio-direction";
+import {
+  reloadProjects,
+  setCurrentProject,
+  useProjects,
+} from "@/features/direction/projects";
 import { acceptSnapshot, reconnectGeneration, useGeneration } from "./store";
+import { takeStudioDraft, type StudioDraft } from "./draft";
+import { studioDirection, studioRequest, type Medium } from "./request";
 import { JobList } from "./job-list";
 
 const prompts = [
@@ -34,18 +47,55 @@ const prompts = [
   "A handmade cobalt-blue ceramic teapot on a linen tablecloth, one sliced pear beside it, soft window light, editorial still life.",
   "An abandoned coastal observatory at blue hour, tall grass moving in the sea breeze, a single amber light in the dome, atmospheric film still.",
 ];
-type Medium = "image" | "video";
+const ASPECTS = [
+  { value: "1:1", label: "Square" },
+  { value: "16:9", label: "16:9" },
+  { value: "21:9", label: "Scope" },
+  { value: "9:16", label: "Vertical" },
+] as const satisfies readonly { value: ImageAspectRatio; label: string }[];
 
-export function PromptStudio({ introduction }: { introduction: ReactNode }) {
+export function PromptStudio({
+  introduction,
+  projectId,
+}: {
+  introduction: ReactNode;
+  /** A project chosen by link, e.g. "Make a shot" on a project page. */
+  projectId?: string;
+}) {
   const { snapshot, connection } = useGeneration();
-  const [prompt, setPrompt] = useState("");
-  const [medium, setMedium] = useState<Medium>("image");
+  const [draft] = useState<StudioDraft | null>(takeStudioDraft);
+  const [prompt, setPrompt] = useState(draft?.prompt ?? "");
+  const [medium, setMedium] = useState<Medium>(draft?.medium ?? "image");
+  const [aspect, setAspect] = useState<ImageAspectRatio>(
+    draft?.aspectRatio ?? "1:1",
+  );
+  const [overrides, setOverrides] = useState<Look>(draft?.overrides ?? {});
+  const [shot, setShot] = useState<ShotDirection>(draft?.shot ?? {});
+  const [recipe, setRecipe] = useState(draft?.recipe ?? null);
+  const projects = useProjects();
+  // A linked project wins until the creator picks another.
+  const [chosen, setChosen] = useState<string | null | undefined>(projectId);
+  const selectedId = chosen !== undefined ? chosen : projects.currentId;
+  const project = projects.projects.find((p) => p.id === selectedId) ?? null;
+  function chooseProject(id: string | null) {
+    setChosen(id);
+    setCurrentProject(id);
+  }
   const [camera, setCamera] = useState<CameraMove | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [uncertain, setUncertain] = useState<WorkflowCommandInput | null>(null);
   const mentions = useMentions(prompt);
-  const request = studioRequest(prompt, mentions, medium, camera);
+  const direction = studioDirection(project, overrides, shot, recipe);
+  const request = studioRequest(
+    prompt,
+    mentions,
+    medium,
+    aspect,
+    direction,
+    camera,
+    draft?.durationSeconds as 4 | 5 | 6 | 8 | 10 | undefined,
+  );
   const preferences = useCostPreferences();
   const estimate = estimateGeneration(request);
   async function start() {
@@ -55,6 +105,7 @@ export function PromptStudio({ introduction }: { introduction: ReactNode }) {
       await beginLocalSession();
       reconnectGeneration();
       await reloadElements();
+      await reloadProjects();
     } catch {
       setError(
         "Local testing is not configured. Set up the local session variables in apps/web/.dev.vars.",
@@ -68,6 +119,7 @@ export function PromptStudio({ introduction }: { introduction: ReactNode }) {
     const command: WorkflowCommandInput = uncertain ?? {
       idempotencyKey: crypto.randomUUID(),
       request,
+      ...(project ? { projectId: project.id } : {}),
     };
     setBusy(true);
     setError("");
@@ -118,6 +170,19 @@ export function PromptStudio({ introduction }: { introduction: ReactNode }) {
           aria-describedby="generation-estimate"
         />
         <MentionSummary mentions={mentions} className="mt-3" />
+        <StudioDirection
+          projects={projects.projects}
+          project={project}
+          onProject={chooseProject}
+          overrides={overrides}
+          onOverrides={setOverrides}
+          shot={shot}
+          onShot={setShot}
+          medium={medium}
+          recipe={recipe}
+          onClearRecipe={() => setRecipe(null)}
+          disabled={!!uncertain}
+        />
         {medium === "video" && (
           <CameraMoves
             value={camera}
@@ -143,6 +208,29 @@ export function PromptStudio({ introduction }: { introduction: ReactNode }) {
                 Video
               </ToggleGroupItem>
             </ToggleGroup>
+            {medium === "image" && (
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                size="sm"
+                value={aspect}
+                onValueChange={(value) =>
+                  value && setAspect(value as ImageAspectRatio)
+                }
+                disabled={!!uncertain}
+                aria-label="Frame"
+              >
+                {ASPECTS.map((a) => (
+                  <ToggleGroupItem
+                    key={a.value}
+                    value={a.value}
+                    className="px-2.5"
+                  >
+                    {a.label}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            )}
             <Button
               type="button"
               variant="ghost"
@@ -184,7 +272,8 @@ export function PromptStudio({ introduction }: { introduction: ReactNode }) {
             ? request.inputs.camera
               ? `LTX-2 with the ${CAMERA_MOVES[request.inputs.camera].label.toLowerCase()} camera LoRA · ${request.inputs.durationSeconds} s · 720p with sound · on Comfy Cloud`
               : `LTX 2.5 Fast · ${request.inputs.durationSeconds} s · 720p with sound`
-            : "FLUX 3 · 1K square"}
+            : `FLUX 3 · 1K ${aspect === "1:1" ? "square" : aspect}`}
+          {project && ` · filed under ${project.name}`}
           {request.workflowKind === "image.flux-reference" &&
             ` · ${request.inputs.references.length} ${request.inputs.references.length === 1 ? "reference" : "references"} from your Elements`}
           {shouldShowEstimate(preferences, "image") &&
@@ -234,47 +323,6 @@ export function PromptStudio({ introduction }: { introduction: ReactNode }) {
       </div>
     </section>
   );
-}
-
-/**
- * Video is LTX 2.5 text-to-video: a short, 720p clip keeps the first take cheap.
- * Mentions with approved references condition Flux; otherwise a plain image.
- */
-function studioRequest(
-  prompt: string,
-  mentions: ReturnType<typeof useMentions>,
-  medium: Medium,
-  camera: CameraMove | null,
-): GenerationRequest {
-  const payload = mentionPayload(mentions);
-  if (medium === "video")
-    return {
-      workflowKind: "video.ltx",
-      inputs: {
-        prompt: prompt.trim(),
-        // A camera move runs on a Cloud GPU billed by time; four seconds
-        // show the move and keep the run short.
-        durationSeconds: camera ? 4 : 6,
-        ...(camera ? { camera } : {}),
-        resolution: "1280x720",
-        fps: 25,
-        generateAudio: true,
-        quality: "fast",
-        mentions: payload.mentions.slice(0, 8),
-      },
-    };
-  const base = {
-    prompt: prompt.trim(),
-    aspectRatio: "1:1" as const,
-    resolution: "1k" as const,
-    mentions: payload.mentions.slice(0, 8),
-  };
-  return payload.references.length
-    ? {
-        workflowKind: "image.flux-reference",
-        inputs: { ...base, references: payload.references.slice(0, 10) },
-      }
-    : { workflowKind: "image.flux", inputs: base };
 }
 
 /**

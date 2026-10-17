@@ -115,6 +115,40 @@ export type CharacterReplaceInputs = z.infer<
   typeof characterReplaceInputsSchema
 >;
 
+export const performanceControlSchema = z.enum(["pose", "pose-depth"]);
+export type PerformanceControl = z.infer<typeof performanceControlSchema>;
+
+/**
+ * "Reuse a performance": the source clip supplies acting, choreography and
+ * timing; the result shows the intended Character and setting instead.
+ */
+export const performanceTransferInputsSchema = z.object({
+  /** The performance clip, uploaded or generated. */
+  source: assetRefSchema,
+  /** Who performs in the new shot. */
+  character: elementMentionSchema.optional(),
+  /** Where the new shot takes place. */
+  location: elementMentionSchema.optional(),
+  /**
+   * The new shot's opening frame, e.g. a FLUX keyframe of the Character in the
+   * source's first pose. Without it the Character's reference is used.
+   */
+  firstFrame: assetRefSchema.optional(),
+  /** What the new shot shows. */
+  prompt,
+  /**
+   * `pose` reads only a skeleton, so the Character's build and outfit are free.
+   * `pose-depth` adds the source's depth for tighter blocking, at the cost of
+   * carrying the original performer's silhouette.
+   */
+  control: performanceControlSchema.default("pose"),
+  /** How closely the new clip follows the source's motion. */
+  strength: z.number().min(0.3).max(1).default(0.9),
+  mentions,
+});
+export type PerformanceTransferInputs = z.infer<
+  typeof performanceTransferInputsSchema
+>;
 /** Short descriptions SAM 3 can find in every frame, e.g. "the table lamp". */
 const objectPhrase = z.string().trim().min(3).max(200);
 
@@ -164,6 +198,7 @@ export const workflowInputsSchemas = {
   "video.ltx": ltxVideoInputsSchema,
   "video.background-replace": backgroundReplaceInputsSchema,
   "video.character-replace": characterReplaceInputsSchema,
+  "video.performance-transfer": performanceTransferInputsSchema,
   "video.object-swap": objectSwapInputsSchema,
   "video.restyle": restyleInputsSchema,
   "video.restage": restageInputsSchema,
@@ -194,6 +229,10 @@ export const generationRequestSchema = z.discriminatedUnion("workflowKind", [
   z.object({
     workflowKind: z.literal("video.character-replace"),
     inputs: characterReplaceInputsSchema,
+  }),
+  z.object({
+    workflowKind: z.literal("video.performance-transfer"),
+    inputs: performanceTransferInputsSchema,
   }),
   z.object({
     workflowKind: z.literal("video.object-swap"),
@@ -251,6 +290,11 @@ export function requestAssetRefs(request: GenerationRequest): AssetRef[] {
           ? [request.inputs.target.mask]
           : []),
       ];
+    case "video.performance-transfer":
+      return [
+        request.inputs.source,
+        ...(request.inputs.firstFrame ? [request.inputs.firstFrame] : []),
+      ];
     case "video.object-swap":
     case "video.restage":
       return [request.inputs.source];
@@ -276,6 +320,18 @@ export function requestMentions(request: GenerationRequest) {
       return request.inputs.location ? [request.inputs.location] : [];
     case "video.character-replace":
       return [request.inputs.character];
+    case "video.performance-transfer": {
+      const { character, location, mentions } = request.inputs;
+      const all = [
+        ...(character ? [character] : []),
+        ...(location ? [location] : []),
+        ...mentions,
+      ];
+      // The Character may also be in `mentions`; resolve each Element once.
+      return all.filter(
+        (m, i) => all.findIndex((n) => n.elementId === m.elementId) === i,
+      );
+    }
     case "video.object-swap":
       return [request.inputs.thing];
     case "video.restyle":
@@ -352,6 +408,12 @@ export const WORKFLOW_DESCRIPTORS = {
     label: "Recast character",
     output: "video",
     models: ["kling/kling-v3-omni"],
+  },
+  "video.performance-transfer": {
+    kind: "video.performance-transfer",
+    label: "Reuse performance",
+    output: "video",
+    models: ["comfy-cloud/ltx-2.3-union-pose"],
   },
   "video.object-swap": {
     kind: "video.object-swap",

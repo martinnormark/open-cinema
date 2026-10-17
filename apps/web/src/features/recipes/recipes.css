@@ -1,0 +1,69 @@
+.recipe-collection {
+  display: grid;
+  gap: 2rem 1.25rem;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 40rem) {
+  .recipe-collection {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .recipe-tile-lead {
+    grid-column: 1 / -1;
+  }
+}
+@media (min-width: 64rem) {
+  .recipe-collection {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .recipe-tile-lead {
+    grid-column: span 2;
+    grid-row: span 2;
+  }
+  /* Five tiles: the last one widens so the bottom row has no gap. */
+  .recipe-tile:nth-child(5):last-child {
+    grid-column: span 2;
+  }
+}
+.recipe-frame {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background: var(--surface);
+  aspect-ratio: 16 / 10;
+}
+.recipe-frame > img,
+.recipe-frame > video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform var(--duration-medium) var(--ease-smooth-out);
+}
+a:hover .recipe-frame > img {
+  transform: scale(1.02);
+}
+/* The treatment preview cross-fades between example and alternatives. */
+.recipe-stage {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  background: black;
+}
+.recipe-stage > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-smooth-out);
+}
+.recipe-stage > img[data-active="true"] {
+  opacity: 1;
+}
+.recipe-slot-token {
+  border-radius: 0.25rem;
+  background: color-mix(in oklch, var(--tungsten) 14%, transparent);
+  padding: 0 0.25rem;
+  color: var(--foreground);
+}

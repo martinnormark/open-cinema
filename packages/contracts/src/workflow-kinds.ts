@@ -7,6 +7,7 @@ export const workflowKindSchema = z.enum([
   "video.ltx",
   "video.background-replace",
   "video.character-replace",
+  "video.performance-transfer",
   "video.object-swap",
   "video.restyle",
   "video.restage",
