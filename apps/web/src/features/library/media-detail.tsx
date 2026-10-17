@@ -127,14 +127,16 @@ function Detail({ item, onClose }: { item: MediaItem; onClose: () => void }) {
         </SheetDescription>
       </SheetHeader>
       <div className="flex flex-wrap gap-2 px-5 pt-5">
-        <Button asChild>
-          <a href={mediaUseHref(item, "source")}>
-            <Wand2 aria-hidden="true" />
-            Use as source
-          </a>
-        </Button>
+        {item.kind === "video" && (
+          <Button asChild>
+            <a href={mediaUseHref(item, "source")}>
+              <Wand2 aria-hidden="true" />
+              Use as source
+            </a>
+          </Button>
+        )}
         {item.kind === "image" && (
-          <Button asChild variant="outline">
+          <Button asChild>
             <a href={mediaUseHref(item, "reference")}>
               <Layers aria-hidden="true" />
               Use as reference

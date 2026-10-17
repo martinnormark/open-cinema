@@ -60,12 +60,13 @@ export function parseAssetRefKey(value: string): AssetRef | null {
 }
 
 /**
- * Where "Use as source" and "Use as reference" lead. Destinations read the
+ * Where "Use as source" (videos, into the revision studio) and "Use as
+ * reference" (images, into a new Element) lead. Destinations read the
  * `source` or `reference` search param with `parseAssetRefKey`.
  */
 export function mediaUseHref(item: MediaItem, role: MediaRole) {
   const key = assetRefKey(item.ref);
   return role === "reference"
     ? `/elements/new?reference=${encodeURIComponent(key)}`
-    : `/?source=${encodeURIComponent(key)}`;
+    : `/revisions/new?source=${encodeURIComponent(key)}`;
 }
