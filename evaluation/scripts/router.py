@@ -97,6 +97,23 @@ def run(model, body, out_dir, poll_s=5, deadline_s=3600):
     rid = res.get("request_id") or res.get("id")
     log["request_id"] = rid
     _write(out_dir, log)  # persist the request id before polling, so a crash can resume or cancel it
+    return follow(log, out_dir, poll_s, deadline_s)
+
+
+def resume(out_dir, poll_s=10, deadline_s=3600):
+    """Keep following a request whose runner stopped (deadline or crash) without resubmitting it."""
+    log = json.load(open(os.path.join(out_dir, "router-log.json")))
+    if not log.get("request_id"):
+        raise RuntimeError(f"{out_dir}: no request id to resume")
+    for f in log.pop("files", []):
+        if f.endswith(".bin") and os.path.exists(f):
+            os.remove(f)
+    log.pop("download_errors", None)
+    return follow(log, out_dir, poll_s, deadline_s)
+
+
+def follow(log, out_dir, poll_s=5, deadline_s=3600):
+    model, rid = log["model"], log["request_id"]
     t0 = time.time()
     last = None
     while time.time() - t0 < deadline_s:
@@ -108,7 +125,7 @@ def run(model, body, out_dir, poll_s=5, deadline_s=3600):
             continue
         state = (st or {}).get("status") if isinstance(st, dict) else None
         if state != last:
-            print(f"[{model}] {int(time.time()-t0)}s {state}", flush=True)
+            print(f"[{model}] {int(time.time()-float(log['submitted_at']))}s {state}", flush=True)
             last = state
         if state and state.upper() in ("COMPLETED", "FAILED", "CANCELLED", "ERROR"):
             log["final_status"] = st
@@ -116,7 +133,11 @@ def run(model, body, out_dir, poll_s=5, deadline_s=3600):
         time.sleep(poll_s)
     else:
         log["final_status"] = "deadline"
-    log["elapsed_s"] = round(time.time() - t0, 1)
+    # Turnaround is measured from submission, including any earlier runner that gave up.
+    log["elapsed_s"] = round(time.time() - float(log["submitted_at"]), 1)
+    if log["final_status"] == "deadline":
+        _write(out_dir, log)
+        return log
     s, result = _call("GET", f"/v2/models/{model}/requests/{rid}")
     log["result_status"], log["result"] = s, result
     files = _save_inline(result, out_dir)
@@ -178,5 +199,11 @@ if __name__ == "__main__":
         body = json.load(open(sys.argv[3]))
         log = run(sys.argv[2], body, sys.argv[4])
         print(json.dumps({k: log.get(k) for k in ("request_id", "elapsed_s", "files", "final_status")}, indent=1))
+    elif cmd == "resume":
+        import concurrent.futures as cf
+
+        with cf.ThreadPoolExecutor(len(sys.argv) - 2) as ex:
+            for d, log in zip(sys.argv[2:], ex.map(resume, sys.argv[2:])):
+                print(os.path.basename(d), log["final_status"] if isinstance(log["final_status"], str) else log["final_status"].get("status"), f"{log['elapsed_s']:.0f}s", len(log.get("files", [])), "files", flush=True)
     elif cmd == "schema":
         print(json.dumps(schema(sys.argv[2]), indent=1))
