@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/page-header";
 import { Textarea } from "@/components/ui/textarea";
 import { useGeneration } from "@/features/generation/store";
 import { startSession } from "@/features/elements/generate";
+import { LOOK_NOTES_MAX, lookPrompt } from "@open-cinema/contracts";
 import { startProject, type ProjectSummary } from "@/server/revisions";
 import "./revision.css";
 
@@ -58,7 +59,7 @@ export function ProjectsIndex({
                     {project.name}
                   </span>
                   <span className="block truncate text-sm text-muted-foreground">
-                    {project.direction || "No direction yet"}
+                    {lookPrompt(project.look, "image") || "No look yet"}
                   </span>
                 </span>
                 <span className="tabular hidden text-xs text-muted-foreground sm:block">
@@ -105,7 +106,7 @@ function NewProject({
   const router = useRouter();
   const { snapshot } = useGeneration();
   const [name, setName] = useState("");
-  const [direction, setDirection] = useState("");
+  const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   async function create() {
@@ -117,7 +118,7 @@ function NewProject({
       const project = await startProject({
         data: {
           name: name.trim(),
-          ...(direction.trim() ? { direction: direction.trim() } : {}),
+          ...(notes.trim() ? { look: { notes: notes.trim() } } : {}),
         },
       });
       await router.invalidate();
@@ -158,21 +159,22 @@ function NewProject({
         />
       </div>
       <div>
-        <label htmlFor="project-direction" className="text-sm font-medium">
-          Direction{" "}
+        <label htmlFor="project-look" className="text-sm font-medium">
+          Look{" "}
           <span className="font-normal text-muted-foreground">(optional)</span>
         </label>
         <Textarea
-          id="project-direction"
-          value={direction}
-          onChange={(event) => setDirection(event.target.value)}
-          maxLength={4000}
+          id="project-look"
+          value={notes}
+          onChange={(event) => setNotes(event.target.value)}
+          maxLength={LOOK_NOTES_MAX}
           rows={3}
           placeholder="Cold blue-grey palette, practical light only, slow push-ins, 35mm grain"
           className="mt-2 text-sm leading-6"
         />
         <p className="mt-1.5 text-xs text-muted-foreground">
-          Palette, light, lens and pacing that every shot shares.
+          What every shot shares. Set palette, light, lens and pacing one by one
+          on the project page.
         </p>
       </div>
       {error && (

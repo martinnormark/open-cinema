@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Clapperboard, Sparkles } from "lucide-react";
+import { lookPrompt } from "@open-cinema/contracts";
 import type { Project, SequenceSummary } from "@open-cinema/contracts";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
@@ -121,7 +122,9 @@ function IdeaComposer({
           ? await planMySequence({
               data: {
                 idea: idea.trim(),
-                direction: (project?.direction ?? "").slice(0, 2000),
+                direction: project
+                  ? lookPrompt(project.look, "video").slice(0, 2000)
+                  : "",
                 elements: elements.slice(0, 40).map((e) => ({
                   handle: e.handle,
                   type: e.type,
@@ -219,8 +222,8 @@ function IdeaComposer({
         </div>
       </div>
       <p className="mt-3 text-xs leading-5 text-muted-foreground">
-        {project?.direction
-          ? `Shots will carry ${project.name}’s look: ${project.direction}`
+        {project && lookPrompt(project.look, "video")
+          ? `Shots will carry ${project.name}’s look: ${lookPrompt(project.look, "video")}`
           : "Planning reads your idea and your Elements; it makes no images and costs a fraction of a credit."}
       </p>
       {error && (

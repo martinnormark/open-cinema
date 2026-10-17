@@ -122,9 +122,8 @@ export function shotPicture(
 export function keyframeRequest(
   shot: Shot,
   elements: readonly Element[],
-  direction: string,
 ): GenerationRequest {
-  const prompt = composeShotPrompt(shot, { role: "keyframe", direction });
+  const prompt = composeShotPrompt(shot, { role: "keyframe" });
   const payload = mentionPayload(resolveMentions(shot.prompt, elements));
   const base = {
     prompt,
@@ -145,13 +144,12 @@ export function motionRequest(
   shot: Shot,
   keyframe: AssetRef,
   elements: readonly Element[],
-  direction: string,
 ): GenerationRequest {
   const payload = mentionPayload(resolveMentions(shot.prompt, elements));
   return {
     workflowKind: "video.ltx",
     inputs: {
-      prompt: composeShotPrompt(shot, { role: "motion", direction }),
+      prompt: composeShotPrompt(shot, { role: "motion" }),
       durationSeconds: shot.durationSeconds,
       resolution: "1280x720",
       fps: 24,
@@ -175,7 +173,6 @@ const REFERENCE_DURATIONS = [3, 4, 5, 6, 8, 10] as const;
 export function referenceMotionRequest(
   shot: Shot,
   elements: readonly Element[],
-  direction: string,
 ): GenerationRequest | null {
   const mentions = resolveMentions(`${shot.prompt} ${shot.staging}`, elements);
   if (!mentions.some((m) => m.references.length || m.moves.length)) return null;
@@ -183,7 +180,7 @@ export function referenceMotionRequest(
   return {
     workflowKind: "video.reference",
     inputs: {
-      prompt: composeShotPrompt(shot, { role: "motion", direction }),
+      prompt: composeShotPrompt(shot, { role: "motion" }),
       durationSeconds:
         REFERENCE_DURATIONS.find((d) => d >= shot.durationSeconds) ?? 10,
       aspectRatio: "16:9",

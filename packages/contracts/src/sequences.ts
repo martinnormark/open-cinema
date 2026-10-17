@@ -235,13 +235,13 @@ export function approvedTake(shot: Shot, role: TakeRole): ShotTake | null {
 
 /**
  * The shot's direction as one prompt: what the frame shows, then framing and
- * camera language, then the project's portrayal. Identity stays in the
- * mentions; the project's look is appended so it never rewrites an Element.
+ * camera language. Identity stays in the mentions; the project's look is
+ * added on submission from the project itself, as for every other shot.
  */
 export function composeShotPrompt(
   shot: Pick<Shot, "prompt" | "beat" | "framing" | "camera"> &
     Partial<Pick<Shot, "staging">>,
-  options: { role: TakeRole; direction?: string | undefined },
+  options: { role: TakeRole },
 ): string {
   const parts = [
     (shot.prompt || shot.beat).trim().replace(/[.\s]+$/, ""),
@@ -250,8 +250,6 @@ export function composeShotPrompt(
     SHOT_FRAMING_PROMPTS[shot.framing],
   ];
   if (options.role === "motion") parts.push(SHOT_CAMERA_PROMPTS[shot.camera]);
-  const direction = options.direction?.trim().replace(/[.\s]+$/, "");
-  if (direction) parts.push(`Look: ${direction}`);
   return `${parts.filter(Boolean).join(". ")}.`.slice(0, 2000);
 }
 

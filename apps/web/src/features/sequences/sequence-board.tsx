@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, Download, Play, Plus } from "lucide-react";
 import {
+  lookPrompt,
   approvedTake,
   type Project,
   type Revision,
@@ -40,7 +41,7 @@ export function SequenceBoard({
   const { snapshot } = useGeneration();
   const { elements } = useElements();
   const jobs = snapshot?.jobs ?? [];
-  const direction = project?.direction ?? "";
+  const direction = project ? lookPrompt(project.look, "video") : "";
   const playable = sequence.shots.filter((shot) => shotPicture(shot));
 
   async function apply(work: Promise<Sequence>) {
@@ -162,7 +163,6 @@ export function SequenceBoard({
               count={sequence.shots.length}
               previous={sequence.shots[index - 1] ?? null}
               project={project}
-              direction={direction}
               elements={elements}
               jobs={jobs}
               revisions={revisions}

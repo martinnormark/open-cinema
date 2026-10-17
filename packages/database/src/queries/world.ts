@@ -225,7 +225,6 @@ export async function collectWorld(
       project: project
         ? {
             name: project.name,
-            direction: project.direction,
             look: project.look,
           }
         : null,

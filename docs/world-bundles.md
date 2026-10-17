@@ -24,7 +24,7 @@ my-project.world.zip
   an older shape when the version is bumped.
 - `studio`: the workflows, models and capabilities of the studio that saved
   it, so an import can explain differences.
-- `project`: name, legacy direction text and structured look, or `null` for a
+- `project`: name and structured look (an older bundle's direction text is folded into the look's notes on import), or `null` for a
   whole-studio save.
 - `elements`, `recipes`, `sequences`: records connected by `key`s (the source's
   ids, used only inside the bundle).

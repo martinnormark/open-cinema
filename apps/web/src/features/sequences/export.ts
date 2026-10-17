@@ -1,6 +1,8 @@
 import {
   approvedTake,
   composeShotPrompt,
+  lookPrompt,
+  withDirection,
   type Project,
   type Sequence,
 } from "@open-cinema/contracts";
@@ -31,10 +33,11 @@ export function exportShotList(sequence: Sequence, project: Project | null) {
       durationSeconds: playedSeconds(shot),
       startsAtSeconds: start,
       continuity: shot.continuity,
-      direction: composeShotPrompt(shot, {
-        role: "motion",
-        direction: project?.direction,
-      }),
+      direction: withDirection(
+        composeShotPrompt(shot, { role: "motion" }),
+        project ? { overrides: project.look } : undefined,
+        "video",
+      ),
       keyframe: keyframe?.asset
         ? {
             url: url(assetUrl(keyframe.asset)),
@@ -58,7 +61,7 @@ export function exportShotList(sequence: Sequence, project: Project | null) {
     title: sequence.title,
     idea: sequence.idea,
     project: project
-      ? { name: project.name, direction: project.direction }
+      ? { name: project.name, look: lookPrompt(project.look, "video") }
       : null,
     runningTimeSeconds: at,
     shots,

@@ -89,7 +89,6 @@ export function ShotRow({
   count,
   previous,
   project,
-  direction,
   elements,
   jobs,
   revisions,
@@ -101,7 +100,6 @@ export function ShotRow({
   count: number;
   previous: Shot | null;
   project: Project | null;
-  direction: string;
   elements: readonly Element[];
   jobs: readonly Job[];
   revisions: readonly Revision[];
@@ -199,13 +197,13 @@ export function ShotRow({
     );
   }
 
-  const keyframeJob = keyframeRequest(current, elements, direction);
+  const keyframeJob = keyframeRequest(current, elements);
   const motionJob = keyframe?.asset
-    ? motionRequest(current, keyframe.asset, elements, direction)
+    ? motionRequest(current, keyframe.asset, elements)
     : null;
   const referenceJob = continuing
     ? null
-    : referenceMotionRequest(current, elements, direction);
+    : referenceMotionRequest(current, elements);
   // A Location's moving reference makes references the way in; a
   // continuation keeps its keyframe so the cut has no jump.
   const referencesFirst =

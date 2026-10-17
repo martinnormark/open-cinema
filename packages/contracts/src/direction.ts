@@ -239,6 +239,8 @@ export const LOOK_OPTIONS: Record<LookField, readonly DirectionOption[]> = {
 
 /** Each field is an option id or the creator's own words; empty clears it. */
 const lookValue = z.string().trim().max(160);
+export const LOOK_NOTES_MAX = 300;
+
 export const lookSchema = z.object({
   palette: lookValue.optional(),
   lighting: lookValue.optional(),
@@ -246,7 +248,7 @@ export const lookSchema = z.object({
   texture: lookValue.optional(),
   pacing: lookValue.optional(),
   /** Anything else that defines the look, in a sentence. */
-  notes: z.string().trim().max(300).optional(),
+  notes: z.string().trim().max(LOOK_NOTES_MAX).optional(),
 });
 export type Look = z.infer<typeof lookSchema>;
 
@@ -442,6 +444,11 @@ export function directionPrompt(
   ].filter((p): p is string => !!p);
   if (!parts.length) return "";
   return `${parts.map((p) => p.replace(/[.\s]+$/, "")).join("; ")}.`;
+}
+
+/** A project's look alone as prompt language, for summaries and planning. */
+export function lookPrompt(look: Look, medium: "image" | "video"): string {
+  return directionPrompt({ overrides: look }, medium);
 }
 
 /** Appends direction to a prompt, keeping the creator's words first. */

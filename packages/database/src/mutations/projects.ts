@@ -1,5 +1,6 @@
 import {
   createProjectInputSchema,
+  lookWithDirection,
   projectSchema,
   updateProjectInputSchema,
   type CreateProjectInput,
@@ -23,8 +24,9 @@ export async function createProject(
       id: crypto.randomUUID(),
       ownerId: scope.ownerId,
       name: data.name,
-      direction: data.direction ?? "",
-      look: data.look ?? {},
+      // The look is the project's only direction; old free text joins its notes.
+      direction: "",
+      look: lookWithDirection(data.look ?? {}, data.direction ?? ""),
     },
   });
   return projectSchema.parse({ ...row, ...timestamps(row) });
@@ -41,10 +43,11 @@ export async function updateProject(
     where: { id, ownerId: scope.ownerId },
     data: {
       ...(changes.name !== undefined ? { name: changes.name } : {}),
-      ...(changes.direction !== undefined
-        ? { direction: changes.direction }
+      // A saved look already carries any old free text (read folds it into
+      // the notes), so the legacy column is cleared with it.
+      ...(changes.look !== undefined
+        ? { look: changes.look, direction: "" }
         : {}),
-      ...(changes.look !== undefined ? { look: changes.look } : {}),
     },
   });
   if (count === 0) return null;

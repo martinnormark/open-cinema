@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import {
   assetRefKey,
+  lookPrompt,
   type Project,
   type Revision,
 } from "@open-cinema/contracts";
@@ -68,9 +69,9 @@ export function ProjectHome({
           >
             {project.name}
           </h1>
-          {project.direction && (
+          {lookPrompt(project.look, "image") && (
             <p className="mt-2 max-w-2xl text-[0.9375rem] leading-6 text-muted-foreground">
-              {project.direction}
+              {lookPrompt(project.look, "image")}
             </p>
           )}
         </div>
