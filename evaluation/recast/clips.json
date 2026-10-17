@@ -1,0 +1,189 @@
+{
+ "_note": "Recast evaluation set. 'file' paths are under artifacts/evaluation/recast/sources/ (ignored). Stock clips are fetched from Mixkit (Mixkit Stock Video Free License) and trimmed with 'trim' [start, seconds]; generated clips come from the request bodies in jobs/sources.json.",
+ "clips": [
+  {
+   "id": "U1-couple-wall",
+   "origin": "stock",
+   "url": "https://assets.mixkit.co/videos/46596/46596-720.mp4",
+   "page": "https://mixkit.co/free-stock-video/couple-laughing-and-talking-on-a-date-46596/",
+   "trim": [
+    2,
+    5
+   ],
+   "target": "the woman with long red-brown hair on the right",
+   "character": "mara",
+   "wardrobe": "reference",
+   "stresses": [
+    "two people",
+    "close interaction",
+    "partial occlusion by the other person's head",
+    "static camera",
+    "real footage"
+   ],
+   "target_point": [
+    0.7,
+    0.45
+   ]
+  },
+  {
+   "id": "U2-group-table",
+   "origin": "stock",
+   "url": "https://assets.mixkit.co/videos/4794/4794-720.mp4",
+   "page": "https://mixkit.co/free-stock-video/students-in-a-cafeteria-discussing-an-assignment-4794/",
+   "trim": [
+    1,
+    5
+   ],
+   "target": "the young woman with long straight blonde hair in a white sweater sitting in the middle of the group",
+   "character": "mara",
+   "wardrobe": "reference",
+   "stresses": [
+    "five people",
+    "target selection in a group",
+    "hands on shared papers",
+    "real footage"
+   ],
+   "target_point": [
+    0.58,
+    0.35
+   ]
+  },
+  {
+   "id": "U3-poppy-dance",
+   "origin": "stock",
+   "url": "https://assets.mixkit.co/videos/4702/4702-720.mp4",
+   "page": "https://mixkit.co/free-stock-video/girl-dancing-happily-in-a-field-of-flowers-4702/",
+   "trim": [
+    0,
+    5
+   ],
+   "target": "the dancing woman",
+   "character": "mara",
+   "wardrobe": "reference",
+   "stresses": [
+    "fast full-body motion",
+    "spins and view changes",
+    "foreground occlusion by flowers",
+    "real footage"
+   ],
+   "target_point": [
+    0.45,
+    0.45
+   ]
+  },
+  {
+   "id": "U4-couple-sunset",
+   "origin": "stock",
+   "url": "https://assets.mixkit.co/videos/4661/4661-720.mp4",
+   "page": "https://mixkit.co/free-stock-video/couple-walking-hand-in-hand-4661/",
+   "trim": [
+    1,
+    5
+   ],
+   "target": "the woman with long hair in a floral dress on the left",
+   "character": "mara",
+   "wardrobe": "reference",
+   "stresses": [
+    "back view only",
+    "hand-holding interaction",
+    "strong backlight and lens flare",
+    "moving camera",
+    "real footage"
+   ],
+   "target_point": [
+    0.33,
+    0.5
+   ]
+  },
+  {
+   "id": "U5-handshake-portrait",
+   "origin": "stock",
+   "url": "https://assets.mixkit.co/videos/30016/30016-720.mp4",
+   "page": "https://mixkit.co/free-stock-video/man-in-a-suit-giving-a-firm-handshake-30016/",
+   "trim": [
+    0.5,
+    5
+   ],
+   "target": "the bearded man in the black suit",
+   "character": "theo",
+   "wardrobe": "source",
+   "stresses": [
+    "portrait 9:16",
+    "handshake with an off-screen person",
+    "keep source wardrobe intent",
+    "real footage"
+   ],
+   "target_point": [
+    0.35,
+    0.4
+   ]
+  },
+  {
+   "id": "G1-walk-tracking",
+   "origin": "generated",
+   "file": "gen-walk-tracking.mp4",
+   "target": "the young man in the grey hooded sweatshirt walking toward the camera",
+   "character": "theo",
+   "wardrobe": "reference",
+   "stresses": [
+    "moving camera (backward dolly)",
+    "background pedestrians",
+    "single subject"
+   ]
+  },
+  {
+   "id": "G2-cafe-two",
+   "origin": "generated",
+   "file": "gen-cafe-two.mp4",
+   "target": "the woman with long dark curly hair in the denim jacket on the left",
+   "character": "mara",
+   "wardrobe": "reference",
+   "stresses": [
+    "two people",
+    "select left person",
+    "cup to lips interaction",
+    "push-in"
+   ]
+  },
+  {
+   "id": "G3-occlusion-market",
+   "origin": "generated",
+   "file": "gen-occlusion-market.mp4",
+   "target": "the woman with long brown hair in the red coat",
+   "character": "mara",
+   "wardrobe": "reference",
+   "stresses": [
+    "full occlusion by pillar and passer-by",
+    "pan",
+    "crowd"
+   ]
+  },
+  {
+   "id": "G4-handoff-workshop",
+   "origin": "generated",
+   "file": "gen-handoff-workshop.mp4",
+   "target": "the younger man with short black hair in the blue denim shirt on the right",
+   "character": "theo",
+   "wardrobe": "source",
+   "stresses": [
+    "two people",
+    "object hand-off",
+    "orbiting camera",
+    "keep source wardrobe intent"
+   ]
+  },
+  {
+   "id": "G5-spin-park",
+   "origin": "generated",
+   "file": "gen-spin-park.mp4",
+   "target": "the woman with the long blonde braid",
+   "character": "mara",
+   "wardrobe": "reference",
+   "stresses": [
+    "360-degree turn (back view)",
+    "jump",
+    "handheld"
+   ]
+  }
+ ]
+}

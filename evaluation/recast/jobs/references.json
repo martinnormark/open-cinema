@@ -1,0 +1,83 @@
+[
+  {
+    "id": "ref-mara-three-quarter",
+    "model": "bfl/flux-3-image",
+    "input": {
+      "prompt": "Full-body photo of the woman from the reference image, turned three-quarters to her left, head to toe in frame. Same woman, same face, same short platinum silver-white blunt bob with fringe, same freckles, same build, same exact outfit (mustard-yellow rain jacket, black t-shirt, olive trousers, white sneakers). Plain light-grey seamless studio backdrop, soft even studio light, photorealistic.",
+      "images": [
+        "@file:evaluation/recast/references/mara/front-full.jpg"
+      ],
+      "aspect_ratio": "2:3",
+      "resolution": "1k",
+      "grounding": false
+    },
+    "out": "artifacts/evaluation/recast/refs-raw/mara-three-quarter.png"
+  },
+  {
+    "id": "ref-mara-profile",
+    "model": "bfl/flux-3-image",
+    "input": {
+      "prompt": "Full-body side profile photo of the woman from the reference image, facing left, head to toe in frame. Same woman, same face, same short platinum silver-white blunt bob with fringe, same freckles, same build, same exact outfit (mustard-yellow rain jacket, black t-shirt, olive trousers, white sneakers). Plain light-grey seamless studio backdrop, soft even studio light, photorealistic.",
+      "images": [
+        "@file:evaluation/recast/references/mara/front-full.jpg"
+      ],
+      "aspect_ratio": "2:3",
+      "resolution": "1k",
+      "grounding": false
+    },
+    "out": "artifacts/evaluation/recast/refs-raw/mara-profile.png"
+  },
+  {
+    "id": "ref-mara-back",
+    "model": "bfl/flux-3-image",
+    "input": {
+      "prompt": "Full-body photo of the woman from the reference image seen from directly behind, head to toe in frame, showing the back of the jacket and hair. Same woman, same face, same short platinum silver-white blunt bob with fringe, same freckles, same build, same exact outfit (mustard-yellow rain jacket, black t-shirt, olive trousers, white sneakers). Plain light-grey seamless studio backdrop, soft even studio light, photorealistic.",
+      "images": [
+        "@file:evaluation/recast/references/mara/front-full.jpg"
+      ],
+      "aspect_ratio": "2:3",
+      "resolution": "1k",
+      "grounding": false
+    },
+    "out": "artifacts/evaluation/recast/refs-raw/mara-back.png"
+  },
+  {
+    "id": "ref-mara-face",
+    "model": "bfl/flux-3-image",
+    "input": {
+      "prompt": "Head-and-shoulders close-up portrait of the woman from the reference image, looking straight into the camera, neutral expression, face details sharp. Same woman, same face, same short platinum silver-white blunt bob with fringe, same freckles, same build, same exact outfit (mustard-yellow rain jacket, black t-shirt, olive trousers, white sneakers). Plain light-grey seamless studio backdrop, soft even studio light, photorealistic.",
+      "images": [
+        "@file:evaluation/recast/references/mara/front-full.jpg"
+      ],
+      "aspect_ratio": "1:1",
+      "resolution": "1k",
+      "grounding": false
+    },
+    "out": "artifacts/evaluation/recast/refs-raw/mara-face.png"
+  },
+  {
+    "id": "ref-mara-face-34",
+    "model": "bfl/flux-3-image",
+    "input": {
+      "prompt": "Head-and-shoulders close-up portrait of the woman from the reference image, head turned three-quarters to her right, slight smile. Same woman, same face, same short platinum silver-white blunt bob with fringe, same freckles, same build, same exact outfit (mustard-yellow rain jacket, black t-shirt, olive trousers, white sneakers). Plain light-grey seamless studio backdrop, soft even studio light, photorealistic.",
+      "images": [
+        "@file:evaluation/recast/references/mara/front-full.jpg"
+      ],
+      "aspect_ratio": "1:1",
+      "resolution": "1k",
+      "grounding": false
+    },
+    "out": "artifacts/evaluation/recast/refs-raw/mara-face-34.png"
+  },
+  {
+    "id": "ref-theo-hero",
+    "model": "bfl/flux-3-image",
+    "input": {
+      "prompt": "Full-body character reference photo of an original fictional man named Theo, late thirties, standing in a neutral relaxed pose facing the camera, plain light-grey seamless studio backdrop, even soft studio lighting. Distinctive identity: tall broad-shouldered build, deep brown skin, full neatly trimmed black beard, close-cropped hair under a bright red ribbed knit beanie, round tortoiseshell glasses. Wardrobe: navy wool double-breasted peacoat, cream roll-neck sweater, charcoal trousers, brown leather boots. Photorealistic, sharp focus, head to toe fully in frame, no props, no text.",
+      "aspect_ratio": "2:3",
+      "resolution": "1k",
+      "grounding": false
+    },
+    "out": "artifacts/evaluation/recast/refs-raw/theo-front-full.png"
+  }
+]

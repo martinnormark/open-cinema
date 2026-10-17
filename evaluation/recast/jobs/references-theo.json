@@ -1,0 +1,58 @@
+[
+  {
+    "id": "ref-theo-three-quarter",
+    "model": "bfl/flux-3-image",
+    "input": {
+      "prompt": "Full-body photo of the man from the reference image, turned three-quarters to his left, head to toe in frame. Same man, same face, same deep brown skin, same full black beard, same round tortoiseshell glasses, same bright red ribbed knit beanie, same build, same exact outfit (navy double-breasted peacoat, cream roll-neck sweater, charcoal trousers, brown leather boots). Plain light-grey seamless studio backdrop, soft even studio light, photorealistic.",
+      "images": [
+        "@file:evaluation/recast/references/theo/front-full.jpg"
+      ],
+      "aspect_ratio": "2:3",
+      "resolution": "1k",
+      "grounding": false
+    },
+    "out": "artifacts/evaluation/recast/refs-raw/theo-three-quarter.png"
+  },
+  {
+    "id": "ref-theo-profile",
+    "model": "bfl/flux-3-image",
+    "input": {
+      "prompt": "Full-body side profile photo of the man from the reference image, facing left, head to toe in frame. Same man, same face, same deep brown skin, same full black beard, same round tortoiseshell glasses, same bright red ribbed knit beanie, same build, same exact outfit (navy double-breasted peacoat, cream roll-neck sweater, charcoal trousers, brown leather boots). Plain light-grey seamless studio backdrop, soft even studio light, photorealistic.",
+      "images": [
+        "@file:evaluation/recast/references/theo/front-full.jpg"
+      ],
+      "aspect_ratio": "2:3",
+      "resolution": "1k",
+      "grounding": false
+    },
+    "out": "artifacts/evaluation/recast/refs-raw/theo-profile.png"
+  },
+  {
+    "id": "ref-theo-back",
+    "model": "bfl/flux-3-image",
+    "input": {
+      "prompt": "Full-body photo of the man from the reference image seen from directly behind, head to toe in frame. Same man, same face, same deep brown skin, same full black beard, same round tortoiseshell glasses, same bright red ribbed knit beanie, same build, same exact outfit (navy double-breasted peacoat, cream roll-neck sweater, charcoal trousers, brown leather boots). Plain light-grey seamless studio backdrop, soft even studio light, photorealistic.",
+      "images": [
+        "@file:evaluation/recast/references/theo/front-full.jpg"
+      ],
+      "aspect_ratio": "2:3",
+      "resolution": "1k",
+      "grounding": false
+    },
+    "out": "artifacts/evaluation/recast/refs-raw/theo-back.png"
+  },
+  {
+    "id": "ref-theo-face",
+    "model": "bfl/flux-3-image",
+    "input": {
+      "prompt": "Head-and-shoulders close-up portrait of the man from the reference image, looking straight into the camera, neutral expression, face details sharp. Same man, same face, same deep brown skin, same full black beard, same round tortoiseshell glasses, same bright red ribbed knit beanie, same build, same exact outfit (navy double-breasted peacoat, cream roll-neck sweater, charcoal trousers, brown leather boots). Plain light-grey seamless studio backdrop, soft even studio light, photorealistic.",
+      "images": [
+        "@file:evaluation/recast/references/theo/front-full.jpg"
+      ],
+      "aspect_ratio": "1:1",
+      "resolution": "1k",
+      "grounding": false
+    },
+    "out": "artifacts/evaluation/recast/refs-raw/theo-face.png"
+  }
+]

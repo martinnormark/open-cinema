@@ -1,0 +1,3 @@
+# Transient outputs of jobs/sources.json runs started before outputs moved to artifacts/
+clips/
+__pycache__/

@@ -1,0 +1,92 @@
+[
+  {
+    "id": "src-gen-walk-tracking",
+    "model": "byteplus/dreamina-seedance-2-0-260128",
+    "input": {
+      "content": [
+        {
+          "type": "text",
+          "text": "A young man with short curly brown hair and a light stubble, wearing a grey hooded sweatshirt and blue jeans, walks toward the camera along a wet city sidewalk at dusk, glancing at shop windows and then adjusting his backpack strap. The camera dollies backward ahead of him at walking pace, keeping him framed from the knees up. Other pedestrians walk in the background, shop signs glow, light rain. Photorealistic live-action cinematic footage, natural lighting, 35mm film look, realistic skin and fabric, no text, no music video style."
+        }
+      ],
+      "duration": 5,
+      "resolution": "720p",
+      "ratio": "16:9",
+      "generate_audio": false,
+      "watermark": false
+    },
+    "out": "artifacts/evaluation/recast/sources/gen-walk-tracking.mp4"
+  },
+  {
+    "id": "src-gen-cafe-two",
+    "model": "byteplus/dreamina-seedance-2-0-260128",
+    "input": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Two friends sit facing each other at a small round caf\u00e9 table by a window, seen from the side in a medium two-shot. On the LEFT: a woman in her twenties with long dark curly hair, wearing a denim jacket over a white t-shirt, talks animatedly with expressive hand gestures, then picks up her coffee cup and takes a sip. On the RIGHT: a bald man with a grey beard in a dark green knit sweater listens, nods and laughs. The camera slowly pushes in. Warm afternoon light, other customers softly blurred in the background. Photorealistic live-action cinematic footage, natural lighting, 35mm film look, realistic skin and fabric, no text, no music video style."
+        }
+      ],
+      "duration": 5,
+      "resolution": "720p",
+      "ratio": "16:9",
+      "generate_audio": false,
+      "watermark": false
+    },
+    "out": "artifacts/evaluation/recast/sources/gen-cafe-two.mp4"
+  },
+  {
+    "id": "src-gen-occlusion-market",
+    "model": "byteplus/dreamina-seedance-2-0-260128",
+    "input": {
+      "content": [
+        {
+          "type": "text",
+          "text": "A woman with long straight brown hair in a red wool coat walks from left to right along a busy outdoor market street. The camera pans to follow her. Halfway through, she passes behind a stone pillar and a man carrying a crate crosses in front of the camera, briefly hiding her, then she emerges and keeps walking while looking at fruit stalls. Overcast daylight. Photorealistic live-action cinematic footage, natural lighting, 35mm film look, realistic skin and fabric, no text, no music video style."
+        }
+      ],
+      "duration": 5,
+      "resolution": "720p",
+      "ratio": "16:9",
+      "generate_audio": false,
+      "watermark": false
+    },
+    "out": "artifacts/evaluation/recast/sources/gen-occlusion-market.mp4"
+  },
+  {
+    "id": "src-gen-handoff-workshop",
+    "model": "byteplus/dreamina-seedance-2-0-260128",
+    "input": {
+      "content": [
+        {
+          "type": "text",
+          "text": "In a carpenter workshop, two men stand facing each other. On the LEFT an older man with white hair and a leather apron hands a small wooden box to a younger man on the RIGHT, who has short black hair and wears a blue denim shirt; the man on the right takes the box with both hands, opens the lid and smiles. The camera slowly orbits a quarter turn around them. Sawdust in the light beams, tools on the walls. Photorealistic live-action cinematic footage, natural lighting, 35mm film look, realistic skin and fabric, no text, no music video style."
+        }
+      ],
+      "duration": 5,
+      "resolution": "720p",
+      "ratio": "16:9",
+      "generate_audio": false,
+      "watermark": false
+    },
+    "out": "artifacts/evaluation/recast/sources/gen-handoff-workshop.mp4"
+  },
+  {
+    "id": "src-gen-spin-park",
+    "model": "byteplus/dreamina-seedance-2-0-260128",
+    "input": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Full-body shot of a woman with a long blonde braid wearing a light grey sweatshirt and black leggings in a city park, she turns around a full 360 degrees on the spot showing her back, then raises both arms and does a small jump, landing and laughing. Handheld camera, slight sway, trees and joggers in the background, morning sun. Photorealistic live-action cinematic footage, natural lighting, 35mm film look, realistic skin and fabric, no text, no music video style."
+        }
+      ],
+      "duration": 5,
+      "resolution": "720p",
+      "ratio": "16:9",
+      "generate_audio": false,
+      "watermark": false
+    },
+    "out": "artifacts/evaluation/recast/sources/gen-spin-park.mp4"
+  }
+]

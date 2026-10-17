@@ -1,0 +1,27 @@
+{
+  "mara": {
+    "name": "Mara",
+    "identity": "a woman in her early thirties with a short platinum silver-white blunt bob haircut with a fringe, light freckles, dark brows, grey-green eyes and a slim athletic build",
+    "wardrobe": "a mustard-yellow hip-length rain jacket with a high collar, a black crew-neck t-shirt, dark olive-green trousers and chunky white sneakers",
+    "views": {
+      "front-full": "front-full.jpg",
+      "face": "face.jpg",
+      "three-quarter": "three-quarter.jpg",
+      "profile": "profile.jpg",
+      "back": "back.jpg",
+      "face-34": "face-34.jpg"
+    }
+  },
+  "theo": {
+    "name": "Theo",
+    "identity": "a tall broad-shouldered man in his late thirties with deep brown skin, a full neatly trimmed black beard, round tortoiseshell glasses and a bright red ribbed knit beanie",
+    "wardrobe": "a navy wool double-breasted peacoat, a cream roll-neck sweater, charcoal trousers and brown leather boots",
+    "views": {
+      "front-full": "front-full.jpg",
+      "face": "face.jpg",
+      "three-quarter": "three-quarter.jpg",
+      "profile": "profile.jpg",
+      "back": "back.jpg"
+    }
+  }
+}
