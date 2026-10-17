@@ -1,0 +1,120 @@
+/* Revision studio. Tokens follow transitions.dev (see styles.css); motion uses
+   transform, opacity and filter only so playback and live progress stay smooth. */
+
+/* Wipe layers move with the pointer; promote them once instead of per drag. */
+.compare-layer {
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+/* The scrubber is themed from the palette instead of browser defaults. */
+.compare-scrubber {
+  appearance: none;
+  height: 1.5rem;
+  background: transparent;
+  cursor: pointer;
+}
+.compare-scrubber::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 999px;
+  background: var(--input);
+}
+.compare-scrubber::-moz-range-track {
+  height: 3px;
+  border-radius: 999px;
+  background: var(--input);
+}
+.compare-scrubber::-webkit-slider-thumb {
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  margin-top: -5px;
+  border-radius: 999px;
+  background: var(--foreground);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.5);
+}
+.compare-scrubber::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--foreground);
+}
+.compare-scrubber:focus-visible {
+  outline: none;
+}
+.compare-scrubber:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring), transparent 40%);
+}
+
+/* A step panel that appears once its prerequisite is chosen (panel reveal). */
+.revision-reveal {
+  animation: revision-reveal var(--duration-fast) var(--ease-smooth-out);
+}
+@keyframes revision-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+/* Person marker dropped on a frame (success-check pop, scale only). */
+.target-marker {
+  animation: target-marker var(--duration-fast) var(--ease-smooth-out);
+}
+@keyframes target-marker {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.6);
+  }
+}
+
+/* A result replaces the generating placeholder (skeleton reveal). */
+.result-reveal {
+  animation: result-reveal var(--duration-slow) ease-in-out;
+}
+@keyframes result-reveal {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+  }
+}
+
+/* Generating: a slow light sweep over the source frame, transform only. */
+.generating-sweep {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.generating-sweep::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--tungsten), transparent 82%),
+    transparent
+  );
+  will-change: transform;
+  animation: generating-sweep 2.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes generating-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .revision-reveal,
+  .target-marker,
+  .result-reveal,
+  .generating-sweep::before {
+    animation: none;
+  }
+}
