@@ -1,5 +1,7 @@
 # Character recast on LTX 2.5 (experiment)
 
+> **Deferred (2026-10-17):** results are not good enough yet; finding a better model, nodes or workflow is deferred. See [known-limitations.md](known-limitations.md).
+
 Tested on 2026-10-17. Can character recast run on open LTX weights with Lightricks' own adapters, and does that match the shipped Kling 3.0 Omni path ([phase0-recast.md](phase0-recast.md)) inside its envelope?
 
 **Verdict: no, not yet.** The LTX graph keeps the performance frame for frame and leaves everyone else untouched, at about a seventh of Kling's price. But the Character's face does not survive past the first second. Its median likeness to Mara is 0.22, against 0.52 for Kling on the same four seconds, and 0.22 is in the range of strangers. The outfit is also only half right. The graph is therefore **not** wired into the jobs Worker. It stays a documented experiment that `scripts/ltx-graph.ts recast` can run. Kling 3.0 Omni remains the recast pipeline.

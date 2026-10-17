@@ -1,5 +1,7 @@
 # Reuse a performance (`video.performance-transfer`)
 
+> **Deferred (2026-10-17):** results are not good enough yet; finding a better model, nodes or workflow is deferred. See [known-limitations.md](known-limitations.md).
+
 Roadmap issue #10. The creator picks a clip, uploaded or generated, whose acting, choreography and timing they like, and gets a new clip in which a different Character performs it, optionally somewhere else. The source supplies only motion. Appearance comes from the keyframe and the prompt.
 
 Status on 2026-10-17: the kind is registered, has tests, and its graph ran on Comfy Cloud twice: once with a pose skeleton, then, after the decision to rely on no other lab's weights, with edge tracing, which is the graph the app now builds. No composer UI exists for it yet.
