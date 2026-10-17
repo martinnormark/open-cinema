@@ -12,6 +12,13 @@ export interface DirectionOption {
   label: string;
   /** Appended to the prompt; written so FLUX and LTX read it as camera language. */
   phrase: string;
+  /**
+   * Used for video instead of `phrase`. LTX draws camera hardware it is told
+   * about: "shot on a 24mm lens" with "35mm film grain" put a round,
+   * keyhole-shaped lens mask over every frame. Video phrases describe the
+   * picture, never the lens or film stock (see LTX_FRAME_ARTEFACT).
+   */
+  video?: string;
   hint: string;
 }
 
@@ -127,24 +134,28 @@ export const LOOK_OPTIONS: Record<LookField, readonly DirectionOption[]> = {
       id: "wide-24",
       label: "Wide 24mm",
       phrase: "shot on a 24mm wide-angle lens",
+      video: "wide-angle perspective with a broad field of view",
       hint: "Space and environment",
     },
     {
       id: "normal-35",
       label: "Normal 35mm",
       phrase: "shot on a 35mm lens",
+      video: "natural perspective, as the eye sees it",
       hint: "Natural perspective",
     },
     {
       id: "portrait-85",
       label: "Portrait 85mm",
       phrase: "shot on an 85mm portrait lens with compressed perspective",
+      video: "flattering portrait perspective, the background compressed",
       hint: "Intimate, flattering",
     },
     {
       id: "tele-135",
       label: "Telephoto",
       phrase: "shot on a long telephoto lens, strongly compressed background",
+      video: "observed from far away, the background strongly compressed",
       hint: "Observed from afar",
     },
     {
@@ -152,12 +163,15 @@ export const LOOK_OPTIONS: Record<LookField, readonly DirectionOption[]> = {
       label: "Anamorphic",
       phrase:
         "shot on anamorphic cinema lenses, oval bokeh and subtle horizontal flares, the full widescreen frame with no masking",
+      video:
+        "cinematic widescreen look with oval bokeh and subtle horizontal flares",
       hint: "Cinema widescreen",
     },
     {
       id: "vintage",
       label: "Vintage glass",
       phrase: "vintage lens with soft edges and gentle vignetting",
+      video: "soft, slightly hazy vintage look with warm, low contrast",
       hint: "Imperfect, warm",
     },
   ],
@@ -172,12 +186,14 @@ export const LOOK_OPTIONS: Record<LookField, readonly DirectionOption[]> = {
       id: "film-35",
       label: "35mm film",
       phrase: "fine 35mm film grain and gentle halation",
+      video: "fine film grain and a soft glow around highlights",
       hint: "Classic cinema",
     },
     {
       id: "film-16",
       label: "16mm film",
       phrase: "coarse 16mm film grain with soft contrast",
+      video: "coarse, visible grain with soft contrast",
       hint: "Indie, handmade",
     },
     {
@@ -389,11 +405,25 @@ export function directionLabel(
   return optionFor(options, value)?.label ?? value;
 }
 
-function phrase(options: readonly DirectionOption[], value?: string) {
+function phrase(
+  options: readonly DirectionOption[],
+  value: string | undefined,
+  medium: "image" | "video",
+) {
   const v = value?.trim();
   if (!v) return null;
-  return optionFor(options, v)?.phrase ?? v;
+  const option = optionFor(options, v);
+  if (!option) return v;
+  return (medium === "video" && option.video) || option.phrase;
 }
+
+/**
+ * Words LTX renders as a lens mask, vignette or film gate rather than as a
+ * look. No video phrase from a preset may contain them; the creator's own
+ * words are passed through as written.
+ */
+export const LTX_FRAME_ARTEFACT =
+  /\b(lens|lenses|vignett\w*|halation|anamorphic|fisheye|shot on|\d+\s?mm)\b/i;
 
 /**
  * The direction as prompt language. Shot choices come first because framing
@@ -408,14 +438,16 @@ export function directionPrompt(
   const look = effectiveLook(snapshot);
   const shot = snapshot.shot ?? {};
   const parts = [
-    phrase(SHOT_OPTIONS.framing, shot.framing),
-    phrase(SHOT_OPTIONS.depth, shot.depth),
-    phrase(SHOT_OPTIONS.performance, shot.performance),
-    phrase(LOOK_OPTIONS.palette, look.palette),
-    phrase(LOOK_OPTIONS.lighting, look.lighting),
-    phrase(LOOK_OPTIONS.lens, look.lens),
-    phrase(LOOK_OPTIONS.texture, look.texture),
-    medium === "video" ? phrase(LOOK_OPTIONS.pacing, look.pacing) : null,
+    phrase(SHOT_OPTIONS.framing, shot.framing, medium),
+    phrase(SHOT_OPTIONS.depth, shot.depth, medium),
+    phrase(SHOT_OPTIONS.performance, shot.performance, medium),
+    phrase(LOOK_OPTIONS.palette, look.palette, medium),
+    phrase(LOOK_OPTIONS.lighting, look.lighting, medium),
+    phrase(LOOK_OPTIONS.lens, look.lens, medium),
+    phrase(LOOK_OPTIONS.texture, look.texture, medium),
+    medium === "video"
+      ? phrase(LOOK_OPTIONS.pacing, look.pacing, medium)
+      : null,
     look.notes?.trim() || null,
   ].filter((p): p is string => !!p);
   if (!parts.length) return "";
@@ -449,9 +481,9 @@ export function revisionDirectionPrompt(
   if (!snapshot) return "";
   const look = effectiveLook(snapshot);
   const parts = [
-    phrase(LOOK_OPTIONS.palette, look.palette),
-    phrase(LOOK_OPTIONS.lighting, look.lighting),
-    phrase(LOOK_OPTIONS.texture, look.texture),
+    phrase(LOOK_OPTIONS.palette, look.palette, "video"),
+    phrase(LOOK_OPTIONS.lighting, look.lighting, "video"),
+    phrase(LOOK_OPTIONS.texture, look.texture, "video"),
   ].filter((p): p is string => !!p);
   return parts.length
     ? `Match the project's look in the new setting: ${parts.join("; ")}.`

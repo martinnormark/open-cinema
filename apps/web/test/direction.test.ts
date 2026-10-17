@@ -1,0 +1,53 @@
+// LTX draws the camera hardware a look names: "shot on a 24mm lens" with
+// "35mm film grain" put a keyhole-shaped lens mask over every frame.
+import { expect, test } from "bun:test";
+import {
+  LOOK_FIELDS,
+  LOOK_OPTIONS,
+  LTX_FRAME_ARTEFACT,
+  SHOT_FIELDS,
+  SHOT_OPTIONS,
+  directionPrompt,
+  revisionDirectionPrompt,
+  type Look,
+} from "@open-cinema/contracts";
+
+const every = <F extends string>(
+  fields: readonly F[],
+  options: Record<F, readonly { id: string }[]>,
+) =>
+  fields.flatMap((field) => options[field].map((o) => [field, o.id] as const));
+
+test("no look or shot preset puts lens or film-stock words into a video prompt", () => {
+  for (const [field, id] of every(LOOK_FIELDS, LOOK_OPTIONS)) {
+    const look: Look = { [field]: id };
+    const prompts = [
+      directionPrompt({ overrides: look }, "video"),
+      revisionDirectionPrompt({ overrides: look }),
+    ];
+    for (const prompt of prompts)
+      expect(prompt, `${field}: ${id}`).not.toMatch(LTX_FRAME_ARTEFACT);
+  }
+  for (const [field, id] of every(SHOT_FIELDS, SHOT_OPTIONS))
+    expect(
+      directionPrompt({ shot: { [field]: id } }, "video"),
+      `${field}: ${id}`,
+    ).not.toMatch(LTX_FRAME_ARTEFACT);
+});
+
+test("the vignetted Arrival look reads as a picture, not a camera, on video", () => {
+  const look = { lens: "wide-24", texture: "film-35" };
+  expect(directionPrompt({ overrides: look }, "video")).toBe(
+    "wide-angle perspective with a broad field of view; fine film grain and a soft glow around highlights.",
+  );
+  // FLUX renders lens language as intended, so images keep it.
+  expect(directionPrompt({ overrides: look }, "image")).toBe(
+    "shot on a 24mm wide-angle lens; fine 35mm film grain and gentle halation.",
+  );
+});
+
+test("the creator's own words pass through unchanged", () => {
+  expect(
+    directionPrompt({ overrides: { lens: "an old 50mm lens" } }, "video"),
+  ).toBe("an old 50mm lens.");
+});
