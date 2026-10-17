@@ -3,7 +3,7 @@ import type {
   ResolvedMention,
 } from "@open-cinema/contracts";
 import { expandMentions, httpsUrl, mediaTypeFromUrl } from "./results";
-import { LOCK_STAGE } from "@open-cinema/contracts";
+import { LOCK_STAGE, revisionDirectionPrompt } from "@open-cinema/contracts";
 import type {
   MediaStage,
   ProviderOutput,
@@ -75,7 +75,8 @@ function settingText(
  * allowed only when the creator allowed it.
  */
 export function backgroundEditPrompt(
-  inputs: Pick<BackgroundReplaceInputs, "prompt" | "preservation">,
+  inputs: Pick<BackgroundReplaceInputs, "prompt" | "preservation"> &
+    Partial<Pick<BackgroundReplaceInputs, "direction">>,
   location: ResolvedMention | undefined,
   referenceToken: string | null,
 ): string {
@@ -86,8 +87,10 @@ export function backgroundEditPrompt(
   const light = inputs.preservation.allowIntegration
     ? "Adjust light and shadows on the people only as needed to sit naturally in the new setting."
     : "Do not change the lighting or colour of the people or the objects they touch.";
+  const look = revisionDirectionPrompt(inputs.direction);
   return (
     `Replace only the background and setting with ${setting}.${reference} ` +
+    (look ? `${look} ` : "") +
     "Keep every person and every object they hold or touch exactly as in the source: same faces, hair, " +
     "clothing, poses, gestures, expressions and timing. Keep the camera movement, framing and lens identical. " +
     light
@@ -103,7 +106,8 @@ export interface BackgroundRequestMedia {
 
 /** Kling 3.0 Omni video edit: the source is `<<<video_1>>>`, references `<<<image_N>>>`. */
 export function klingBackgroundRequest(
-  inputs: Pick<BackgroundReplaceInputs, "prompt" | "preservation">,
+  inputs: Pick<BackgroundReplaceInputs, "prompt" | "preservation"> &
+    Partial<Pick<BackgroundReplaceInputs, "direction">>,
   location: ResolvedMention | undefined,
   media: BackgroundRequestMedia,
 ): ProviderRequest {

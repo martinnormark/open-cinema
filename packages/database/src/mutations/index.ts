@@ -4,6 +4,12 @@ export { ensureUser } from "./users";
 export { applyJobSnapshot } from "./jobs";
 export { createProject, updateProject } from "./projects";
 export {
+  createRecipe,
+  deleteRecipe,
+  recordRecipeUse,
+  updateRecipe,
+} from "./recipes";
+export {
   createPendingMediaAsset,
   deleteMediaAsset,
   markMediaAssetFailed,
@@ -20,6 +26,7 @@ export {
   removeElementReference,
   updateElement,
   updateElementReference,
+  updateElementState,
 } from "./elements";
 export {
   createRevision,

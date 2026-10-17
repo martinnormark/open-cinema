@@ -2,6 +2,8 @@ import {
   addElementReferenceInputSchema,
   createElementInputSchema,
   createElementStateInputSchema,
+  updateElementStateInputSchema,
+  type UpdateElementStateInput,
   toElementHandle,
   updateElementInputSchema,
   updateElementReferenceInputSchema,
@@ -224,9 +226,34 @@ export async function createElementState(
       elementId: element.id,
       name: data.name,
       description: data.description ?? "",
+      kind: data.kind ?? "other",
     },
   });
   return getElement(db, scope, element.id);
+}
+
+/** A state's description or kind; renaming would break `@Name:state` mentions. */
+export async function updateElementState(
+  db: DatabaseContext,
+  scope: OwnerScope,
+  input: UpdateElementStateInput,
+): Promise<Element | null> {
+  const { id, ...changes } = updateElementStateInputSchema.parse(input);
+  const client = getClient(db);
+  const state = await client.elementState.findFirst({
+    where: { id, element: { ownerId: scope.ownerId } },
+  });
+  if (!state) return null;
+  await client.elementState.update({
+    where: { id },
+    data: {
+      ...(changes.description !== undefined
+        ? { description: changes.description }
+        : {}),
+      ...(changes.kind !== undefined ? { kind: changes.kind } : {}),
+    },
+  });
+  return getElement(db, scope, state.elementId);
 }
 
 export async function deleteElementState(

@@ -89,11 +89,69 @@ export const elementReferenceSchema = z.object({
 });
 export type ElementReference = z.infer<typeof elementReferenceSchema>;
 
+/**
+ * What a state changes. One state per kind can combine in a mention, so wet
+ * and frightened Cal is `@Cal:wet+frightened`, but wet and dry is a conflict.
+ */
+export const stateKindSchema = z.enum([
+  "emotion",
+  "wardrobe",
+  "condition",
+  "weather",
+  "time",
+  "season",
+  "era",
+  "use",
+  "other",
+]);
+export type StateKind = z.infer<typeof stateKindSchema>;
+
+export const STATE_KIND_LABELS: Record<StateKind, string> = {
+  emotion: "Emotion",
+  wardrobe: "Wardrobe",
+  condition: "Condition",
+  weather: "Weather",
+  time: "Time of day",
+  season: "Season",
+  era: "Era",
+  use: "In use",
+  other: "Other",
+};
+
+/** Kinds offered first for each Element type, with an example of each. */
+export const STATE_KINDS_BY_TYPE = {
+  character: [
+    { kind: "emotion", example: "Frightened" },
+    { kind: "wardrobe", example: "Winter coat" },
+    { kind: "condition", example: "Wet, injured" },
+    { kind: "era", example: "Aged 70" },
+  ],
+  location: [
+    { kind: "weather", example: "Heavy rain" },
+    { kind: "time", example: "Night" },
+    { kind: "season", example: "Deep winter" },
+    { kind: "era", example: "1920s" },
+    { kind: "condition", example: "Abandoned" },
+  ],
+  thing: [
+    { kind: "condition", example: "Broken, rusted" },
+    { kind: "use", example: "Lit, switched on" },
+    { kind: "era", example: "Brand new in 1960" },
+  ],
+} as const satisfies Record<
+  ElementType,
+  readonly { kind: StateKind; example: string }[]
+>;
+
+/** The highest number of states one mention may combine. */
+export const MAX_COMBINED_STATES = 3;
+
 export const elementStateSchema = z.object({
   id: z.string(),
   elementId: z.string(),
   name: z.string(),
   description: z.string().default(""),
+  kind: stateKindSchema.default("other"),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -137,10 +195,58 @@ export function toElementHandle(name: string): string {
   return (handle || "Element").slice(0, 40);
 }
 
+/**
+ * States combined in one mention, or the reason they cannot combine: an
+ * unknown state, two of the same kind, or more than the limit.
+ */
+export function combineStates(
+  element: Pick<Element, "name" | "states">,
+  stateIds: readonly string[],
+): { states: ElementState[]; problem: string | null } {
+  const states: ElementState[] = [];
+  for (const id of stateIds) {
+    const state = element.states.find((s) => s.id === id);
+    if (!state)
+      return { states, problem: `${element.name} no longer has that state.` };
+    if (states.some((s) => s.id === id)) continue;
+    const clash = states.find(
+      (s) => s.kind !== "other" && s.kind === state.kind,
+    );
+    if (clash)
+      return {
+        states,
+        problem: `${clash.name} and ${state.name} are both ${STATE_KIND_LABELS[state.kind].toLowerCase()} states of ${element.name}; choose one.`,
+      };
+    states.push(state);
+  }
+  if (states.length > MAX_COMBINED_STATES)
+    return {
+      states,
+      problem: `Combine at most ${MAX_COMBINED_STATES} states of ${element.name}.`,
+    };
+  return { states, problem: null };
+}
+
+/** Every state a mention selects, primary first. */
+export function mentionStateIds(mention: {
+  stateId?: string | undefined;
+  stateIds?: readonly string[] | undefined;
+}): string[] {
+  return [
+    ...(mention.stateId ? [mention.stateId] : []),
+    ...(mention.stateIds ?? []),
+  ];
+}
+
 /** A mention carries identity and references, not just a name in the prompt. */
 export const elementMentionSchema = z.object({
   elementId: z.string().min(1),
   stateId: z.string().min(1).optional(),
+  /** Further states combined with `stateId`, one per kind. */
+  stateIds: z
+    .array(z.string().min(1))
+    .max(MAX_COMBINED_STATES - 1)
+    .optional(),
 });
 export type ElementMention = z.infer<typeof elementMentionSchema>;
 
@@ -196,9 +302,19 @@ export const createElementStateInputSchema = z.object({
   elementId: z.string().min(1),
   name: z.string().trim().min(1).max(80),
   description: z.string().trim().max(2000).optional(),
+  kind: stateKindSchema.optional(),
 });
 export type CreateElementStateInput = z.infer<
   typeof createElementStateInputSchema
+>;
+
+export const updateElementStateInputSchema = z.object({
+  id: z.string().min(1),
+  description: z.string().trim().max(2000).optional(),
+  kind: stateKindSchema.optional(),
+});
+export type UpdateElementStateInput = z.infer<
+  typeof updateElementStateInputSchema
 >;
 
 /**
@@ -209,21 +325,39 @@ export type CreateElementStateInput = z.infer<
  */
 export function approvedReferences(
   element: Pick<Element, "references">,
-  stateId?: string,
+  stateId?: string | readonly string[],
 ): ElementReference[] {
   const approved = element.references.filter(
     (ref) => ref.status === "approved",
   );
-  const own = stateId ? approved.filter((ref) => ref.stateId === stateId) : [];
-  const overridden = new Set(
-    own.flatMap((ref) => (ref.view ? [ref.view] : [])),
-  );
+  const stateIds =
+    stateId === undefined
+      ? []
+      : typeof stateId === "string"
+        ? [stateId]
+        : stateId;
+  // With combined states the first one that shows a view wins it: a wardrobe
+  // state's sheet over a mood's, in the order the creator wrote them.
+  const own: ElementReference[] = [];
+  const overridden = new Set<string>();
+  for (const id of stateIds) {
+    const refs = approved
+      .filter((ref) => ref.stateId === id)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+    const claimed: string[] = [];
+    for (const ref of refs) {
+      if (ref.view && overridden.has(ref.view)) continue;
+      own.push(ref);
+      if (ref.view) claimed.push(ref.view);
+    }
+    for (const view of claimed) overridden.add(view);
+  }
   const base = approved.filter(
     (ref) => ref.stateId === null && !(ref.view && overridden.has(ref.view)),
   );
   const bySortOrder = (a: ElementReference, b: ElementReference) =>
     a.sortOrder - b.sortOrder;
-  return [...own.sort(bySortOrder), ...base.sort(bySortOrder)];
+  return [...own, ...base.sort(bySortOrder)];
 }
 
 export function missingViews(

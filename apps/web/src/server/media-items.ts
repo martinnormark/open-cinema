@@ -28,7 +28,7 @@ export function assetToItem(asset: MediaAsset): MediaItem {
     hasAudio: asset.hasAudio,
     createdAt: asset.createdAt,
     url,
-    // A video's poster is made with ffmpeg; a small image is its own poster.
+    // A video's poster is drawn in the browser; a small image is its own poster.
     thumbnailUrl: `${url}?variant=poster`,
     prompt: null,
   };

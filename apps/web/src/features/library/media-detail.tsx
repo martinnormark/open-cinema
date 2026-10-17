@@ -15,6 +15,7 @@ import {
   mediaUseHref,
   type MediaItem,
 } from "./model";
+import { repairVideoPoster } from "./poster-repair";
 import { removeItem } from "./store";
 
 const dateFormat = new Intl.DateTimeFormat(undefined, {
@@ -98,6 +99,7 @@ function Detail({ item, onClose }: { item: MediaItem; onClose: () => void }) {
         </SheetClose>
         {item.kind === "video" ? (
           <video
+            ref={repairVideoPoster}
             src={item.url}
             poster={item.thumbnailUrl ?? undefined}
             controls

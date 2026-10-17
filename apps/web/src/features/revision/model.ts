@@ -162,7 +162,7 @@ export function assetUrl(ref: AssetRef): string {
     : `/api/jobs/output?job=${encodeURIComponent(ref.jobId)}&output=${encodeURIComponent(ref.outputId)}`;
 }
 
-/** A still for any upload or output: a video's ffmpeg poster, or the image. */
+/** A still for any upload or output: a video's poster frame, or the image. */
 export function posterUrl(ref: AssetRef): string {
   return ref.type === "media-asset"
     ? `${assetUrl(ref)}?variant=poster`

@@ -100,8 +100,8 @@ async function existingOutput(
 }
 
 /**
- * Idempotent save of an output the jobs Worker produced itself (the media
- * container's MP4). `produce` runs only when the object is not already stored.
+ * Idempotent save of an output the jobs Worker produced itself (a Comfy Cloud
+ * media graph's MP4). `produce` runs only when the object is not already stored.
  */
 export async function storeProducedOutput(
   bucket: R2Bucket,

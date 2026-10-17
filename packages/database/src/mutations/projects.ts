@@ -24,6 +24,7 @@ export async function createProject(
       ownerId: scope.ownerId,
       name: data.name,
       direction: data.direction ?? "",
+      look: data.look ?? {},
     },
   });
   return projectSchema.parse({ ...row, ...timestamps(row) });
@@ -43,6 +44,7 @@ export async function updateProject(
       ...(changes.direction !== undefined
         ? { direction: changes.direction }
         : {}),
+      ...(changes.look !== undefined ? { look: changes.look } : {}),
     },
   });
   if (count === 0) return null;

@@ -33,6 +33,7 @@ import {
   resultChecksSchema,
   type ResultChecks,
 } from "@/features/revision/shot-checks";
+import { stampDirection } from "./direction";
 import { getCoordinator } from "./jobs";
 import { requireSameOrigin, requireSession } from "./session";
 
@@ -270,15 +271,21 @@ export const submitRevision = createServerFn({ method: "POST" })
         error:
           "This clip is not ready for revisions yet. Choose another clip, or upload it again.",
       };
-    const command = workflowCommandSchema.parse({
-      idempotencyKey: data.idempotencyKey,
-      request: request.data,
-      projectId: data.projectId,
-      revision: {
-        intent: data.intent,
-        parentRevisionId: data.parentRevisionId,
-      },
-    });
+    const stamped = await stampDirection(
+      db(),
+      scope,
+      workflowCommandSchema.parse({
+        idempotencyKey: data.idempotencyKey,
+        request: request.data,
+        projectId: data.projectId,
+        revision: {
+          intent: data.intent,
+          parentRevisionId: data.parentRevisionId,
+        },
+      }),
+    );
+    if (!stamped.ok) return { ok: false, error: stamped.error };
+    const command = stamped.command;
     using submitted = await getCoordinator(session.userId).submit(
       scope,
       command,

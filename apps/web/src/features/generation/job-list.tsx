@@ -2,6 +2,7 @@ import { useState } from "react";
 import { isActiveJob, type Job } from "@open-cinema/contracts";
 import { cancelGeneration, reconcileGeneration } from "@/server/functions";
 import { Button } from "@/components/ui/button";
+import { repairVideoPoster } from "@/features/library";
 import { acceptSnapshot } from "./store";
 const labels: Record<Job["state"], string> = {
   queued: "Queued",
@@ -80,6 +81,7 @@ function JobRow({ job }: { job: Job }) {
             )}
             {output.mediaType.startsWith("video/") && (
               <video
+                ref={repairVideoPoster}
                 src={`/api/jobs/output?job=${encodeURIComponent(job.id)}&output=${encodeURIComponent(output.id)}`}
                 poster={`/api/jobs/output?job=${encodeURIComponent(job.id)}&output=${encodeURIComponent(output.id)}&variant=poster`}
                 controls

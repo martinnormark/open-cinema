@@ -1,5 +1,7 @@
 import {
   approvedReferences,
+  combineStates,
+  mentionStateIds,
   parseMentionHandles,
   requestMentions,
   requestPrompt,
@@ -19,12 +21,10 @@ const MAX_REFERENCES_PER_MENTION = 8;
 
 export class MentionError extends Error {}
 
-function snapshot(element: Element, stateId: string | null): ResolvedMention {
-  const state = stateId
-    ? element.states.find((s) => s.id === stateId)
-    : undefined;
-  if (stateId && !state)
-    throw new MentionError(`${element.name} no longer has that state.`);
+function snapshot(element: Element, stateIds: string[]): ResolvedMention {
+  const { states, problem } = combineStates(element, stateIds);
+  if (problem) throw new MentionError(problem);
+  const state = states[0];
   return {
     elementId: element.id,
     handle: element.handle,
@@ -33,9 +33,24 @@ function snapshot(element: Element, stateId: string | null): ResolvedMention {
     version: element.version,
     description: element.description,
     stateId: state?.id ?? null,
-    stateName: state?.name ?? null,
-    stateDescription: state?.description ?? null,
-    references: approvedReferences(element, state?.id)
+    // Combined states read as one: "Wet, Frightened".
+    stateName: states.length ? states.map((s) => s.name).join(", ") : null,
+    stateDescription: states.length
+      ? states
+          .map((s) => s.description.trim())
+          .filter(Boolean)
+          .join("; ") || null
+      : null,
+    states: states.map((s) => ({
+      id: s.id,
+      name: s.name,
+      description: s.description,
+      kind: s.kind,
+    })),
+    references: approvedReferences(
+      element,
+      states.map((s) => s.id),
+    )
       .slice(0, MAX_REFERENCES_PER_MENTION)
       .map((ref) => ({ asset: ref.asset, view: ref.view, roles: ref.roles })),
   };
@@ -66,12 +81,12 @@ export async function resolveMentions(
     const element = byId.find((e) => e.id === mention.elementId);
     if (!element)
       throw new MentionError("A mentioned Element is no longer available.");
-    resolved.push(snapshot(element, mention.stateId ?? null));
+    resolved.push(snapshot(element, mentionStateIds(mention)));
   }
   for (const handle of handles) {
     const element = byHandle.find((e) => e.handle === handle);
     if (element && !resolved.some((m) => m.elementId === element.id))
-      resolved.push(snapshot(element, null));
+      resolved.push(snapshot(element, []));
   }
   if (resolved.length > MAX_MENTIONS)
     throw new MentionError(

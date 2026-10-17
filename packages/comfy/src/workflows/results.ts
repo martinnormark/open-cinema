@@ -34,20 +34,63 @@ export function mediaTypeFromUrl(url: string, fallback: string): string {
   return EXTENSIONS.find(([pattern]) => pattern.test(path))?.[1] ?? fallback;
 }
 
-/** Replaces `@Handle` tokens with Element names so text-only models read them naturally. */
+interface MentionText {
+  handle: string;
+  name: string;
+  description?: string;
+  stateName: string | null;
+  stateDescription?: string | null;
+}
+
+/**
+ * How much a mention says in the prompt. `name` suits a model that sees the
+ * Element's references and its states' own sheets; `state` adds what the
+ * selected states change; `full` also says who the Element is, for text-only
+ * models (LTX on Router, FLUX with no references) that would otherwise only
+ * read a name.
+ */
+export type MentionDetail = "name" | "state" | "full";
+
+function clip(text: string, max: number) {
+  const t = text
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/[.\s]+$/, "");
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max);
+  return cut.slice(0, Math.max(cut.lastIndexOf(" "), max - 20)).trim();
+}
+
+function mentionText(mention: MentionText, detail: MentionDetail) {
+  const details: string[] = [];
+  if (detail === "full" && mention.description?.trim())
+    details.push(clip(mention.description, 240));
+  if (mention.stateName) {
+    const change =
+      detail !== "name" && mention.stateDescription?.trim()
+        ? `: ${clip(mention.stateDescription, 200)}`
+        : "";
+    details.push(`${mention.stateName.toLowerCase()}${change}`);
+  }
+  return details.length
+    ? `${mention.name} (${details.join("; ")})`
+    : mention.name;
+}
+
+/**
+ * Replaces `@Handle` and `@Handle:state+state` tokens with Element names (and
+ * as much detail as `detail` asks for) so models read them naturally.
+ */
 export function expandMentions(
   prompt: string,
-  mentions: readonly {
-    handle: string;
-    name: string;
-    stateName: string | null;
-  }[],
+  mentions: readonly MentionText[],
+  detail: MentionDetail = "name",
 ): string {
-  return prompt.replace(/@([A-Za-z][A-Za-z0-9_]{0,39})/g, (token, handle) => {
-    const mention = mentions.find((m) => m.handle === handle);
-    if (!mention) return token;
-    return mention.stateName
-      ? `${mention.name} (${mention.stateName})`
-      : mention.name;
-  });
+  return prompt.replace(
+    /@([A-Za-z][A-Za-z0-9_]{0,39})(?::[A-Za-z0-9-]+(?:\+[A-Za-z0-9-]+)*)?/g,
+    (token, handle: string) => {
+      const mention = mentions.find((m) => m.handle === handle);
+      return mention ? mentionText(mention, detail) : token;
+    },
+  );
 }

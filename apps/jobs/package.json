@@ -4,13 +4,12 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev --port 8788 --persist-to ../../.wrangler/state",
-    "build": "wrangler deploy --dry-run --outdir dist --containers-rollout none",
+    "build": "wrangler deploy --dry-run --outdir dist",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "types:generate": "wrangler types --env-interface JobsEnv --include-runtime false"
   },
   "dependencies": {
-    "@cloudflare/containers": "0.3.7",
     "@open-cinema/assets": "workspace:*",
     "@open-cinema/comfy": "workspace:*",
     "@open-cinema/contracts": "workspace:*",

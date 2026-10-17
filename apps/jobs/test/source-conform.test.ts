@@ -18,6 +18,7 @@ import {
   createPendingMediaAsset,
   markMediaAssetReady,
 } from "@open-cinema/database/mutations";
+import { cloudMedia } from "./cloud-media";
 
 const network = setupNetwork();
 beforeAll(() => network.enable());
@@ -134,18 +135,9 @@ it("conforms a clip with non-square pixels before Kling reads it", async () => {
   const ownerId = crypto.randomUUID();
   const assetId = await upload(ownerId, 639 / 640);
   const stored = storage();
-  const operations: string[] = [];
-  network.use(
-    http.post("http://127.0.0.1:8791/:operation", ({ params }) => {
-      operations.push(String(params.operation));
-      return new HttpResponse(squared, {
-        headers: {
-          "content-type": "video/mp4",
-          "content-length": String(squared.length),
-        },
-      });
-    }),
-  );
+  // The browser converts at upload; a clip it could not convert goes to Cloud.
+  const cloud = cloudMedia({ square: squared });
+  network.use(...cloud.handlers);
   const bodies: unknown[] = [];
   network.use(
     http.post(requests, async ({ request }) => {
@@ -155,7 +147,8 @@ it("conforms a clip with non-square pixels before Kling reads it", async () => {
   );
   const stub = await submit(ownerId, assetId);
   await due(stub);
-  expect(operations).toEqual(["square"]);
+  expect(cloud.runs.map((r) => r.operation)).toEqual(["square"]);
+  expect(cloud.runs[0]!.parts).toEqual({ source: take });
   expect(bodies).toHaveLength(1);
   const name = videoUrl(bodies[0]).split("/").pop()!;
   expect(stored.get(name)).toEqual(squared);

@@ -6,6 +6,7 @@ import {
   createElementInputSchema,
   createElementStateInputSchema,
   updateElementInputSchema,
+  updateElementStateInputSchema,
   updateElementReferenceInputSchema,
   type Element,
   type OwnerScope,
@@ -21,6 +22,7 @@ import {
   removeElementReference,
   updateElement,
   updateElementReference,
+  updateElementState,
 } from "@open-cinema/database/mutations";
 import { requireSameOrigin, requireSession } from "./session";
 
@@ -124,4 +126,11 @@ export const deleteMyElementState = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { db, scope } = await mutate();
     return found(await deleteElementState(db, scope, data.id).catch(failure));
+  });
+
+export const updateMyElementState = createServerFn({ method: "POST" })
+  .validator(updateElementStateInputSchema)
+  .handler(async ({ data }) => {
+    const { db, scope } = await mutate();
+    return found(await updateElementState(db, scope, data).catch(failure));
   });

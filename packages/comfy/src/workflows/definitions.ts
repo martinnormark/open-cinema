@@ -1,4 +1,8 @@
-import type { AssetRef, WorkflowInputs } from "@open-cinema/contracts";
+import {
+  withDirection,
+  type AssetRef,
+  type WorkflowInputs,
+} from "@open-cinema/contracts";
 import { fluxImageInput, FLUX_IMAGE_MODEL } from "./flux-image";
 import {
   backgroundLockStage,
@@ -117,9 +121,14 @@ export const fluxImageWorkflow: WorkflowDefinition<"image.flux"> = {
   async build(inputs, context) {
     return {
       model: FLUX_IMAGE_MODEL,
+      // No reference images reach this model, so mentions say who they are.
       input: fluxImageInput({
         ...inputs,
-        prompt: expandMentions(inputs.prompt, context.mentions),
+        prompt: withDirection(
+          expandMentions(inputs.prompt, context.mentions, "full"),
+          inputs.direction,
+          "image",
+        ),
       }),
     };
   },
@@ -149,7 +158,11 @@ export const fluxReferenceWorkflow: WorkflowDefinition<"image.flux-reference"> =
           ...fluxImageInput({
             ...inputs,
             prompt: withSheetGuide(
-              expandMentions(inputs.prompt, context.mentions),
+              withDirection(
+                expandMentions(inputs.prompt, context.mentions, "state"),
+                inputs.direction,
+                "image",
+              ),
               context,
             ),
           }),
@@ -167,8 +180,14 @@ export const ltxVideoWorkflow: WorkflowDefinition<"video.ltx"> = {
   model: ltxVideoModel,
   async build(inputs, context) {
     const frame = inputs.firstFrame && (await context.asset(inputs.firstFrame));
+    // Router's LTX reads text only: mentions say who they are, not just a name.
+    const prompt = expandMentions(
+      inputs.prompt,
+      context.mentions,
+      frame ? "state" : "full",
+    );
     return ltxVideoRequest(
-      { ...inputs, prompt: expandMentions(inputs.prompt, context.mentions) },
+      { ...inputs, prompt: withDirection(prompt, inputs.direction, "video") },
       frame ? (frame.publicUrl ?? (await frame.base64())) : undefined,
     );
   },
