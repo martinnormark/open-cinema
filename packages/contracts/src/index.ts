@@ -2,6 +2,7 @@ import { z } from "zod";
 import { workflowKindSchema } from "./workflow-kinds";
 import type { WorkflowCommandInput } from "./workflows";
 import type { AssetRef } from "./media";
+import type { PlanSequenceInput, SequencePlan } from "./sequences";
 
 export const jobStateSchema = z.enum([
   "queued",
@@ -189,6 +190,8 @@ export interface GenerationCoordinatorApi {
   reconcile(scope: OwnerScope, jobId: string): Promise<CommandResult>;
   /** Display-safe: whether the jobs Worker holds Comfy credentials. Never the key. */
   getProviderStatus(): Promise<{ comfyConfigured: boolean }>;
+  /** Proposes shots for an idea; falls back to a sentence split, never throws. */
+  planSequence(scope: OwnerScope, input: PlanSequenceInput): Promise<SequencePlan>;
   getStoredOutput(
     scope: OwnerScope,
     jobId: string,
@@ -200,6 +203,7 @@ export * from "./media";
 export * from "./elements";
 export * from "./replacement";
 export * from "./workflows";
+export * from "./sequences";
 export * from "./direction";
 export * from "./capabilities";
 export * from "./recipes";

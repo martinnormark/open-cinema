@@ -17,6 +17,7 @@ model User {
   elements  Element[]
   media     MediaAsset[]
   revisions Revision[]
+  sequences Sequence[]
   recipes   Recipe[]
 }
 
@@ -91,6 +92,7 @@ model Project {
   elements  Element[]
   media     MediaAsset[]
   revisions Revision[]
+  sequences Sequence[]
 
   @@index([ownerId, updatedAt])
 }
@@ -206,6 +208,63 @@ model Revision {
   @@index([jobId])
   @@index([sourceAssetId])
   @@index([sourceJobId, sourceOutputId])
+}
+
+/// An idea developed into ordered shots; each shot is approved independently.
+model Sequence {
+  id        String   @id
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id])
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  title     String
+  idea      String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  shots     Shot[]
+
+  @@index([ownerId, updatedAt])
+  @@index([projectId])
+}
+
+model Shot {
+  id              String      @id
+  sequenceId      String
+  sequence        Sequence    @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  sortOrder       Int
+  title           String
+  beat            String      @default("")
+  prompt          String      @default("")
+  framing         String
+  camera          String
+  durationSeconds Int
+  continuity      String      @default("fresh")
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  takes           ShotTake[]
+
+  @@index([sequenceId, sortOrder])
+}
+
+/// Asset columns stay null until the take's job saves an output.
+model ShotTake {
+  id           String   @id
+  shotId       String
+  shot         Shot     @relation(fields: [shotId], references: [id], onDelete: Cascade)
+  role         String
+  origin       String
+  status       String
+  jobId        String?
+  assetType    String?
+  mediaAssetId String?
+  assetJobId   String?
+  outputId     String?
+  prompt       String   @default("")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([shotId, role])
+  @@index([jobId])
 }
 
 /// A saved creative recipe. `spec` is the current template, slots, look and

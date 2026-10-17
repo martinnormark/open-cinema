@@ -33,3 +33,14 @@ export {
   setRevisionStatus,
   settleRevisionForJob,
 } from "./revisions";
+export {
+  addShot,
+  addTake,
+  createSequence,
+  deleteSequence,
+  deleteShot,
+  moveShot,
+  setTakeStatus,
+  updateSequence,
+  updateShot,
+} from "./sequences";
