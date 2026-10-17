@@ -85,7 +85,7 @@ workerd connects directly, not through `HTTPS_PROXY`. In an environment whose pr
 
 `loopbackRelay` (used for both Router and Cloud uploads) ignores any override that is not plain http on loopback, so a deployed Worker always sends its own secret to Router directly. I verified on 2026-10-17 that a queued FLUX 3 Image submission and its status polling succeed through the relay with a placeholder key.
 
-Comfy Cloud's `/api/v2/...` endpoints (asset upload and job submission, which the app uses) accept only a Comfy API key. On 2026-10-17 the proxy-injected Cloud credential in a Claude Code container answered `401 Missing or invalid API key` there while the older `/api/...` routes accepted it, so the LTX Alpha Gen background swap needs a real `COMFY_API_KEY` to run from the app. Its graph itself ran successfully on Cloud (job `f30bd530`, 97 frames at 640×360 in about 40 s).
+Comfy Cloud's `/api/v2/...` routes (the SDK's asset upload and job submission) reject the proxy-injected credential in a Claude Code container with `401 Missing or invalid API key`, whatever Authorization header the request carries; the ComfyUI-compatible `/api/...` routes accept it. That is a Cloud response, not the SDK failing locally. Behind the relay, the Cloud client therefore uses the `/api/...` routes. On 2026-10-17 the LTX Alpha Gen background swap ran end to end from the app this way: upload, prompt, status, result saved and ready to review (97 frames at 640×360).
 
 ## Known gaps
 
