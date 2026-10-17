@@ -48,6 +48,8 @@ const POLL_MS = 2000;
 const DEADLINE_MS = 30 * 60_000;
 // Provider fetch links outlive monitoring so a recovered submission can still read them.
 const LINK_GRACE_MS = 60 * 60_000;
+/** Router's shared queue can hold a job for hours; past this, ask the creator. */
+const MAX_QUEUE_WAIT_MS = 6 * 60 * 60_000;
 type Execution = CoordinatorRecord["executions"][string];
 const deadlineFor = (execution: Execution) =>
   getWorkflowDefinition(execution.workflowKind)?.deadlineMs ?? DEADLINE_MS;
@@ -406,6 +408,13 @@ export class GenerationCoordinator
       if (job.state === "needs_attention")
         job.error =
           "Comfy returned an unknown status. Check again to reconcile this job.";
+      // The monitoring deadline covers generation, not waiting in Router's queue:
+      // while the provider confirms the job is queued, keep the window open.
+      if (status.state === "queued" && !execution.cancelRequested)
+        execution.deadline = Math.min(
+          Date.parse(job.createdAt) + MAX_QUEUE_WAIT_MS,
+          Math.max(execution.deadline, Date.now() + deadlineFor(execution)),
+        );
       execution.attempts = 0;
       execution.nextAttemptAt = Date.now() + POLL_MS;
     });

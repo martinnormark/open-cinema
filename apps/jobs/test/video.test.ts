@@ -216,3 +216,47 @@ it("animates a first frame on FLUX 3 Video, sending the stored image inline only
   });
   expect(await storedBytes(done.outputs[0]!.r2Key)).toEqual(mp4);
 }, 20_000);
+
+it("keeps monitoring while Router reports the job queued, up to the queue-wait cap", async () => {
+  const { scope, stub } = fixture();
+  const requests = "https://api.comfy.org/v2/models/ltx/ltx-2-5-fast/requests";
+  network.use(
+    http.post(requests, () =>
+      HttpResponse.json({ request_id: "queued-1" }, { status: 202 }),
+    ),
+    http.get(`${requests}/queued-1/status`, () =>
+      HttpResponse.json({ request_id: "queued-1", status: "IN_QUEUE" }),
+    ),
+  );
+  const job = accepted(
+    await stub.submit(scope, {
+      idempotencyKey: crypto.randomUUID(),
+      request: {
+        workflowKind: "video.ltx",
+        inputs: { prompt: "Waves at dusk" },
+      },
+    }),
+  );
+  await due(stub);
+  const nearlyExpired = async (createdAt: string) =>
+    runInDurableObject(stub, (_, state) =>
+      mutateCoordinator(state.storage, scope, (r) => {
+        r.executions[job.id]!.deadline = Date.now() + 1000;
+        r.jobs[0]!.createdAt = createdAt;
+      }),
+    );
+  // An hour in Router's queue: the window extends instead of timing out.
+  await nearlyExpired(new Date(Date.now() - 60 * 60_000).toISOString());
+  await due(stub);
+  let current = await checkpoint(stub);
+  expect(current!.jobs[0]!.state).toBe("queued");
+  expect(current!.executions[job.id]!.deadline).toBeGreaterThan(
+    Date.now() + 30 * 60_000,
+  );
+  // Past six hours queued, the deadline stops moving and the creator is asked.
+  await nearlyExpired(new Date(Date.now() - 7 * 60 * 60_000).toISOString());
+  await due(stub);
+  await due(stub);
+  current = await checkpoint(stub);
+  expect(current!.jobs[0]!.state).toBe("needs_attention");
+});
