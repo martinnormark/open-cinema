@@ -1,17 +1,279 @@
 {
  "reviewer": "Claude (thread: Phase 0 character recast), contact sheets at matched timestamps and side-by-sides",
  "runs": {
-  "kling-o1/U1-couple-wall": {"A": [1, 3, 3, 3, 3], "A1w": 3, "B": [0, 3, 3, 4, 3, 3, 3, 1], "gates": ["G4"],
-   "notes": "Wrong person: the bearded man on the left was recast as Mara and the woman was restyled in a yellow jacket. Background and both performances otherwise kept."},
-  "kling-o1/U2-group-table": {"A": [4, 3, 3, 3, 4], "A1w": 4, "B": [3, 4, 3, 4, 3, 4, 3, 1], "gates": ["G4"],
-   "notes": "Right person, strong likeness and outfit, but the table was rewritten: cups and teapots removed, papers added, an extra table leg."},
-  "kling-v3-omni/U1-couple-wall": {"A": [3, 4, 4, 4, 4], "A1w": 4, "B": [4, 4, 3, 4, 3, 4, 4, 4], "gates": [],
-   "notes": "Right person (the case O1 got wrong). Bob, freckles and mustard jacket; the man, his hands and every head turn track the source frame for frame. Likeness softer in the lowered-head frames (ref_sim min 0.12)."},
-  "kling-v3-omni/U2-group-table": {"A": [4, 4, 4, 4, 4], "A1w": 4, "B": [4, 4, 3, 4, 3, 4, 4, 4], "gates": [],
-   "notes": "Right person among five; Mara's bob, jacket and black tee; she leans and points with the source timing. Table, cups and papers intact; the other four faces hold (0.93)."},
-  "wan27-edit/U1-couple-wall": {"A": [3, 3, 3, 3, 3], "A1w": 4, "B": [3, 2, 3, 4, 3, 3, 3, 3], "gates": [],
-   "notes": "Right person with bob and jacket, but the man's performance drifts: head angle and hand positions differ at t=0 and t=4 s. 30 fps output."},
-  "wan27-edit/U2-group-table": {"A": [2, 3, 3, 3, 3], "A1w": 4, "B": [3, 2, 3, 4, 3, 4, 3, 3], "gates": [],
-   "notes": "Right person and outfit, weaker likeness (ref_sim 0.36). Other people's poses drift from the source in several frames; table intact. 30 fps output."}
+  "kling-o1/U1-couple-wall": {
+   "A": [
+    1,
+    3,
+    3,
+    3,
+    3
+   ],
+   "A1w": 3,
+   "B": [
+    0,
+    3,
+    3,
+    4,
+    3,
+    3,
+    3,
+    1
+   ],
+   "gates": [
+    "G4"
+   ],
+   "notes": "Wrong person: the bearded man on the left was recast as Mara and the woman was restyled in a yellow jacket. Background and both performances otherwise kept."
+  },
+  "kling-o1/U2-group-table": {
+   "A": [
+    4,
+    3,
+    3,
+    3,
+    4
+   ],
+   "A1w": 4,
+   "B": [
+    3,
+    4,
+    3,
+    4,
+    3,
+    4,
+    3,
+    1
+   ],
+   "gates": [
+    "G4"
+   ],
+   "notes": "Right person, strong likeness and outfit, but the table was rewritten: cups and teapots removed, papers added, an extra table leg."
+  },
+  "kling-v3-omni/U1-couple-wall": {
+   "A": [
+    3,
+    4,
+    4,
+    4,
+    4
+   ],
+   "A1w": 4,
+   "B": [
+    4,
+    4,
+    3,
+    4,
+    3,
+    4,
+    4,
+    4
+   ],
+   "gates": [],
+   "notes": "Right person (the case O1 got wrong). Bob, freckles and mustard jacket; the man, his hands and every head turn track the source frame for frame. Likeness softer in the lowered-head frames (ref_sim min 0.12)."
+  },
+  "kling-v3-omni/U2-group-table": {
+   "A": [
+    4,
+    4,
+    4,
+    4,
+    4
+   ],
+   "A1w": 4,
+   "B": [
+    4,
+    4,
+    3,
+    4,
+    3,
+    4,
+    4,
+    4
+   ],
+   "gates": [],
+   "notes": "Right person among five; Mara's bob, jacket and black tee; she leans and points with the source timing. Table, cups and papers intact; the other four faces hold (0.93)."
+  },
+  "wan27-edit/U1-couple-wall": {
+   "A": [
+    3,
+    3,
+    3,
+    3,
+    3
+   ],
+   "A1w": 4,
+   "B": [
+    3,
+    2,
+    3,
+    4,
+    3,
+    3,
+    3,
+    3
+   ],
+   "gates": [],
+   "notes": "Right person with bob and jacket, but the man's performance drifts: head angle and hand positions differ at t=0 and t=4 s. 30 fps output."
+  },
+  "wan27-edit/U2-group-table": {
+   "A": [
+    2,
+    3,
+    3,
+    3,
+    3
+   ],
+   "A1w": 4,
+   "B": [
+    3,
+    2,
+    3,
+    4,
+    3,
+    4,
+    3,
+    3
+   ],
+   "gates": [],
+   "notes": "Right person and outfit, weaker likeness (ref_sim 0.36). Other people's poses drift from the source in several frames; table intact. 30 fps output."
+  },
+  "happyhorse-edit/U2-group-table": {
+   "A": [
+    3,
+    3,
+    3,
+    3,
+    3
+   ],
+   "A1w": 4,
+   "B": [
+    0,
+    3,
+    3,
+    4,
+    3,
+    4,
+    3,
+    1
+   ],
+   "gates": [
+    "G4"
+   ],
+   "notes": "Two people became Mara: the target and the woman beside her in beige both get the bob and mustard jacket. Table and the three others kept."
+  },
+  "genjutsu/U1-couple-wall": {
+   "A": [
+    2,
+    3,
+    3,
+    3,
+    4
+   ],
+   "A1w": 3,
+   "B": [
+    4,
+    4,
+    1,
+    4,
+    3,
+    4,
+    4,
+    3
+   ],
+   "gates": [
+    "G3"
+   ],
+   "notes": "Right person and the closest performance match of any pipeline, but only part of Mara arrives: white hair at shoulder length rather than the bob and a face still close to the source (ref_sim 0.23, src_sim 0.23). Returns 4.71 s of a 5 s clip."
+  },
+  "genjutsu/U2-group-table": {
+   "A": [
+    4,
+    4,
+    4,
+    4,
+    4
+   ],
+   "A1w": 4,
+   "B": [
+    3,
+    4,
+    1,
+    4,
+    3,
+    4,
+    4,
+    4
+   ],
+   "gates": [
+    "G3"
+   ],
+   "notes": "Right person with the strongest likeness measured (ref_sim 0.71, min 0.63); bob, jacket and black tee; table intact; every pose tracks. Fails timing: 4.71 s of a 5 s clip (7 frames short)."
+  },
+  "kling-v3-omni/U4-couple-sunset": {
+   "A": [
+    2,
+    1,
+    3,
+    3,
+    1
+   ],
+   "A1w": 4,
+   "B": [
+    3,
+    1,
+    3,
+    4,
+    3,
+    4,
+    4,
+    3
+   ],
+   "gates": [],
+   "notes": "Back-view failure: the woman walking away from camera becomes Mara facing the camera while still walking away, so her body is reversed against the hand-hold; she also reads twenty years older. Hand-holding, the man and the street are kept."
+  },
+  "kling-v3-omni/G3-occlusion-market": {
+   "A": [
+    4,
+    4,
+    4,
+    4,
+    4
+   ],
+   "A1w": 4,
+   "B": [
+    4,
+    4,
+    4,
+    4,
+    3,
+    4,
+    4,
+    4
+   ],
+   "gates": [],
+   "notes": "Full occlusion handled: Mara re-emerges after the pillar and the crate carrier with the same face, bob and jacket. Pillar, carrier, crowd and fruit stall unchanged (protected PSNR 34.8). 24 fps source, so frame-exact."
+  },
+  "kling-v3-omni/G2-cafe-two": {
+   "A": [
+    3,
+    4,
+    4,
+    4,
+    4
+   ],
+   "A1w": 4,
+   "B": [
+    4,
+    4,
+    4,
+    4,
+    4,
+    4,
+    4,
+    4
+   ],
+   "gates": [],
+   "notes": "Cup to lips, gestures, laugh and gaze all land on the source frames; the man is untouched (face 0.98, protected PSNR 37.4). Mara reads ten or more years older than her sheet, a pattern also seen on U4."
+  }
  }
 }
