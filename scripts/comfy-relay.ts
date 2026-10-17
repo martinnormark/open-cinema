@@ -9,7 +9,8 @@
  *
  * The relay binds to loopback only, forwards to Comfy through HTTPS_PROXY (Comfy
  * Cloud's `/api/...` paths to https://cloud.comfy.org, everything else to Router
- * at https://api.comfy.org), and drops the caller's Authorization header so only the proxy's
+ * at https://api.comfy.org), and drops the caller's Authorization and X-API-Key
+ * headers so only the proxy's
  * credential is used. Never run it on a shared or public interface.
  */
 const ROUTER = "https://api.comfy.org";
@@ -23,6 +24,7 @@ if (!proxy) {
 const DROP = new Set([
   "host",
   "authorization",
+  "x-api-key",
   "connection",
   "content-length",
   "accept-encoding",

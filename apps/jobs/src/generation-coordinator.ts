@@ -41,6 +41,7 @@ import {
   workflowStage,
   workflowStages,
   type ComfyJobStatus,
+  type MediaPartName,
   type MediaStage,
   type StageContext,
   type WorkflowDefinition,
@@ -51,7 +52,7 @@ import {
   storedAsset,
   type UploadCache,
 } from "./asset-resolver";
-import { MediaRejectedError, renderMedia } from "./media";
+import { MediaRejectedError, renderCloudMedia, renderMedia } from "./media";
 import { MentionError, resolveMentions } from "./mentions";
 
 import {
@@ -761,8 +762,9 @@ export class GenerationCoordinator
   }
 
   /**
-   * One media task per alarm, like asset archiving: each task's MP4 is saved
-   * under a deterministic key, so a repeated alarm never renders twice.
+   * One media task per alarm, like asset archiving: each task runs as a Comfy
+   * Cloud graph and its MP4 is saved under a deterministic key, so a repeated
+   * alarm never renders a saved output twice.
    */
   private async runMediaStage(ownerId: string, job: Job, execution: Execution) {
     if (execution.cancelRequested) {
@@ -809,7 +811,13 @@ export class GenerationCoordinator
             job.outputs,
           );
           if (!stored) throw new AssetUnavailableError(part.name);
-          return { name: part.name, r2Key: stored.r2Key };
+          return {
+            name: part.name as MediaPartName,
+            r2Key: stored.r2Key,
+            mediaType: stored.mediaType,
+            pixelAspect:
+              "pixelAspect" in stored ? stored.pixelAspect : undefined,
+          };
         }),
       );
       const saved = await storeProducedOutput(
@@ -817,11 +825,12 @@ export class GenerationCoordinator
         ownerId,
         output,
         () =>
-          renderMedia(
+          renderCloudMedia(
             this.env,
             task.operation,
             parts,
             AbortSignal.timeout(10 * 60_000),
+            parts.find((p) => p.name === "source")?.pixelAspect,
           ),
       );
       await this.change(ownerId, job.id, (j, r) => {

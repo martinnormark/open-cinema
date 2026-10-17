@@ -42,9 +42,9 @@ export interface StageContext extends BuildContext {
   saved: readonly string[];
 }
 
-/** Steps a media container performs; see apps/jobs/media/server.mjs. */
+/** Media steps: lock and conform run as Comfy Cloud graphs (./media-graphs.ts); square also runs in the jobs media container. */
 export type MediaOperation = "lock" | "conform" | "square";
-/** One container call that produces one output from named media parts. */
+/** One media step that produces one output from named media parts. */
 export interface MediaTask {
   /** Stored as `{stage id}:{output}`. */
   output: string;
@@ -72,7 +72,7 @@ export interface RouterStage<
   ): Promise<ProviderRequest>;
   outputs(result: unknown): ProviderOutput[];
 }
-/** Container work over saved media; each task saves one output. */
+/** Media steps over saved media on Comfy Cloud; each task saves one output. */
 export interface MediaStage<
   K extends WorkflowKind = WorkflowKind,
 > extends StageBase {

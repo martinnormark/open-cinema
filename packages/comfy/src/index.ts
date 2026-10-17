@@ -11,6 +11,8 @@ export * from "./workflows/ltx-video";
 export * from "./workflows/ltx-alpha-background";
 export * from "./estimates";
 export { uploadToComfyStorage } from "./storage";
+export { CloudMediaRejectedError, runCloudMedia } from "./cloud-media";
+export type { CloudMediaPart } from "./cloud-media";
 import { loopbackRelay } from "./relay";
 
 import { FLUX_IMAGE_MODEL } from "./workflows/flux-image";
