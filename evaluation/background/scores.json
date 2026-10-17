@@ -1,0 +1,28 @@
+{
+  "reviewer": "Claude (thread: Phase 0 background replacement), contact sheets at matched timestamps + 1:1 crops",
+  "cost_usd": {
+    "bria-composite": "0.05/s",
+    "switchx-ref": "0.143/30 frames (720p)",
+    "kling-o1-edit": "0.14/Kling credit (5.4 credits per 6 s std)",
+    "bfl-video-edit": "GPU-seconds (~0.043/s per ComfyUI badge)",
+    "wan27-edit": "0.10/s (720P)",
+    "aleph2-edit": "0.40/s"
+  },
+  "runs": {
+    "c5-bria-composite": {"A": [4,2,1,4,4], "B": [4,4,4,4,3,4,3,2], "gates": [], "notes": "Foreground pixel-exact. Background is the razor-sharp still behind a shallow-focus take; daylight face on a dusk harbor; the office chair was matted out."},
+    "c5-switchx-ref": {"A": [4,2,2,4,4], "B": [3,4,4,4,3,4,3,2], "gates": [], "notes": "Plate behind a globally relit subject; skin and shirt texture oversharpened; background still sharp; chair matted out."},
+    "c5-bfl-video-edit": {"A": [1,4,4,3,4], "B": [3,4,2,4,3,4,4,4], "gates": ["G3"], "notes": "Best integration (lamp light on face, bokeh) but an invented harbor, not @Harbor (no reference input). 24 fps, 1248x704, 2 frames short."},
+    "c5-wan27-edit": {"A": [3,3,4,3,4], "B": [3,4,3,4,3,4,4,3], "gates": [], "notes": "@Harbor recognisable, convincing dusk relight; background sharp against a shallow-focus take; face texture re-rendered. 30 fps, duration within a frame."},
+    "c5-kling-o1-edit": {"A": [4,4,3,4,4], "B": [3,4,2,4,4,4,4,4], "gates": ["G3"], "notes": "@Harbor layout, defocused to match the lens; chair kept; subtle relight. Face re-rendered but close (protected PSNR 27.7). 24 fps and 2 frames short."},
+    "c5-comfyui-kling": {"A": [4,4,3,4,4], "B": [3,4,2,4,4,4,4,4], "gates": ["G3"], "notes": "Packaged ComfyUI graph with two references; same quality as the Router run (protected PSNR 27.8), 176 s end to end via the partner-node path."},
+    "c5-kling-o1-edit+lock": {"A": [4,3,2,4,4], "B": [4,4,4,4,3,4,4,4], "gates": [], "notes": "Source foreground composited over the Kling background with the SwitchX matte, at source fps and length. Clean edges at 1:1; loses Kling's relight, so the face reads as daylight."},
+    "c5-aleph2-edit": {"A": [2,3,3,3,4], "B": [2,3,4,1,3,4,3,2], "gates": [], "notes": "Reframed: subject smaller and shifted (B4). Face and hair drift; heavy orange relight; generic harbor (text only). Frame-exact timing, 1080p output."},
+    "c3-bria-composite": {"A": [3,1,1,4,0], "B": [4,4,4,4,2,4,1,1], "gates": ["G4"], "notes": "Background is a frozen still while the camera orbits (no parallax). The matte drops the bicycle's front wheel at t=1.2 s and t=3.6 s."},
+    "c3-switchx-ref": {"A": [4,4,3,3,4], "B": [3,4,4,4,3,4,2,2], "gates": [], "notes": "Generates a moving @Harbor background with parallax that follows the orbit; scoped dusk relight; curly-hair edges clean. Front wheel partly lost around t=3.6 s; some background shimmer."},
+    "c3-bfl-video-edit": {"A": [1,3,4,1,3], "B": [3,4,2,4,3,4,2,1], "gates": ["G3","G4"], "notes": "Invented dusk harbor with parallax, then the original parking lot bleeds back from t=4.8 s; bike frame partly lost. 24 fps, 2 frames short."},
+    "c3-wan27-edit": {"A": [3,4,4,3,4], "B": [3,4,3,4,3,4,4,3], "gates": [], "notes": "Harbor holds through the whole orbit with plausible parallax; bike and hands intact; dusk relight; face slightly re-rendered. 30 fps."},
+    "c3-kling-o1-edit": {"A": [4,4,2,4,4], "B": [4,4,2,4,4,4,4,4], "gates": ["G3"], "notes": "Opens on the exact @Harbor establishing view and orbits through it, revealing consistent new areas. Bike, hands, jacket logo intact. Little relight: overcast subject on a dusk harbor. 24 fps, 2 frames short."},
+    "c3-kling-o1-edit+lock": {"A": [4,3,2,4,4], "B": [4,4,4,4,3,4,4,4], "gates": [], "notes": "Source foreground over the Kling background; hair edge clean at 1:1; background slightly sharper than the source lens."},
+    "c3-aleph2-edit": {"A": [2,4,4,3,4], "B": [3,4,4,4,3,4,4,3], "gates": [], "notes": "Convincing dusk harbor with parallax and lamp rim light, but generic (text only). Frame-exact. Hair texture re-rendered."}
+  }
+}
