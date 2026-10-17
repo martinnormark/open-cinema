@@ -23,6 +23,12 @@
     },
   ],
   "name": "open-cinema-web",
+  "vars": {
+    // "local" (loopback test sessions) or "cloudflare-access". See docs/auth.md.
+    "AUTH_MODE": "local",
+    "CF_ACCESS_TEAM_DOMAIN": "",
+    "CF_ACCESS_AUD": "",
+  },
   "secrets": { "required": ["LOCAL_SESSION_SECRET", "LOCAL_MVP_ENABLED"] },
   "main": "@tanstack/react-start/server-entry",
   "durable_objects": {

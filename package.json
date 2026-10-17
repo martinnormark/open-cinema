@@ -17,7 +17,7 @@
     "types:generate": "bun run --cwd apps/jobs types:generate && bun run --cwd apps/web types:generate",
     "db:generate": "bun run --cwd packages/database generate",
     "db:migrate:local": "bun run --cwd packages/database migrate:local",
-    "test": "bun run --cwd apps/jobs test",
+    "test": "bun run --cwd apps/jobs test && bun run --cwd apps/web test",
     "check": "bun run typecheck && bun run test && bun run build",
     "format": "prettier --write apps packages package.json tsconfig.base.json .prettierrc.json .github/workflows/check.yml README.md",
     "format:check": "prettier --check apps packages package.json tsconfig.base.json .prettierrc.json .github/workflows/check.yml README.md",
