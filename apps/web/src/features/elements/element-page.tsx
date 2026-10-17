@@ -18,20 +18,26 @@ import { cn } from "@/lib/utils";
 import {
   generateViews,
   nextSlots,
+  retagPendingView,
+  settlePendingView,
   useJobViews,
+  usePendingViews,
   type JobView,
+  type PendingView,
 } from "./generate";
 import {
+  assetUrl,
   elementTypes,
-  referenceImageUrl,
   reviewSheet,
-  type CreativeElement,
+  stateHandle,
+  type Element,
   type ElementReference,
   type ElementState,
   type GuidanceSlot,
+  type ReferenceView,
 } from "./model";
 import {
-  addReferences,
+  addReference,
   addState,
   deleteElement,
   removeReference,
@@ -40,12 +46,12 @@ import {
   updateReference,
   useElement,
 } from "./store";
-import { ACCEPTED_IMAGES, readReferenceImage } from "./upload";
-import { typeIcons } from "./visuals";
+import { ACCEPTED_IMAGES, uploadReferenceImage } from "./upload";
+import { SessionRequired, typeIcons } from "./visuals";
 
 export function ElementPage({
   elementId,
-  stateHandle,
+  stateHandle: selected,
   notice,
 }: {
   elementId: string;
@@ -54,20 +60,21 @@ export function ElementPage({
 }) {
   const { status, element } = useElement(elementId);
   if (status === "loading") return <PageSkeleton />;
+  if (status === "signed-out") return <SessionRequired />;
   if (!element)
     return (
       <section className="mx-auto w-full max-w-3xl px-6 py-16 md:px-12">
         <h1 className="text-2xl font-semibold">This Element is not here</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          It may have been deleted, or it was created in another browser.
+          It may have been deleted, or it belongs to another session.
         </p>
         <Button asChild variant="outline" className="mt-6">
           <Link to="/elements">Back to Elements</Link>
         </Button>
       </section>
     );
-  const state = stateHandle
-    ? (element.states.find((s) => s.handle === stateHandle) ?? null)
+  const state = selected
+    ? (element.states.find((s) => stateHandle(s) === selected) ?? null)
     : null;
   return <ElementWorkspace element={element} state={state} notice={notice} />;
 }
@@ -96,13 +103,16 @@ function ElementWorkspace({
   state,
   notice,
 }: {
-  element: CreativeElement;
+  element: Element;
   state: ElementState | null;
   notice?: string | undefined;
 }) {
   const info = elementTypes[element.type];
   const Icon = typeIcons[element.type];
-  const jobs = useJobViews();
+  const { jobs, ready } = useJobViews();
+  const pending = usePendingViews(element.id).filter(
+    (p) => p.stateId === (state?.id ?? null),
+  );
   const review = reviewSheet(element, state?.id ?? null);
   const [generating, setGenerating] = useState<string | null>(null);
   const [error, setError] = useState(notice ?? "");
@@ -112,7 +122,7 @@ function ElementWorkspace({
     setGenerating(key);
     setError("");
     try {
-      await generateViews(element, slots, state, jobs.ready);
+      await generateViews(element, slots, state, ready);
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "The view could not be generated.",
@@ -121,6 +131,9 @@ function ElementWorkspace({
       setGenerating(null);
     }
   }
+  const complementary = state
+    ? info.slots.filter((s) => s.required).slice(0, 1)
+    : nextSlots(element, review.missingRequired, 1);
 
   return (
     <section
@@ -154,8 +167,8 @@ function ElementWorkspace({
           <ReferenceSheet
             element={element}
             state={state}
-            jobs={jobs.jobs}
-            outputs={jobs.outputs}
+            pending={pending}
+            jobs={jobs}
             onError={setError}
           />
         </div>
@@ -164,32 +177,31 @@ function ElementWorkspace({
           className="lg:sticky lg:top-6 lg:self-start"
         >
           <h2 className="text-base font-medium">
-            {state ? `${state.name} references` : "Reference guidance"}
+            {state ? `${state.name} views` : "Reference guidance"}
           </h2>
           {state ? (
             <p className="mt-1 text-sm leading-6 text-muted-foreground">
               Show this state from the views where it matters. Identity
               references still apply when you mention{" "}
               <span className="font-medium text-foreground">
-                @{element.handle}:{state.handle}
+                @{element.handle}:{stateHandle(state)}
               </span>
               .
             </p>
           ) : (
-            <p className="mt-1 text-sm leading-6 text-muted-foreground tabular-nums">
+            <p className="tabular mt-1 text-sm leading-6 text-muted-foreground">
               {review.coverage.done === review.coverage.total
                 ? `All ${review.coverage.total} essential views approved.`
                 : `${review.coverage.done} of ${review.coverage.total} essential views approved.`}
             </p>
           )}
-          <ol className="mt-5 space-y-1">
+          <ol className="mt-4">
             {review.slots.map(({ slot, approved, exploring }) => {
               const done = approved.length > 0;
+              const waiting =
+                exploring + pending.filter((p) => p.view === slot.id).length;
               return (
-                <li
-                  key={slot.id}
-                  className="flex items-start gap-3 rounded-lg py-2"
-                >
+                <li key={slot.id} className="flex items-start gap-3 py-2">
                   {done ? (
                     <Check
                       aria-hidden="true"
@@ -198,12 +210,15 @@ function ElementWorkspace({
                   ) : (
                     <CircleDashed
                       aria-hidden="true"
-                      className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                      className="mt-0.5 size-4 shrink-0 text-subtle-foreground"
                     />
                   )}
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium">
                       {slot.label}
+                      <span className="sr-only">
+                        {done ? ", approved" : ", missing"}
+                      </span>
                       {!slot.required && (
                         <span className="ml-1.5 text-xs font-normal text-muted-foreground">
                           Optional
@@ -213,8 +228,8 @@ function ElementWorkspace({
                     <p className="text-xs leading-5 text-muted-foreground">
                       {done
                         ? `${approved.length} approved`
-                        : exploring
-                          ? `${exploring} to review`
+                        : waiting
+                          ? `${waiting} to review`
                           : slot.hint}
                     </p>
                   </div>
@@ -230,7 +245,6 @@ function ElementWorkspace({
                       <Sparkles aria-hidden="true" />
                     </Button>
                   )}
-                  <span className="sr-only">{done ? "Done" : "Missing"}</span>
                 </li>
               );
             })}
@@ -249,22 +263,17 @@ function ElementWorkspace({
           ))}
           <Button
             className="mt-6 w-full"
-            disabled={!!generating}
-            onClick={() =>
-              void generate(
-                state
-                  ? info.slots.filter((s) => s.required).slice(0, 1)
-                  : nextSlots(element, review.missingRequired, 1),
-                "complementary",
-              )
-            }
+            disabled={!!generating || !complementary.length}
+            onClick={() => void generate(complementary, "complementary")}
           >
             <Sparkles aria-hidden="true" />
             {generating ? "Starting…" : "Generate a complementary view"}
           </Button>
           <p className="mt-2 text-xs leading-5 text-muted-foreground">
-            {complementaryHint(element, state, review.missingRequired)} FLUX 3
-            Image · uses your Comfy Router credits.
+            {complementary[0]
+              ? `Next: ${complementary[0].label.toLowerCase()}${state ? ` while ${state.name.toLowerCase()}` : ""}. `
+              : ""}
+            FLUX 3 Image · uses your Comfy Router credits.
           </p>
         </aside>
       </div>
@@ -273,27 +282,12 @@ function ElementWorkspace({
   );
 }
 
-function complementaryHint(
-  element: CreativeElement,
-  state: ElementState | null,
-  missing: GuidanceSlot[],
-) {
-  if (state) return `Adds a ${state.name.toLowerCase()} view to explore.`;
-  const [slot] = nextSlots(element, missing, 1);
-  return slot ? `Next up: ${slot.label.toLowerCase()}.` : "";
-}
-
-function Identity({
-  element,
-  icon,
-}: {
-  element: CreativeElement;
-  icon: ReactNode;
-}) {
+function Identity({ element, icon }: { element: Element; icon: ReactNode }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(element.name);
   const [description, setDescription] = useState(element.description);
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const info = elementTypes[element.type];
 
@@ -304,11 +298,13 @@ function Identity({
         onSubmit={(event) => {
           event.preventDefault();
           setError("");
+          setSaving(true);
           updateIdentity(element.id, { name, description })
             .then(() => setEditing(false))
             .catch((e: unknown) =>
               setError(e instanceof Error ? e.message : "Could not save."),
-            );
+            )
+            .finally(() => setSaving(false));
         }}
       >
         <div>
@@ -334,7 +330,7 @@ function Identity({
             onChange={(event) => setDescription(event.target.value)}
             rows={4}
             maxLength={1200}
-            className="mt-2 w-full resize-y rounded-xl border border-input bg-background p-4 text-base leading-7 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="mt-2 w-full resize-y rounded-xl border border-input bg-transparent p-4 text-base leading-7 outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
         </div>
         {error && (
@@ -343,15 +339,13 @@ function Identity({
           </p>
         )}
         <div className="flex gap-2">
-          <Button type="submit">Save identity</Button>
+          <Button type="submit" disabled={saving}>
+            {saving ? "Saving…" : "Save identity"}
+          </Button>
           <Button
             type="button"
             variant="ghost"
-            onClick={() => {
-              setName(element.name);
-              setDescription(element.description);
-              setEditing(false);
-            }}
+            onClick={() => setEditing(false)}
           >
             Cancel
           </Button>
@@ -367,14 +361,14 @@ function Identity({
       </p>
       <h1
         id="page-title"
-        className="mt-2 text-3xl font-semibold tracking-tight text-balance"
+        className="mt-2 text-[1.75rem] leading-tight font-semibold tracking-[-0.025em] text-balance"
       >
         {element.name}
       </h1>
       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
         <button
           type="button"
-          className="inline-flex items-center gap-1.5 rounded-md text-sm font-medium outline-none hover:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          className="inline-flex items-center gap-1.5 rounded-md text-sm font-medium text-tungsten outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring"
           onClick={() => {
             void navigator.clipboard
               ?.writeText(`@${element.handle}`)
@@ -384,15 +378,12 @@ function Identity({
         >
           @{element.handle}
           {copied ? (
-            <Check aria-hidden="true" className="size-3.5 text-success" />
+            <Check aria-hidden="true" className="size-3.5" />
           ) : (
-            <Copy
-              aria-hidden="true"
-              className="size-3.5 text-muted-foreground"
-            />
+            <Copy aria-hidden="true" className="size-3.5 opacity-70" />
           )}
           <span className="sr-only" role="status">
-            {copied ? "Copied" : "Copy mention"}
+            {copied ? "Mention copied" : "Copy mention"}
           </span>
         </button>
         <button
@@ -408,7 +399,7 @@ function Identity({
           Edit identity
         </button>
       </div>
-      <p className="mt-4 text-base leading-7 text-muted-foreground">
+      <p className="mt-4 text-[0.9375rem] leading-7 text-muted-foreground">
         {element.description ||
           "No description yet. Describe what should stay the same in every shot."}
       </p>
@@ -420,12 +411,15 @@ function SheetTabs({
   element,
   state,
 }: {
-  element: CreativeElement;
+  element: Element;
   state: ElementState | null;
 }) {
   const [adding, setAdding] = useState(false);
   const tab =
-    "inline-flex h-9 items-center rounded-full px-4 text-sm transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring";
+    "inline-flex h-8 items-center rounded-full px-3.5 text-sm transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  const active = "bg-primary text-primary-foreground";
+  const idle =
+    "bg-secondary text-muted-foreground hover:bg-accent hover:text-foreground";
   return (
     <div className="mt-10 border-b border-border pb-4">
       <nav
@@ -437,12 +431,7 @@ function SheetTabs({
           params={{ elementId: element.id }}
           search={{}}
           aria-current={!state ? "page" : undefined}
-          className={cn(
-            tab,
-            !state
-              ? "bg-foreground text-background"
-              : "bg-secondary hover:bg-secondary/70",
-          )}
+          className={cn(tab, !state ? active : idle)}
         >
           Identity
         </Link>
@@ -451,14 +440,9 @@ function SheetTabs({
             key={s.id}
             to="/elements/$elementId"
             params={{ elementId: element.id }}
-            search={{ state: s.handle }}
+            search={{ state: stateHandle(s) }}
             aria-current={state?.id === s.id ? "page" : undefined}
-            className={cn(
-              tab,
-              state?.id === s.id
-                ? "bg-foreground text-background"
-                : "bg-secondary hover:bg-secondary/70",
-            )}
+            className={cn(tab, state?.id === s.id ? active : idle)}
           >
             {s.name}
           </Link>
@@ -469,7 +453,7 @@ function SheetTabs({
           onClick={() => setAdding((v) => !v)}
           className={cn(
             tab,
-            "gap-1.5 text-muted-foreground hover:bg-secondary/70 hover:text-foreground",
+            "gap-1.5 text-muted-foreground hover:bg-accent hover:text-foreground",
           )}
         >
           <Plus aria-hidden="true" className="size-4" /> Add state
@@ -486,41 +470,45 @@ function StateForm({
   element,
   onDone,
 }: {
-  element: CreativeElement;
+  element: Element;
   onDone: () => void;
 }) {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
   const info = elementTypes[element.type];
   return (
     <form
-      className="elements-panel mt-5 max-w-2xl space-y-4 rounded-xl bg-secondary/50 p-5"
+      className="elements-panel mt-5 max-w-2xl space-y-4 rounded-xl bg-surface p-5"
       onSubmit={(event) => {
         event.preventDefault();
         setError("");
-        addState(element.id, { name, description })
-          .then((created) => {
+        setSaving(true);
+        const trimmed = name.trim();
+        addState({ elementId: element.id, name: trimmed, description })
+          .then(() => {
             onDone();
             return navigate({
               to: "/elements/$elementId",
               params: { elementId: element.id },
-              search: { state: created.handle },
+              search: { state: stateHandle({ name: trimmed }) },
             });
           })
-          .catch((e: unknown) =>
+          .catch((e: unknown) => {
             setError(
               e instanceof Error ? e.message : "Could not add the state.",
-            ),
-          );
+            );
+            setSaving(false);
+          });
       }}
     >
       <div>
         <h2 className="text-sm font-medium">New state</h2>
         <p className="mt-1 text-xs leading-5 text-muted-foreground">
           A state changes how {element.name} appears without changing who or
-          what it is. It gets its own references.
+          what it is. It gets its own references; identity stays as approved.
         </p>
       </div>
       <div className="flex flex-wrap gap-2">
@@ -530,8 +518,9 @@ function StateForm({
             <button
               key={example}
               type="button"
+              aria-pressed={name === example}
               onClick={() => setName(example)}
-              className="rounded-full border border-border bg-background px-3 py-1 text-xs transition-colors duration-150 outline-none hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring"
+              className="rounded-full border border-border px-3 py-1 text-xs transition-colors duration-150 outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring aria-pressed:border-foreground"
             >
               {example}
             </button>
@@ -548,8 +537,13 @@ function StateForm({
           maxLength={40}
           required
           autoFocus
-          className="mt-2 bg-background"
+          className="mt-2"
         />
+        {name.trim() && (
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            Mention it as @{element.handle}:{stateHandle({ name })}
+          </p>
+        )}
       </div>
       <div>
         <label htmlFor="state-description" className="text-sm font-medium">
@@ -561,8 +555,8 @@ function StateForm({
           onChange={(event) => setDescription(event.target.value)}
           rows={2}
           maxLength={600}
-          placeholder="Optional, e.g. a wide warm smile, eyes creased, relaxed shoulders"
-          className="mt-2 w-full resize-y rounded-lg border border-input bg-background p-3 text-sm leading-6 outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          placeholder="Optional. A wide warm smile, eyes creased, relaxed shoulders."
+          className="mt-2 w-full resize-y rounded-lg border border-input bg-transparent p-3 text-sm leading-6 outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
         />
       </div>
       {error && (
@@ -571,7 +565,9 @@ function StateForm({
         </p>
       )}
       <div className="flex gap-2">
-        <Button type="submit">Add state</Button>
+        <Button type="submit" disabled={saving || !name.trim()}>
+          {saving ? "Adding…" : "Add state"}
+        </Button>
         <Button type="button" variant="ghost" onClick={onDone}>
           Cancel
         </Button>
@@ -584,7 +580,7 @@ function StateHeader({
   element,
   state,
 }: {
-  element: CreativeElement;
+  element: Element;
   state: ElementState;
 }) {
   const navigate = useNavigate();
@@ -592,8 +588,8 @@ function StateHeader({
   return (
     <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
       <div className="max-w-2xl">
-        <p className="text-sm font-medium">
-          @{element.handle}:{state.handle}
+        <p className="text-sm font-medium text-tungsten">
+          @{element.handle}:{stateHandle(state)}
         </p>
         <p className="mt-1 text-sm leading-6 text-muted-foreground">
           {state.description ||
@@ -606,7 +602,7 @@ function StateHeader({
         onBlur={() => setConfirm(false)}
         onClick={() => {
           if (!confirm) return setConfirm(true);
-          void removeState(element.id, state.id).then(() =>
+          void removeState(state.id).then(() =>
             navigate({
               to: "/elements/$elementId",
               params: { elementId: element.id },
@@ -625,61 +621,56 @@ function StateHeader({
 function ReferenceSheet({
   element,
   state,
+  pending,
   jobs,
-  outputs,
   onError,
 }: {
-  element: CreativeElement;
+  element: Element;
   state: ElementState | null;
+  pending: PendingView[];
   jobs: ReadonlyMap<string, JobView>;
-  outputs: ReadonlyMap<string, string>;
   onError: (message: string) => void;
 }) {
+  const [uploading, setUploading] = useState(0);
   const stateId = state?.id ?? null;
   const references = element.references.filter((r) => r.stateId === stateId);
   const approved = references.filter((r) => r.status === "approved");
-  const explorations = references.filter((r) => r.status === "exploration");
+  const experiments = references.filter((r) => r.status === "experiment");
   const rejected = references.filter((r) => r.status === "rejected");
+  const reviewCount = experiments.length + pending.length;
 
   async function upload(files: FileList | null) {
     if (!files?.length) return;
-    const added: { url: string; fileName: string }[] = [];
-    for (const file of Array.from(files)) {
+    const list = Array.from(files);
+    setUploading((n) => n + list.length);
+    for (const file of list) {
       try {
-        added.push({
-          url: await readReferenceImage(file),
-          fileName: file.name,
+        const assetId = await uploadReferenceImage(file);
+        await addReference({
+          elementId: element.id,
+          ...(stateId ? { stateId } : {}),
+          asset: { type: "media-asset", assetId },
+          status: "experiment",
         });
       } catch (e) {
         onError(
-          e instanceof Error ? e.message : "That file could not be used.",
+          e instanceof Error ? e.message : `${file.name} could not be added.`,
         );
+      } finally {
+        setUploading((n) => n - 1);
       }
     }
-    if (added.length)
-      await addReferences(
-        element.id,
-        added.map((a) => ({
-          source: { kind: "upload", ...a },
-          view: null,
-          stateId,
-        })),
-      ).catch((e: unknown) =>
-        onError(e instanceof Error ? e.message : "Could not add the images."),
-      );
   }
 
   return (
     <div className="space-y-12">
       <section aria-labelledby="approved-heading">
-        <div className="flex items-baseline justify-between gap-4">
-          <h2 id="approved-heading" className="text-base font-medium">
-            Approved references
-            <span className="ml-2 text-sm font-normal text-muted-foreground tabular-nums">
-              {approved.length}
-            </span>
-          </h2>
-        </div>
+        <h2 id="approved-heading" className="text-base font-medium">
+          Approved references
+          <span className="tabular ml-2 text-sm font-normal text-muted-foreground">
+            {approved.length}
+          </span>
+        </h2>
         <p className="mt-1 text-sm leading-6 text-muted-foreground">
           {state
             ? `These define ${element.name} when ${state.name.toLowerCase()}.`
@@ -689,18 +680,13 @@ function ReferenceSheet({
           <ul className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
             {approved.map((reference) => (
               <li key={reference.id}>
-                <ReferenceCard
-                  element={element}
-                  reference={reference}
-                  job={jobView(reference, jobs)}
-                  url={referenceImageUrl(reference, outputs)}
-                />
+                <SavedReference element={element} reference={reference} />
               </li>
             ))}
           </ul>
         ) : (
           <p className="mt-5 rounded-xl border border-dashed border-border px-5 py-8 text-center text-sm leading-6 text-muted-foreground">
-            Approve explorations that look right and they will collect here.
+            Approve explorations that look right and they collect here.
           </p>
         )}
       </section>
@@ -709,13 +695,13 @@ function ReferenceSheet({
         <div className="flex flex-wrap items-baseline justify-between gap-3">
           <h2 id="explorations-heading" className="text-base font-medium">
             Explorations
-            <span className="ml-2 text-sm font-normal text-muted-foreground tabular-nums">
-              {explorations.length}
+            <span className="tabular ml-2 text-sm font-normal text-muted-foreground">
+              {reviewCount}
             </span>
           </h2>
-          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-sm text-muted-foreground transition-colors duration-150 hover:bg-secondary hover:text-foreground has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring">
+          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-sm text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring">
             <ImagePlus aria-hidden="true" className="size-4" />
-            Upload images
+            {uploading ? `Uploading ${uploading}…` : "Upload images"}
             <input
               type="file"
               accept={ACCEPTED_IMAGES}
@@ -729,19 +715,24 @@ function ReferenceSheet({
           </label>
         </div>
         <p className="mt-1 text-sm leading-6 text-muted-foreground">
-          Candidates to approve or reject. They never affect generations until
+          Candidates to approve or reject. They never shape a generation until
           approved.
         </p>
-        {explorations.length ? (
+        {reviewCount ? (
           <ul className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
-            {explorations.map((reference) => (
-              <li key={reference.id}>
-                <ReferenceCard
+            {pending.map((view) => (
+              <li key={view.jobId}>
+                <PendingReference
                   element={element}
-                  reference={reference}
-                  job={jobView(reference, jobs)}
-                  url={referenceImageUrl(reference, outputs)}
+                  view={view}
+                  job={jobs.get(view.jobId) ?? null}
+                  onError={onError}
                 />
+              </li>
+            ))}
+            {experiments.map((reference) => (
+              <li key={reference.id}>
+                <SavedReference element={element} reference={reference} />
               </li>
             ))}
           </ul>
@@ -754,19 +745,17 @@ function ReferenceSheet({
       </section>
 
       {rejected.length > 0 && (
-        <details className="group">
+        <details>
           <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
             {rejected.length} rejected{" "}
             {rejected.length === 1 ? "reference" : "references"}
           </summary>
-          <ul className="mt-5 grid grid-cols-3 gap-3 opacity-80 sm:grid-cols-4 xl:grid-cols-6">
+          <ul className="mt-5 grid grid-cols-3 gap-3 sm:grid-cols-4 xl:grid-cols-6">
             {rejected.map((reference) => (
               <li key={reference.id}>
-                <ReferenceCard
+                <SavedReference
                   element={element}
                   reference={reference}
-                  job={jobView(reference, jobs)}
-                  url={referenceImageUrl(reference, outputs)}
                   compact
                 />
               </li>
@@ -778,13 +767,156 @@ function ReferenceSheet({
   );
 }
 
-function jobView(
-  reference: ElementReference,
-  jobs: ReadonlyMap<string, JobView>,
-): JobView | null {
-  return reference.source.kind === "generated"
-    ? (jobs.get(reference.source.jobId) ?? null)
-    : null;
+function ViewSelect({
+  element,
+  id,
+  value,
+  onChange,
+  warn,
+}: {
+  element: Element;
+  id: string;
+  value: ReferenceView | null;
+  onChange: (view: ReferenceView | null) => void;
+  warn: boolean;
+}) {
+  const slots = elementTypes[element.type].slots;
+  return (
+    <>
+      <label className="sr-only" htmlFor={id}>
+        What this reference shows
+      </label>
+      <select
+        id={id}
+        value={value ?? ""}
+        onChange={(event) =>
+          onChange((event.target.value || null) as ReferenceView | null)
+        }
+        className={cn(
+          "w-full truncate rounded-md border-0 bg-transparent py-1 pr-6 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          warn && "text-warning",
+        )}
+      >
+        <option value="">Tag the view…</option>
+        {slots.map((slot) => (
+          <option key={slot.id} value={slot.id}>
+            {slot.label}
+          </option>
+        ))}
+      </select>
+    </>
+  );
+}
+
+function slotLabel(element: Element, view: ReferenceView | null) {
+  return (
+    elementTypes[element.type].slots.find((s) => s.id === view)?.label ??
+    "Untagged reference"
+  );
+}
+
+function SavedReference({
+  element,
+  reference,
+  compact = false,
+}: {
+  element: Element;
+  reference: ElementReference;
+  compact?: boolean;
+}) {
+  const [busy, setBusy] = useState(false);
+  const label = slotLabel(element, reference.view);
+  const run = (action: () => Promise<unknown>) => {
+    setBusy(true);
+    void action()
+      .catch(() => {})
+      .finally(() => setBusy(false));
+  };
+  const set = (patch: {
+    status?: ElementReference["status"];
+    view?: ReferenceView | null;
+  }) => run(() => updateReference({ id: reference.id, ...patch }));
+
+  return (
+    <figure aria-busy={busy}>
+      <div className="aspect-square overflow-hidden rounded-xl bg-secondary">
+        <img
+          src={assetUrl(reference.asset)}
+          alt={`${element.name}, ${label.toLowerCase()}`}
+          loading="lazy"
+          decoding="async"
+          className="reference-reveal size-full object-cover"
+        />
+      </div>
+      {!compact && (
+        <figcaption className="mt-2">
+          <ViewSelect
+            element={element}
+            id={`view-${reference.id}`}
+            value={reference.view}
+            onChange={(view) => set({ view })}
+            warn={!reference.view && reference.status === "approved"}
+          />
+          <p className="truncate text-xs text-muted-foreground">
+            {reference.asset.type === "media-asset" ? "Uploaded" : "Generated"}
+          </p>
+        </figcaption>
+      )}
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {reference.status === "experiment" && (
+          <>
+            <Button
+              size="xs"
+              disabled={busy}
+              onClick={() => set({ status: "approved" })}
+              aria-label={`Approve ${label.toLowerCase()}`}
+            >
+              <Check aria-hidden="true" /> Approve
+            </Button>
+            <Button
+              size="xs"
+              variant="outline"
+              disabled={busy}
+              onClick={() => set({ status: "rejected" })}
+            >
+              Reject
+            </Button>
+          </>
+        )}
+        {reference.status === "approved" && (
+          <Button
+            size="xs"
+            variant="ghost"
+            disabled={busy}
+            onClick={() => set({ status: "experiment" })}
+          >
+            Move to explorations
+          </Button>
+        )}
+        {reference.status === "rejected" && (
+          <>
+            <Button
+              size="xs"
+              variant="ghost"
+              disabled={busy}
+              onClick={() => set({ status: "experiment" })}
+            >
+              Restore
+            </Button>
+            <Button
+              size="xs"
+              variant="ghost"
+              disabled={busy}
+              aria-label="Delete permanently"
+              onClick={() => run(() => removeReference(reference.id))}
+            >
+              <Trash2 aria-hidden="true" />
+            </Button>
+          </>
+        )}
+      </div>
+    </figure>
+  );
 }
 
 const jobLabels: Partial<Record<JobView["state"], string>> = {
@@ -798,141 +930,118 @@ const jobLabels: Partial<Record<JobView["state"], string>> = {
   needs_attention: "Needs attention",
 };
 
-function ReferenceCard({
+/** A generated view waiting for its image, or for the creator's decision. */
+function PendingReference({
   element,
-  reference,
+  view,
   job,
-  url,
-  compact = false,
+  onError,
 }: {
-  element: CreativeElement;
-  reference: ElementReference;
+  element: Element;
+  view: PendingView;
   job: JobView | null;
-  url: string | null;
-  compact?: boolean;
+  onError: (message: string) => void;
 }) {
-  const slots = elementTypes[element.type].slots;
-  const view = slots.find((s) => s.id === reference.view);
-  const generated = reference.source.kind === "generated";
-  const pending = generated && !url && (!job || job.active);
-  const failed = generated && !url && !!job && !job.active;
-  const description = view ? view.label : "Untagged reference";
-  const set = (patch: Partial<Pick<ElementReference, "status" | "view">>) =>
-    void updateReference(element.id, reference.id, patch);
+  const [busy, setBusy] = useState(false);
+  const label = slotLabel(element, view.view);
+  const output = job?.output ?? null;
+  const failed = !!job && !job.active && !output;
+
+  async function decide(status: "approved" | "rejected") {
+    if (!output) return;
+    setBusy(true);
+    try {
+      await addReference({
+        elementId: element.id,
+        ...(view.stateId ? { stateId: view.stateId } : {}),
+        asset: {
+          type: "job-output",
+          jobId: output.jobId,
+          outputId: output.outputId,
+        },
+        status,
+        view: view.view,
+      });
+      settlePendingView(view.jobId);
+    } catch (e) {
+      onError(e instanceof Error ? e.message : "Could not save this view.");
+      setBusy(false);
+    }
+  }
 
   return (
-    <figure className="group/card">
-      <div className="relative aspect-square overflow-hidden rounded-xl bg-secondary">
-        {url ? (
+    <figure aria-busy={busy}>
+      <div className="aspect-square overflow-hidden rounded-xl bg-secondary">
+        {output ? (
           <img
-            src={url}
-            alt={`${element.name}, ${description.toLowerCase()}`}
-            loading="lazy"
+            src={output.url}
+            alt={`${element.name}, ${label.toLowerCase()}`}
             decoding="async"
             className="reference-reveal size-full object-cover"
           />
-        ) : pending ? (
+        ) : failed ? (
+          <div className="flex size-full flex-col justify-end gap-1 p-3">
+            <span className="text-xs font-medium text-destructive">
+              {jobLabels[job.state] ?? "Unavailable"}
+            </span>
+            <span className="line-clamp-3 text-xs text-muted-foreground">
+              {job.error ?? "This view could not be generated."}
+            </span>
+          </div>
+        ) : (
           <div
             className="reference-pending flex size-full items-end p-3"
             role="status"
           >
-            <span className="rounded-full bg-background/90 px-2.5 py-1 text-xs font-medium tabular-nums">
-              {job ? jobLabels[job.state] : "Waiting for status"}
+            <span className="tabular rounded-full bg-elevated/90 px-2.5 py-1 text-xs font-medium">
+              {job
+                ? (jobLabels[job.state] ?? "Generating")
+                : "Waiting for status"}
               {job?.progress != null && job.active
                 ? ` · ${Math.round(job.progress * 100)}%`
                 : ""}
             </span>
           </div>
-        ) : (
-          <div className="flex size-full flex-col justify-end gap-1 p-3">
-            <span className="text-xs font-medium text-destructive">
-              {failed ? jobLabels[job!.state] : "Image unavailable"}
-            </span>
-            <span className="line-clamp-3 text-xs text-muted-foreground">
-              {failed
-                ? (job!.error ?? "This view could not be generated.")
-                : "Its generation session is no longer available."}
-            </span>
-          </div>
         )}
       </div>
-      {!compact && (
-        <figcaption className="mt-2">
-          <label className="sr-only" htmlFor={`view-${reference.id}`}>
-            What this reference shows
-          </label>
-          <select
-            id={`view-${reference.id}`}
-            value={reference.view ?? ""}
-            onChange={(event) => set({ view: event.target.value || null })}
-            className={cn(
-              "w-full truncate rounded-md border-0 bg-transparent py-1 pr-6 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              !view && reference.status === "approved" && "text-warning",
-            )}
-          >
-            <option value="">Tag the view…</option>
-            {slots.map((slot) => (
-              <option key={slot.id} value={slot.id}>
-                {slot.label}
-              </option>
-            ))}
-          </select>
-          <p className="truncate text-xs text-muted-foreground">
-            {reference.source.kind === "upload"
-              ? `Uploaded · ${reference.source.fileName}`
-              : "Generated"}
-          </p>
-        </figcaption>
-      )}
+      <figcaption className="mt-2">
+        <ViewSelect
+          element={element}
+          id={`view-${view.jobId}`}
+          value={view.view}
+          onChange={(next) => next && retagPendingView(view.jobId, next)}
+          warn={false}
+        />
+        <p className="truncate text-xs text-muted-foreground">
+          {output ? "Generated · not saved yet" : "Generating"}
+        </p>
+      </figcaption>
       <div className="mt-2 flex flex-wrap gap-1.5">
-        {reference.status === "exploration" && (
+        {failed ? (
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={() => settlePendingView(view.jobId)}
+          >
+            Dismiss
+          </Button>
+        ) : (
           <>
             <Button
               size="xs"
-              disabled={!url}
-              onClick={() => set({ status: "approved" })}
-              aria-label={`Approve ${description.toLowerCase()}`}
+              disabled={!output || busy}
+              onClick={() => void decide("approved")}
+              aria-label={`Approve ${label.toLowerCase()}`}
             >
               <Check aria-hidden="true" /> Approve
             </Button>
             <Button
               size="xs"
               variant="outline"
-              onClick={() =>
-                failed
-                  ? void removeReference(element.id, reference.id)
-                  : set({ status: "rejected" })
-              }
+              disabled={!output || busy}
+              onClick={() => void decide("rejected")}
             >
-              {failed ? "Remove" : "Reject"}
-            </Button>
-          </>
-        )}
-        {reference.status === "approved" && (
-          <Button
-            size="xs"
-            variant="ghost"
-            onClick={() => set({ status: "exploration" })}
-          >
-            Unapprove
-          </Button>
-        )}
-        {reference.status === "rejected" && (
-          <>
-            <Button
-              size="xs"
-              variant="ghost"
-              onClick={() => set({ status: "exploration" })}
-            >
-              Restore
-            </Button>
-            <Button
-              size="xs"
-              variant="ghost"
-              aria-label="Delete permanently"
-              onClick={() => void removeReference(element.id, reference.id)}
-            >
-              <Trash2 aria-hidden="true" />
+              Reject
             </Button>
           </>
         )}
@@ -941,7 +1050,7 @@ function ReferenceCard({
   );
 }
 
-function DeleteElement({ element }: { element: CreativeElement }) {
+function DeleteElement({ element }: { element: Element }) {
   const navigate = useNavigate();
   const [confirm, setConfirm] = useState(false);
   return (

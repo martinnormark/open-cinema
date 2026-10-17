@@ -1,16 +1,9 @@
-/* Element authoring motion. Tokens follow transitions.dev; opacity, transform and
+/* Element authoring motion. Uses the transitions.dev tokens from styles.css; opacity, transform and
    filter only so live job updates never trigger layout animation. */
-:root {
-  --elements-open-dur: 250ms;
-  --elements-close-dur: 150ms;
-  --elements-reveal-dur: 400ms;
-  --elements-ease: cubic-bezier(0.22, 1, 0.36, 1);
-}
-
 /* Mention suggestions grow from the composer (menu dropdown). */
 .mention-list:not([hidden]) {
   transform-origin: top left;
-  animation: elements-dropdown var(--elements-open-dur) var(--elements-ease);
+  animation: elements-dropdown var(--duration-fast) var(--ease-smooth-out);
 }
 @keyframes elements-dropdown {
   from {
@@ -21,7 +14,7 @@
 
 /* A generated reference resolves from its placeholder (skeleton reveal). */
 .reference-reveal {
-  animation: elements-reveal var(--elements-reveal-dur) ease-in-out;
+  animation: elements-reveal var(--duration-slow) ease-in-out;
 }
 @keyframes elements-reveal {
   from {
@@ -30,29 +23,37 @@
   }
 }
 
-/* Waiting placeholder for an image that is still generating. */
+/* Waiting placeholder for an image that is still generating. The sweep moves
+   with transform so it stays on the compositor while jobs report progress. */
 .reference-pending {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.reference-pending::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
   background: linear-gradient(
     100deg,
-    var(--secondary) 30%,
-    color-mix(in oklab, var(--secondary), white 55%) 50%,
-    var(--secondary) 70%
+    transparent 20%,
+    var(--hover) 50%,
+    transparent 80%
   );
-  background-size: 300% 100%;
-  animation: elements-shimmer 1.6s linear infinite;
+  transform: translateX(-100%);
+  animation: elements-sweep 1.6s linear infinite;
+  will-change: transform;
 }
-@keyframes elements-shimmer {
-  from {
-    background-position: 100% 0;
-  }
+@keyframes elements-sweep {
   to {
-    background-position: 0 0;
+    transform: translateX(100%);
   }
 }
 
 /* Inline panels such as the new-state form (panel reveal). */
 .elements-panel {
-  animation: elements-panel var(--elements-open-dur) var(--elements-ease);
+  animation: elements-panel var(--duration-fast) var(--ease-smooth-out);
 }
 @keyframes elements-panel {
   from {
@@ -64,7 +65,7 @@
 @media (prefers-reduced-motion: reduce) {
   .mention-list:not([hidden]),
   .reference-reveal,
-  .reference-pending,
+  .reference-pending::before,
   .elements-panel {
     animation: none;
   }

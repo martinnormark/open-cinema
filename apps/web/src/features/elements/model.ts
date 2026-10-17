@@ -1,47 +1,25 @@
-/** Browser-safe Element vocabulary shared by the Element pages and `@` mentions.
- * Mirrors the planned contracts; the data adapter maps persistence records onto it. */
-export type ElementType = "character" | "location" | "thing";
-export type ReferenceStatus = "exploration" | "approved" | "rejected";
+/** Element authoring vocabulary on top of the shared contracts: per-type
+ * guidance, sheet review and prompts for complementary views. */
+import type {
+  AssetRef,
+  Element,
+  ElementReference,
+  ElementState,
+  ElementType,
+  ReferenceView,
+} from "@open-cinema/contracts";
 
-export type ReferenceSource =
-  | { kind: "upload"; url: string; fileName: string }
-  | { kind: "generated"; jobId: string; prompt: string };
-
-export interface ElementReference {
-  id: string;
-  /** null belongs to the Element's identity; otherwise to one named state. */
-  stateId: string | null;
-  status: ReferenceStatus;
-  /** A guidance slot id, such as `profile` or `landmark`. */
-  view: string | null;
-  source: ReferenceSource;
-  createdAt: string;
-}
-
-export interface ElementState {
-  id: string;
-  name: string;
-  /** Mention token, e.g. `smiling` in `@Mara:smiling`. */
-  handle: string;
-  description: string;
-  createdAt: string;
-}
-
-export interface CreativeElement {
-  id: string;
-  type: ElementType;
-  name: string;
-  /** Mention token, e.g. `RedCoat` in `@RedCoat`. */
-  handle: string;
-  description: string;
-  references: ElementReference[];
-  states: ElementState[];
-  createdAt: string;
-  updatedAt: string;
-}
+export type {
+  Element,
+  ElementReference,
+  ElementState,
+  ElementType,
+  ReferenceView,
+} from "@open-cinema/contracts";
+export { toElementHandle as toHandle } from "@open-cinema/contracts";
 
 export interface GuidanceSlot {
-  id: string;
+  id: ReferenceView;
   label: string;
   /** What the creator is establishing with this view. */
   hint: string;
@@ -74,7 +52,7 @@ export const elementTypes: Record<ElementType, ElementTypeInfo> = {
     stateExamples: ["Smiling", "Exhausted", "Rain-soaked", "Formal wear"],
     slots: [
       {
-        id: "face",
+        id: "face-closeup",
         label: "Face close-up",
         hint: "Facial structure, eyes, skin and distinguishing marks in detail.",
         required: true,
@@ -82,12 +60,12 @@ export const elementTypes: Record<ElementType, ElementTypeInfo> = {
           "tight close-up portrait, neutral expression, looking at camera, soft even studio light, plain light gray background, sharp facial detail",
       },
       {
-        id: "full-body",
-        label: "Full body",
-        hint: "Height, proportions, posture and complete outfit.",
+        id: "front",
+        label: "Front, full body",
+        hint: "Height, proportions, posture and the complete outfit.",
         required: true,
         framing:
-          "full body shot from head to toe, standing in a relaxed neutral pose, front view, plain light gray background, even studio light",
+          "full body shot from head to toe, facing the camera, standing in a relaxed neutral pose, plain light gray background, even studio light",
       },
       {
         id: "three-quarter",
@@ -109,7 +87,7 @@ export const elementTypes: Record<ElementType, ElementTypeInfo> = {
         id: "rear",
         label: "Rear view",
         hint: "Hair, back of clothing and posture from behind.",
-        required: false,
+        required: true,
         framing:
           "full body seen from directly behind, plain light gray background, even studio light",
       },
@@ -151,7 +129,7 @@ export const elementTypes: Record<ElementType, ElementTypeInfo> = {
           "medium shot centered on the most distinctive landmark, clear daylight, sharp architectural detail",
       },
       {
-        id: "atmosphere",
+        id: "detail",
         label: "Atmosphere and materials",
         hint: "Surfaces, textures, light and mood up close.",
         required: true,
@@ -159,19 +137,12 @@ export const elementTypes: Record<ElementType, ElementTypeInfo> = {
           "close detail of surfaces and materials, natural light, rich texture",
       },
       {
-        id: "viewpoint",
+        id: "alternate-angle",
         label: "Alternate viewpoint",
         hint: "The same place from another side, so a camera can move.",
         required: true,
         framing:
           "wide view of the same place from the opposite side, reverse angle, eye level, clear daylight",
-      },
-      {
-        id: "aerial",
-        label: "High angle",
-        hint: "How the parts of the place relate from above.",
-        required: false,
-        framing: "high angle overview from above, clear daylight",
       },
     ],
   },
@@ -187,7 +158,7 @@ export const elementTypes: Record<ElementType, ElementTypeInfo> = {
     stateExamples: ["Doors open", "Worn", "Damaged", "Folded"],
     slots: [
       {
-        id: "hero",
+        id: "three-quarter",
         label: "Hero view",
         hint: "The overall shape and proportions in one clear image.",
         required: true,
@@ -195,35 +166,44 @@ export const elementTypes: Record<ElementType, ElementTypeInfo> = {
           "product photograph, front three-quarter view, isolated on a plain light gray background, soft studio light",
       },
       {
+        id: "front",
+        label: "Front",
+        hint: "The face it shows the camera, square on.",
+        required: true,
+        framing:
+          "product photograph, straight-on front view, isolated on a plain light gray background, soft studio light",
+      },
+      {
         id: "side",
-        label: "Side and back",
-        hint: "The silhouette from another angle.",
+        label: "Side",
+        hint: "The silhouette and depth from the side.",
         required: true,
         framing:
           "product photograph, side view, isolated on a plain light gray background, soft studio light",
       },
       {
-        id: "material",
-        label: "Materials",
-        hint: "Surface finish, texture and color under good light.",
-        required: true,
-        framing:
-          "macro close-up of the material and surface texture, soft raking light",
-      },
-      {
         id: "detail",
-        label: "Distinctive details",
-        hint: "Marks, hardware and construction that make it this one.",
+        label: "Materials and details",
+        hint: "Surface finish, marks, hardware and construction up close.",
         required: true,
         framing:
-          "close-up of the most distinctive detail and construction, plain background, soft studio light",
+          "macro close-up of the materials, surface texture and most distinctive details, soft raking light",
       },
       {
-        id: "in-use",
-        label: "In use",
-        hint: "Scale against a person or its surroundings.",
+        id: "rear",
+        label: "Back",
+        hint: "What the camera sees from behind.",
         required: false,
-        framing: "shown in use in a simple natural setting for scale",
+        framing:
+          "product photograph, rear view, isolated on a plain light gray background, soft studio light",
+      },
+      {
+        id: "top",
+        label: "Top",
+        hint: "Its footprint seen from above.",
+        required: false,
+        framing:
+          "product photograph, top-down view from directly above, plain light gray background, soft studio light",
       },
     ],
   },
@@ -235,23 +215,11 @@ export const elementTypeOrder: ElementType[] = [
   "thing",
 ];
 
-/** `Red coat` → `RedCoat`; keeps letters, digits, `-` and `_`. */
-export function toHandle(name: string): string {
-  return name
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .split(/[^\p{L}\p{N}_-]+/u)
-    .filter(Boolean)
-    .map((part) => part[0]!.toUpperCase() + part.slice(1))
-    .join("")
-    .slice(0, 40);
-}
-
 /** `Rain soaked` → `rain-soaked`. */
 export function toStateHandle(name: string): string {
   return name
     .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .split(/[^\p{L}\p{N}]+/u)
     .filter(Boolean)
@@ -259,13 +227,15 @@ export function toStateHandle(name: string): string {
     .slice(0, 40);
 }
 
-export function referenceImageUrl(
-  reference: ElementReference,
-  outputs: ReadonlyMap<string, string>,
-): string | null {
-  return reference.source.kind === "upload"
-    ? reference.source.url
-    : (outputs.get(reference.source.jobId) ?? null);
+/** Where the browser loads an owned image; providers get signed URLs server-side. */
+export function assetUrl(asset: AssetRef): string {
+  return asset.type === "media-asset"
+    ? `/api/media/${encodeURIComponent(asset.assetId)}`
+    : `/api/jobs/output?job=${encodeURIComponent(asset.jobId)}&output=${encodeURIComponent(asset.outputId)}`;
+}
+
+export function stateHandle(state: Pick<ElementState, "name">): string {
+  return toStateHandle(state.name);
 }
 
 export interface SheetReview {
@@ -283,7 +253,7 @@ export interface SheetReview {
 
 /** Guidance for one reference sheet: the identity sheet or one state's sheet. */
 export function reviewSheet(
-  element: CreativeElement,
+  element: Element,
   stateId: string | null,
 ): SheetReview {
   const info = elementTypes[element.type];
@@ -293,7 +263,7 @@ export function reviewSheet(
     slot,
     approved: approved.filter((r) => r.view === slot.id),
     exploring: references.filter(
-      (r) => r.status === "exploration" && r.view === slot.id,
+      (r) => r.status === "experiment" && r.view === slot.id,
     ).length,
   }));
   const warnings: string[] = [];
@@ -327,7 +297,7 @@ export function reviewSheet(
 
 /** Prompt for a complementary reference view of the Element or one of its states. */
 export function viewPrompt(
-  element: CreativeElement,
+  element: Element,
   slot: GuidanceSlot,
   state: ElementState | null,
 ): string {

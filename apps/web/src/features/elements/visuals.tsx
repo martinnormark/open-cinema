@@ -1,10 +1,16 @@
-import { Box, MapPin, UserRound, type LucideIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useState } from "react";
 import {
-  referenceImageUrl,
-  type CreativeElement,
-  type ElementType,
-} from "./model";
+  Box,
+  KeyRound,
+  MapPin,
+  UserRound,
+  type LucideIcon,
+} from "lucide-react";
+import { EmptyState } from "@/components/empty-state";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { startSession } from "./generate";
+import { assetUrl, type Element, type ElementType } from "./model";
 import "./elements.css";
 
 export const typeIcons: Record<ElementType, LucideIcon> = {
@@ -13,35 +19,25 @@ export const typeIcons: Record<ElementType, LucideIcon> = {
   thing: Box,
 };
 
-/** First approved identity reference, else any image the sheet already has. */
-export function coverUrl(
-  element: CreativeElement,
-  outputs: ReadonlyMap<string, string>,
-) {
-  const candidates = [
-    ...element.references.filter((r) => r.status === "approved" && !r.stateId),
-    ...element.references.filter((r) => r.status === "exploration"),
-  ];
-  for (const reference of candidates) {
-    const url = referenceImageUrl(reference, outputs);
-    if (url) return url;
-  }
-  return null;
+/** First approved identity reference, else the newest exploration. */
+export function coverUrl(element: Element) {
+  const reference =
+    element.references.find((r) => r.status === "approved" && !r.stateId) ??
+    [...element.references].reverse().find((r) => r.status === "experiment");
+  return reference ? assetUrl(reference.asset) : null;
 }
 
 export function ElementCover({
   element,
-  outputs,
   className,
 }: {
-  element: CreativeElement;
-  outputs: ReadonlyMap<string, string>;
+  element: Element;
   className?: string;
 }) {
-  const url = coverUrl(element, outputs);
+  const url = coverUrl(element);
   const Icon = typeIcons[element.type];
   return (
-    <div className={cn("overflow-hidden bg-secondary", className)}>
+    <div className={cn("overflow-hidden bg-surface", className)}>
       {url ? (
         <img
           src={url}
@@ -51,10 +47,52 @@ export function ElementCover({
           className="size-full object-cover"
         />
       ) : (
-        <div className="flex size-full items-center justify-center text-muted-foreground">
-          <Icon aria-hidden="true" className="size-8" strokeWidth={1.25} />
+        <div className="flex size-full items-center justify-center text-subtle-foreground">
+          <Icon aria-hidden="true" className="size-7" strokeWidth={1.25} />
         </div>
       )}
+    </div>
+  );
+}
+
+/** Elements belong to a session; offer to start the local one. */
+export function SessionRequired({ className }: { className?: string }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  return (
+    <div
+      className={cn("mx-auto w-full max-w-5xl px-6 py-10 md:px-12", className)}
+    >
+      <EmptyState
+        icon={KeyRound}
+        title="Start a session to see your Elements"
+        actions={
+          <Button
+            disabled={busy}
+            onClick={() => {
+              setBusy(true);
+              setError("");
+              startSession()
+                .catch(() =>
+                  setError(
+                    "Local testing is not configured. Set up the local session variables in apps/web/.dev.vars.",
+                  ),
+                )
+                .finally(() => setBusy(false));
+            }}
+          >
+            {busy ? "Starting…" : "Start local session"}
+          </Button>
+        }
+      >
+        Your cast, places and Things are saved with your session. This early
+        preview uses a local test session in this browser.
+        {error && (
+          <span role="alert" className="mt-3 block text-destructive">
+            {error}
+          </span>
+        )}
+      </EmptyState>
     </div>
   );
 }

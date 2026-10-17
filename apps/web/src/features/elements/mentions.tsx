@@ -7,18 +7,21 @@ import {
   type KeyboardEvent,
 } from "react";
 import { cn } from "@/lib/utils";
-import { useJobViews } from "./generate";
+import type { AssetRef, ElementMention } from "@open-cinema/contracts";
 import {
+  assetUrl,
   elementTypes,
-  referenceImageUrl,
-  type CreativeElement,
+  stateHandle,
+  type Element,
   type ElementReference,
   type ElementState,
+  type ReferenceView,
 } from "./model";
 import { useElements } from "./store";
 
 /** `@Handle` or `@Handle:state` where the `@` starts a word. */
-const MENTION = /(^|[^\p{L}\p{N}_@])@([\p{L}\p{N}_-]+)(?::([\p{L}\p{N}-]+))?/gu;
+const MENTION =
+  /(^|[^\p{L}\p{N}_@])@([A-Za-z][A-Za-z0-9_]{0,39})(?::([A-Za-z0-9-]+))?/gu;
 
 export interface MentionToken {
   /** Offset of the `@`. */
@@ -47,15 +50,15 @@ export function parseMentions(text: string): MentionToken[] {
 
 export interface MentionReference {
   id: string;
-  view: string | null;
-  /** null while a generated reference's stored image is unavailable. */
-  url: string | null;
+  view: ReferenceView | null;
+  asset: AssetRef;
+  url: string;
   fromState: boolean;
 }
 
 export interface ResolvedMention {
   token: MentionToken;
-  element: CreativeElement | null;
+  element: Element | null;
   state: ElementState | null;
   /** Approved state references first, then approved identity references. */
   references: MentionReference[];
@@ -65,14 +68,14 @@ export interface ResolvedMention {
 function approved(
   references: ElementReference[],
   stateId: string | null,
-  outputs: ReadonlyMap<string, string>,
 ): MentionReference[] {
   return references
     .filter((r) => r.status === "approved" && r.stateId === stateId)
     .map((r) => ({
       id: r.id,
       view: r.view,
-      url: referenceImageUrl(r, outputs),
+      asset: r.asset,
+      url: assetUrl(r.asset),
       fromState: stateId !== null,
     }));
 }
@@ -80,8 +83,7 @@ function approved(
 /** Pure resolver: turns mentions in `text` into Elements, states and approved references. */
 export function resolveMentions(
   text: string,
-  elements: readonly CreativeElement[],
-  outputs: ReadonlyMap<string, string> = new Map(),
+  elements: readonly Element[],
 ): ResolvedMention[] {
   const byHandle = new Map(elements.map((e) => [e.handle.toLowerCase(), e]));
   return parseMentions(text).map((token) => {
@@ -96,12 +98,12 @@ export function resolveMentions(
       };
     const state = token.stateHandle
       ? (element.states.find(
-          (s) => s.handle === token.stateHandle!.toLowerCase(),
+          (s) => stateHandle(s) === token.stateHandle!.toLowerCase(),
         ) ?? null)
       : null;
-    const identity = approved(element.references, null, outputs);
+    const identity = approved(element.references, null);
     const references = [
-      ...(state ? approved(element.references, state.id, outputs) : []),
+      ...(state ? approved(element.references, state.id) : []),
       ...identity,
     ];
     const problem =
@@ -114,14 +116,41 @@ export function resolveMentions(
   });
 }
 
-/** Live resolution against the creator's Elements and stored generation outputs. */
+/** Live resolution against the creator's Elements. */
 export function useMentions(text: string): ResolvedMention[] {
   const { elements } = useElements();
-  const { outputs } = useJobViews();
-  return useMemo(
-    () => resolveMentions(text, elements, outputs),
-    [text, elements, outputs],
-  );
+  return useMemo(() => resolveMentions(text, elements), [text, elements]);
+}
+
+/**
+ * What a generation request carries for its mentions: each Element and selected
+ * state, plus the approved reference images in mention order without repeats.
+ */
+export function mentionPayload(mentions: readonly ResolvedMention[]): {
+  mentions: ElementMention[];
+  references: AssetRef[];
+} {
+  const seen = new Set<string>();
+  const payload: { mentions: ElementMention[]; references: AssetRef[] } = {
+    mentions: [],
+    references: [],
+  };
+  for (const mention of mentions) {
+    if (!mention.element) continue;
+    const key = `${mention.element.id}:${mention.state?.id ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    payload.mentions.push({
+      elementId: mention.element.id,
+      ...(mention.state ? { stateId: mention.state.id } : {}),
+    });
+    for (const reference of mention.references)
+      if (!seen.has(reference.id)) {
+        seen.add(reference.id);
+        payload.references.push(reference.asset);
+      }
+  }
+  return payload;
 }
 
 interface Query {
@@ -132,12 +161,12 @@ interface Query {
   /** Present once the creator typed `:` after a known handle. */
   stateQuery: string | null;
 }
-const ACTIVE = /(^|[^\p{L}\p{N}_@])@([\p{L}\p{N}_-]*)(?::([\p{L}\p{N}-]*))?$/u;
+const ACTIVE = /(^|[^\p{L}\p{N}_@])@([A-Za-z0-9_]*)(?::([A-Za-z0-9-]*))?$/u;
 function activeQuery(text: string, caret: number): Query | null {
   const match = ACTIVE.exec(text.slice(0, caret));
   if (!match) return null;
   const start = match.index + match[1]!.length;
-  const rest = /^[\p{L}\p{N}_:-]*/u.exec(text.slice(caret))![0];
+  const rest = /^[A-Za-z0-9_:-]*/.exec(text.slice(caret))![0];
   return {
     start,
     end: caret + rest.length,
@@ -149,22 +178,21 @@ function activeQuery(text: string, caret: number): Query | null {
 interface Suggestion {
   key: string;
   insert: string;
-  element: CreativeElement;
+  element: Element;
   state: ElementState | null;
   thumbnail: string | null;
 }
 function suggestionsFor(
   query: Query,
-  elements: readonly CreativeElement[],
-  outputs: ReadonlyMap<string, string>,
+  elements: readonly Element[],
 ): Suggestion[] {
-  const thumbnail = (element: CreativeElement, stateId: string | null) => {
+  const thumbnail = (element: Element, stateId: string | null) => {
     const reference =
       element.references.find(
         (r) => r.status === "approved" && r.stateId === stateId,
       ) ??
       element.references.find((r) => r.status === "approved" && !r.stateId);
-    return reference ? referenceImageUrl(reference, outputs) : null;
+    return reference ? assetUrl(reference.asset) : null;
   };
   if (query.stateQuery !== null) {
     const element = elements.find(
@@ -173,10 +201,12 @@ function suggestionsFor(
     if (!element) return [];
     const q = query.stateQuery.toLowerCase();
     return element.states
-      .filter((s) => s.handle.includes(q) || s.name.toLowerCase().includes(q))
+      .filter(
+        (s) => stateHandle(s).includes(q) || s.name.toLowerCase().includes(q),
+      )
       .map((state) => ({
         key: state.id,
-        insert: `@${element.handle}:${state.handle}`,
+        insert: `@${element.handle}:${stateHandle(state)}`,
         element,
         state,
         thumbnail: thumbnail(element, state.id),
@@ -220,7 +250,6 @@ export function MentionTextarea({
   onValueChange: (value: string) => void;
 }) {
   const { elements } = useElements();
-  const { outputs } = useJobViews();
   const listId = useId();
   const textarea = useRef<HTMLTextAreaElement | null>(null);
   const [caret, setCaret] = useState<number | null>(null);
@@ -228,8 +257,8 @@ export function MentionTextarea({
   const [highlight, setHighlight] = useState(0);
   const query = caret === null ? null : activeQuery(value, caret);
   const suggestions = useMemo(
-    () => (query ? suggestionsFor(query, elements, outputs) : []),
-    [query?.start, query?.handle, query?.stateQuery, elements, outputs],
+    () => (query ? suggestionsFor(query, elements) : []),
+    [query?.start, query?.handle, query?.stateQuery, elements],
   );
   const open = !!query && dismissedAt !== query.start && suggestions.length > 0;
   const active = open ? Math.min(highlight, suggestions.length - 1) : -1;
