@@ -17,8 +17,11 @@ import {
   readCoordinator,
 } from "@open-cinema/database/durable";
 import {
+  addElementReference,
   applyJobSnapshot,
   createElement,
+  createPendingMediaAsset,
+  markMediaAssetReady,
 } from "@open-cinema/database/mutations";
 import { getJob, getRevision } from "@open-cinema/database/queries";
 import { coordinatorRecordSchema } from "@open-cinema/database/durable";
@@ -130,6 +133,65 @@ it("dispatches a typed image.flux command, snapshotting mentioned Elements witho
     workflowKind: "image.flux",
     providerJobId: "provider-1",
   });
+});
+
+it("sends a mentioned Element's approved references inline for image.flux-reference", async () => {
+  const { scope, stub } = fixture();
+  const db = createDatabase(env.DB);
+  const bytes = new Uint8Array([137, 80, 78, 71, 1, 2, 3]);
+  const id = crypto.randomUUID();
+  const r2Key = `uploads/${scope.ownerId}/${id}`;
+  await env.GENERATED_ASSETS.put(r2Key, bytes, {
+    httpMetadata: { contentType: "image/png" },
+  });
+  await createPendingMediaAsset(db, scope, {
+    id,
+    r2Key,
+    filename: "mara.png",
+    mediaType: "image/png",
+    sizeBytes: bytes.length,
+  });
+  await markMediaAssetReady(db, scope, id, {
+    sizeBytes: bytes.length,
+    etag: "e",
+  });
+  const mara = await createElement(db, scope, {
+    type: "character",
+    name: "Mara",
+  });
+  await addElementReference(db, scope, {
+    elementId: mara.id,
+    asset: { type: "media-asset", assetId: id },
+    status: "approved",
+    view: "front",
+  });
+  const bodies = captureSubmissions();
+  accepted(
+    await stub.submit(scope, {
+      idempotencyKey: crypto.randomUUID(),
+      request: {
+        workflowKind: "image.flux-reference",
+        inputs: { prompt: "@Mara in a rain-soaked alley" },
+      },
+    }),
+  );
+  await due(stub);
+  expect(bodies).toEqual([
+    {
+      prompt: "Mara in a rain-soaked alley",
+      aspect_ratio: "auto",
+      resolution: "1k",
+      grounding: false,
+      images: [btoa(String.fromCharCode(...bytes))],
+    },
+  ]);
+  // Inline media lives only in the provider request, never in the checkpoint.
+  const stored = await runInDurableObject(stub, (_, state) =>
+    readCoordinator(state.storage),
+  );
+  expect(JSON.stringify(stored)).not.toContain(
+    btoa(String.fromCharCode(...bytes)),
+  );
 });
 
 it("rejects malformed commands and mentions of Elements the owner cannot use", async () => {
