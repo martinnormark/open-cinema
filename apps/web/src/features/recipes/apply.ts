@@ -111,11 +111,15 @@ export function compatibility(
           level: "warning",
           text: `@${element.handle} has no approved references, so it is carried by its description only and may not look like your ${element.type}.`,
         });
-      else
+      else {
+        const unseen = states.filter(
+          (s) => !approved.some((r) => r.stateId === s.id),
+        );
         notes.push({
           level: "info",
-          text: `@${element.handle} brings ${approved.length} approved ${approved.length === 1 ? "reference" : "references"}${states.length ? ` for ${states.map((s) => s.name.toLowerCase()).join(" and ")}` : ""}.`,
+          text: `@${element.handle} brings ${approved.length} approved ${approved.length === 1 ? "reference" : "references"}${unseen.length ? `; ${unseen.map((s) => s.name.toLowerCase()).join(" and ")} ${unseen.length === 1 ? "comes" : "come"} from ${unseen.length === 1 ? "its description" : "their descriptions"}` : ""}.`,
         });
+      }
     }
     const far =
       spec.shot.framing === "extreme-wide" || spec.shot.framing === "wide";
