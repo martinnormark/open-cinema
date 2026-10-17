@@ -27,7 +27,7 @@ Built by [`packages/comfy/src/workflows/exports.ts`](../packages/comfy/src/workf
 | `performance/edges.api.json`, `performance/edges-detailed.api.json` | **Performance transfer.** ComfyUI's own blur and Canny nodes trace the take's motion as edges (no model weights); LTX 2.3 generates a new character performing it, starting from a FLUX 3 keyframe.                                         | `source.mp4`, `keyframe.png`                                    | `ltx-2.3-22b-ic-lora-union-control-ref0.5`                                        |
 | `experiments/ltx-recast.api.json`                                   | **Experiment, not in the app.** Recast on LTX 2.5: SAM 3.1 tracks the marked person, FLUX.2 Klein recasts the first frame, LTX 2.5 follows the source's pose. Identity did not hold past a second ([recast-ltx.md](../docs/recast-ltx.md)). | `source.mp4`, `reference-0.png`, `reference-1.png`, `sheet.png` | `ltx-2.3-22b-ic-lora-union-control-ref0.5`, `ltx-2.3-22b-ic-lora-ingredients-0.9` |
 
-Every adapter is Lightricks' own; the app uses no LoRA made by anyone else ([third-party-ip.md](../docs/third-party-ip.md)). The base weights (LTX-2 19B, LTX 2.3 22B, LTX 2.5 22B and their Gemma encoders, FLUX.2 Klein 9B, MoGe-2, SAM 3.1, Depth Anything V2, DWPose) are listed per file in the manifest.
+Every adapter is Lightricks' own; the app uses no LoRA made by anyone else ([third-party-ip.md](../docs/third-party-ip.md)). The base weights (LTX-2 19B, LTX 2.3 22B, LTX 2.5 22B and their Gemma encoders, FLUX.2 Klein 9B, MoGe-2, SAM 3.1) are listed per file in the manifest.
 
 ### How the files differ from a live run
 

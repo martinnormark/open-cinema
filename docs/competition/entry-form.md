@@ -47,7 +47,7 @@ Router serves FLUX 3, LTX 2.5, Kling 3.0 Omni, Bria and the shot planner; the jo
 
 **List all generative models used?** (required, short text)
 
-> FLUX 3 Image, FLUX 3 Video, LTX 2.5 Fast/Pro, LTX 2.5 22B + Alpha Gen IC-LoRA, LTX 2.3 22B + Union Control and In-Outpainting IC-LoRAs, LTX-2 19B + camera-control LoRAs, Kling 3.0 Omni, Bria video background removal, FLUX.2 Klein 9B, SAM 3.1, MoGe-2, Depth Anything V2, DWPose, Claude Sonnet 5.5 (shot planning)
+> FLUX 3 Image, FLUX 3 Video, LTX 2.5 Fast/Pro, LTX 2.5 22B + Alpha Gen IC-LoRA, LTX 2.3 22B + Union Control and In-Outpainting IC-LoRAs, LTX-2 19B + camera-control LoRAs, Kling 3.0 Omni, Bria video background removal, FLUX.2 Klein 9B, SAM 3.1, MoGe-2, Claude Sonnet 5.5 (shot planning)
 
 The field is a single line; if it is cut short, keep the first nine. Full list with licences: [third-party-ip.md](../third-party-ip.md). SwitchX (Beeble) was measured during the background evaluation but is not the default path; add it only if Martin wants every model ever called listed.
 
