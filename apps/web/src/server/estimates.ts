@@ -10,8 +10,6 @@ import { requireSession } from "./session";
 
 const estimateInputSchema = z.object({
   request: generationRequestSchema,
-  /** Video from a first frame runs on a different model with different pricing. */
-  firstFrame: z.boolean().optional(),
   /** Resolved reference count, including Element sheets from mentions. */
   references: z.number().int().min(0).max(10).optional(),
 });

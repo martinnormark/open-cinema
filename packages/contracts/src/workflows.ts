@@ -59,6 +59,8 @@ export const ltxVideoInputsSchema = z.object({
   fps: z.literal([24, 25]).default(25),
   generateAudio: z.boolean().default(true),
   quality: z.enum(["fast", "pro"]).default("fast"),
+  /** Animates this image. Router's LTX is text-only, so this runs on FLUX 3 Video. */
+  firstFrame: assetRefSchema.optional(),
   mentions,
 });
 export type LtxVideoInputs = z.infer<typeof ltxVideoInputsSchema>;
@@ -147,8 +149,9 @@ export type WorkflowCommandInput = z.input<typeof workflowCommandSchema>;
 export function requestAssetRefs(request: GenerationRequest): AssetRef[] {
   switch (request.workflowKind) {
     case "image.flux":
-    case "video.ltx":
       return [];
+    case "video.ltx":
+      return request.inputs.firstFrame ? [request.inputs.firstFrame] : [];
     case "image.flux-reference":
       return request.inputs.references;
     case "video.background-replace":
@@ -228,7 +231,7 @@ export const WORKFLOW_DESCRIPTORS = {
     kind: "video.ltx",
     label: "Video",
     output: "video",
-    models: ["ltx/ltx-2-5-fast", "ltx/ltx-2-5-pro"],
+    models: ["ltx/ltx-2-5-fast", "ltx/ltx-2-5-pro", "bfl/flux-3-video"],
   },
   "video.background-replace": {
     kind: "video.background-replace",

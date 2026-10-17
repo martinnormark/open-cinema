@@ -1,5 +1,5 @@
 import type { LtxVideoInputs } from "@open-cinema/contracts";
-import type { ImageSource, RouterRequest } from "./router-request";
+import type { ProviderRequest } from "./types";
 
 export const LTX_MODELS = {
   fast: "ltx/ltx-2-5-fast",
@@ -21,34 +21,44 @@ type VideoOptions = Pick<
   | "quality"
 >;
 
-/** FLUX 3 Video accepts whole seconds from 5 to 20. */
+/** The Router model `video.ltx` runs on for these inputs. */
+export function ltxVideoModel(
+  inputs: Pick<LtxVideoInputs, "quality" | "firstFrame">,
+): string {
+  return inputs.firstFrame ? IMAGE_TO_VIDEO_MODEL : LTX_MODELS[inputs.quality];
+}
+
+/** Seconds actually requested; FLUX 3 Video accepts whole seconds from 5 to 20. */
 export function requestedDuration(
   inputs: Pick<LtxVideoInputs, "durationSeconds">,
-  firstFrame?: ImageSource,
+  imageToVideo: boolean,
 ) {
-  return firstFrame
+  return imageToVideo
     ? Math.min(20, Math.max(5, inputs.durationSeconds))
     : inputs.durationSeconds;
 }
 
-/** `video.ltx`: text-to-video on LTX 2.5, or image-to-video from a first frame. */
+/**
+ * `video.ltx`: text-to-video on LTX 2.5, or image-to-video when `firstFrame`
+ * (an https URL or raw base64 of the resolved image) is given.
+ */
 export function ltxVideoRequest(
   inputs: VideoOptions,
-  firstFrame?: ImageSource,
-): RouterRequest {
+  firstFrame?: string,
+): ProviderRequest {
   const prompt = inputs.prompt.trim();
   if (!prompt) throw new Error("A prompt is required");
   if (firstFrame) {
-    const [width, height] = inputs.resolution.split("x").map(Number);
+    const [width = 0, height = 0] = inputs.resolution.split("x").map(Number);
     return {
       model: IMAGE_TO_VIDEO_MODEL,
       input: {
         mode: "i2v",
         prompt,
-        keyframes: [{ ...firstFrame }],
-        duration: requestedDuration(inputs, firstFrame),
-        aspect_ratio: width! >= height! ? "16:9" : "9:16",
-        resolution: Math.min(width!, height!) >= 1080 ? "fhd" : "hd",
+        keyframes: [firstFrame],
+        duration: requestedDuration(inputs, true),
+        aspect_ratio: width >= height ? "16:9" : "9:16",
+        resolution: Math.min(width, height) >= 1080 ? "fhd" : "hd",
         generate_audio: inputs.generateAudio,
       },
     };

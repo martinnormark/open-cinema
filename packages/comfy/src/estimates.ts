@@ -3,6 +3,7 @@ import type {
   GenerationRequest,
   LtxVideoInputs,
 } from "@open-cinema/contracts";
+import { requestedDuration } from "./workflows/ltx-video";
 
 /**
  * Pre-generation estimates. Prices are Router's published rates (211 credits =
@@ -47,10 +48,8 @@ function ltxEstimate(inputs: LtxVideoInputs): GenerationEstimate {
 
 export function estimateGeneration(
   request: GenerationRequest,
-  options: {
-    firstFrame?: boolean | undefined;
-    references?: number | undefined;
-  } = {},
+  /** Resolved reference count, including Element sheets from mentions. */
+  options: { references?: number | undefined } = {},
 ): GenerationEstimate {
   switch (request.workflowKind) {
     case "image.flux":
@@ -71,30 +70,19 @@ export function estimateGeneration(
         basis: "observed",
       };
     }
-    case "video.ltx":
-      if (!options.firstFrame) return ltxEstimate(request.inputs);
+    case "video.ltx": {
+      if (!request.inputs.firstFrame) return ltxEstimate(request.inputs);
+      // FLUX 3 Video bills GPU-seconds Router does not report back; BFL reported 75 of
+      // its own credits ($0.75) for 5 s at hd. Scale that by length, with margin.
+      const seconds = requestedDuration(request.inputs, true);
+      const credits = (CREDITS_PER_USD * 0.75 * seconds) / 5;
       return {
-        // FLUX 3 Video bills GPU-seconds Router does not report back; BFL reported 75 of
-        // its own credits ($0.75) for 5 s at hd. Treat as a range around that figure.
-        credits: round(
-          ((CREDITS_PER_USD *
-            0.75 *
-            Math.max(5, request.inputs.durationSeconds)) /
-            5) *
-            0.7,
-          ((CREDITS_PER_USD *
-            0.75 *
-            Math.max(5, request.inputs.durationSeconds)) /
-            5) *
-            1.3,
-        ),
-        seconds: round(
-          60,
-          90 + 25 * Math.max(5, request.inputs.durationSeconds),
-        ),
+        credits: round(credits * 0.7, credits * 1.3),
+        seconds: round(60, 90 + 25 * seconds),
         basis: "heuristic",
         note: "Image-to-video runs on FLUX 3 Video; Router does not report its exact charge.",
       };
+    }
     case "video.background-replace":
       return {
         // Bria bills 10.55 credits per output second; source length is unknown here.

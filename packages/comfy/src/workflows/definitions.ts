@@ -1,7 +1,7 @@
 import type { AssetRef } from "@open-cinema/contracts";
 import { fluxImageInput, FLUX_IMAGE_MODEL } from "./flux-image";
 import { MAX_REFERENCE_IMAGES } from "./flux-reference";
-import { ltxVideoRequest, LTX_MODELS } from "./ltx-video";
+import { ltxVideoModel, ltxVideoRequest } from "./ltx-video";
 import {
   expandMentions,
   httpsUrl,
@@ -37,8 +37,11 @@ export function routerSampleOutputs(data: unknown): ProviderOutput[] {
   if (image.length) return image;
   return singleOutput("video_url", "sample", "video/mp4")(data);
 }
-/** LTX returns one clip at `result.video_url`. */
-export const ltxVideoOutputs = singleOutput("video_url", "video", "video/mp4");
+/** LTX returns one clip at `result.video_url`; FLUX 3 Video (first frame) at `result.sample`. */
+export function ltxVideoOutputs(data: unknown): ProviderOutput[] {
+  const ltx = singleOutput("video_url", "video", "video/mp4")(data);
+  return ltx.length ? ltx : singleOutput("sample", "video", "video/mp4")(data);
+}
 
 /** Explicit references first, then each mention's approved sheet, deduplicated. */
 function referenceRefs(explicit: readonly AssetRef[], context: BuildContext) {
@@ -104,12 +107,13 @@ export const ltxVideoWorkflow: WorkflowDefinition<"video.ltx"> = {
   kind: "video.ltx",
   displayModel: "LTX 2.5",
   deadlineMs: 45 * 60_000,
-  model: (inputs) => LTX_MODELS[inputs.quality],
+  model: ltxVideoModel,
   async build(inputs, context) {
-    return ltxVideoRequest({
-      ...inputs,
-      prompt: expandMentions(inputs.prompt, context.mentions),
-    });
+    const frame = inputs.firstFrame && (await context.asset(inputs.firstFrame));
+    return ltxVideoRequest(
+      { ...inputs, prompt: expandMentions(inputs.prompt, context.mentions) },
+      frame ? (frame.publicUrl ?? (await frame.base64())) : undefined,
+    );
   },
   outputs: ltxVideoOutputs,
 };

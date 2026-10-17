@@ -5,7 +5,6 @@ import {
 } from "./cloud-workflow";
 import type { ComfyJobStatus } from "./cloud-workflow";
 export type { ComfyJobStatus } from "./cloud-workflow";
-export * from "./workflows/router-request";
 export * from "./workflows/flux-image";
 export * from "./workflows/flux-reference";
 export * from "./workflows/ltx-video";
