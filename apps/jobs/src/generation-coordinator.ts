@@ -257,6 +257,16 @@ export class GenerationCoordinator
       ownerScopeSchema.parse(scope),
       (record) => {
         const job = record.jobs.find((j) => j.id === jobId);
+        // With no receipt there is nothing to check again, so the creator can
+        // dismiss it; otherwise it would pause admission for good.
+        if (job?.state === "needs_attention" && !job.providerJobId) {
+          record.executions[jobId]!.cancelRequested = true;
+          job.state = "cancelled";
+          job.error =
+            "Dismissed. Comfy may still have run it, so check your Comfy usage.";
+          touch(record, job);
+          return;
+        }
         if (!job || terminal(job) || job.state === "persisting") return;
         const execution = record.executions[jobId]!;
         execution.cancelRequested = true;

@@ -125,3 +125,23 @@ it.each(["truncated", "oversized", "html", "redirect"])(
     expect(unsafeRequests).toBe(0);
   },
 );
+
+it("archives Kling's delivered video, the only output of the replacement kinds", async () => {
+  const kling = "https://v15-kling-fdl.klingai.com/bs2/x/clip.mp4?cacheKey=1";
+  network.use(
+    http.get(
+      kling,
+      () =>
+        new HttpResponse(new Uint8Array([0, 0, 0, 24]), {
+          headers: { "Content-Type": "video/mp4" },
+        }),
+    ),
+  );
+  const saved = await archiveOutput(
+    env.GENERATED_ASSETS,
+    "asset-owner",
+    { ...output(), mediaType: "video/mp4" },
+    async () => kling,
+  );
+  expect(saved).toMatchObject({ mediaType: "video/mp4", sizeBytes: 4 });
+});

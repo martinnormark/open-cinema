@@ -78,6 +78,16 @@ function JobRow({ job }: { job: Job }) {
                 }}
               />
             )}
+            {output.mediaType.startsWith("video/") && (
+              <video
+                src={`/api/jobs/output?job=${encodeURIComponent(job.id)}&output=${encodeURIComponent(output.id)}`}
+                controls
+                playsInline
+                preload="metadata"
+                aria-label={job.prompt}
+                className="aspect-video w-full rounded-lg bg-black object-contain"
+              />
+            )}
             <figcaption hidden className="text-sm text-muted-foreground">
               Saved image temporarily unavailable. Reload to try again.
             </figcaption>
@@ -89,7 +99,9 @@ function JobRow({ job }: { job: Job }) {
             >
               {output.mediaType.startsWith("image/")
                 ? "Open image"
-                : "Open asset"}
+                : output.mediaType.startsWith("video/")
+                  ? "Open video"
+                  : "Open asset"}
             </a>
           </figure>
         ))}
@@ -113,6 +125,16 @@ function JobRow({ job }: { job: Job }) {
         )}
       {job.state === "needs_attention" && (
         <div className="mt-3 flex gap-4">
+          {!job.providerJobId && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pending}
+              onClick={() => void action("cancel")}
+            >
+              Dismiss
+            </Button>
+          )}
           {job.providerJobId && (
             <Button
               variant="outline"

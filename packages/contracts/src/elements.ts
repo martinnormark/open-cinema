@@ -120,6 +120,8 @@ export const elementHandleSchema = z
 export function toElementHandle(name: string): string {
   const words = name
     .normalize("NFKD")
+    // "Keeper's Cottage" is @KeepersCottage, not @KeeperSCottage.
+    .replace(/['\u2019]/g, "")
     .replace(/[^A-Za-z0-9 ]+/g, " ")
     .trim()
     .split(/\s+/)

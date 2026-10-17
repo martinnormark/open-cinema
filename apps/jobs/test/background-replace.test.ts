@@ -94,11 +94,13 @@ it("edits the source on Kling 3.0 Omni with the Location's establishing view fir
   expect(prompt).toContain("Keep the camera movement");
 });
 
-it("sends the source clip by its Comfy storage URL when there is no public origin", async () => {
+it("sends the source by Comfy storage URL and references as bare base64 when there is no public origin", async () => {
   const definition = getWorkflowDefinition("video.background-replace")!;
   const request = await definition.build(inputs, context(null));
   expect(request.input).toMatchObject({
     video_list: [{ video_url: "https://comfy-storage.test/take" }],
+    // Kling answers a data: URI with provider_error (seen live 2026-10-17).
+    image_list: [{ image_url: "AAAA" }, { image_url: "AAAA" }],
   });
 });
 

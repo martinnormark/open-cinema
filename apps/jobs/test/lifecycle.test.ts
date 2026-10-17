@@ -311,6 +311,11 @@ it("bounds ambiguous submission recovery and pauses admission without minting an
     "needs_attention",
   );
   expect(await stub.submit(scope, command())).toMatchObject({ ok: false });
+  // Without a receipt nothing can be checked again; dismissing reopens admission.
+  const [job] = (await stub.getSnapshot(scope))!.jobs;
+  await stub.cancel(scope, job!.id);
+  expect((await stub.getSnapshot(scope))?.jobs[0]?.state).toBe("cancelled");
+  accepted(await stub.submit(scope, command()));
 });
 
 it("keeps a legacy interrupted Cloud submission suspended when upgrading v2 checkpoints", async () => {

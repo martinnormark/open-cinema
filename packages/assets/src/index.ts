@@ -41,7 +41,9 @@ function assetUrl(value: string): URL {
     !(
       host === "storage.googleapis.com" ||
       host.endsWith(".comfy.org") ||
-      host.endsWith(".bfl.ai")
+      host.endsWith(".bfl.ai") ||
+      // Kling 3.0 Omni edits (background replacement, recast) deliver from here.
+      host.endsWith(".klingai.com")
     )
   ) {
     throw new Error("Untrusted provider asset location");

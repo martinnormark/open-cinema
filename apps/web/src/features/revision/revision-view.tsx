@@ -108,7 +108,7 @@ export function RevisionView({
   )?.mediaType;
   const extension = resultType === "video/webm" ? "webm" : "mp4";
   const download = result
-    ? `${replacementKinds[kind].label} – ${sourceTitle}`.replace(
+    ? `${replacementKinds[kind].label} – ${sourceTitle.replace(/\.(mp4|mov|webm)$/i, "")}`.replace(
         /[\\/:*?"<>|]+/g,
         " ",
       )

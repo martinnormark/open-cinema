@@ -7,6 +7,7 @@ import {
 import { estimateGeneration } from "@open-cinema/comfy/estimates";
 import { Shuffle, ArrowUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { beginLocalSession } from "@/server/functions";
 import { submitWorkflow } from "@/server/generation";
 import {
@@ -31,14 +32,17 @@ const prompts = [
   "A handmade cobalt-blue ceramic teapot on a linen tablecloth, one sliced pear beside it, soft window light, editorial still life.",
   "An abandoned coastal observatory at blue hour, tall grass moving in the sea breeze, a single amber light in the dome, atmospheric film still.",
 ];
+type Medium = "image" | "video";
+
 export function PromptStudio({ introduction }: { introduction: ReactNode }) {
   const { snapshot, connection } = useGeneration();
   const [prompt, setPrompt] = useState("");
+  const [medium, setMedium] = useState<Medium>("image");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [uncertain, setUncertain] = useState<WorkflowCommandInput | null>(null);
   const mentions = useMentions(prompt);
-  const request = studioRequest(prompt, mentions);
+  const request = studioRequest(prompt, mentions, medium);
   const preferences = useCostPreferences();
   const estimate = estimateGeneration(request);
   async function start() {
@@ -112,26 +116,52 @@ export function PromptStudio({ introduction }: { introduction: ReactNode }) {
         />
         <MentionSummary mentions={mentions} className="mt-3" />
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <Button
-            type="button"
-            variant="ghost"
-            disabled={!!uncertain}
-            onClick={() => {
-              const alternatives = prompts.filter((p) => p !== prompt);
-              setPrompt(
-                alternatives[Math.floor(Math.random() * alternatives.length)]!,
-              );
-            }}
-          >
-            <Shuffle aria-hidden="true" /> Surprise me
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              size="sm"
+              value={medium}
+              onValueChange={(value) => value && setMedium(value as Medium)}
+              disabled={!!uncertain}
+              aria-label="Make"
+            >
+              <ToggleGroupItem value="image" className="px-3">
+                Image
+              </ToggleGroupItem>
+              <ToggleGroupItem value="video" className="px-3">
+                Video
+              </ToggleGroupItem>
+            </ToggleGroup>
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={!!uncertain}
+              onClick={() => {
+                const alternatives = prompts.filter((p) => p !== prompt);
+                setPrompt(
+                  alternatives[
+                    Math.floor(Math.random() * alternatives.length)
+                  ]!,
+                );
+              }}
+            >
+              <Shuffle aria-hidden="true" /> Surprise me
+            </Button>
+          </div>
           <Button
             type="submit"
             disabled={
               !snapshot || busy || (!uncertain && prompt.trim().length < 3)
             }
           >
-            {busy ? "Sending…" : uncertain ? "Retry request" : "Generate image"}
+            {busy
+              ? "Sending…"
+              : uncertain
+                ? "Retry request"
+                : medium === "video"
+                  ? "Generate video"
+                  : "Generate image"}
             <ArrowUp aria-hidden="true" />
           </Button>
         </div>
@@ -139,8 +169,10 @@ export function PromptStudio({ introduction }: { introduction: ReactNode }) {
           id="generation-estimate"
           className="tabular mt-3 text-xs leading-5 text-muted-foreground"
         >
-          {WORKFLOW_DESCRIPTORS[request.workflowKind].label} · FLUX 3 · 1K
-          square
+          {WORKFLOW_DESCRIPTORS[request.workflowKind].label} ·{" "}
+          {request.workflowKind === "video.ltx"
+            ? `LTX 2.5 Fast · ${request.inputs.durationSeconds} s · 720p with sound`
+            : "FLUX 3 · 1K square"}
           {request.workflowKind === "image.flux-reference" &&
             ` · ${request.inputs.references.length} ${request.inputs.references.length === 1 ? "reference" : "references"} from your Elements`}
           {shouldShowEstimate(preferences, "image") &&
@@ -188,12 +220,29 @@ export function PromptStudio({ introduction }: { introduction: ReactNode }) {
   );
 }
 
-/** Mentions with approved references condition Flux; otherwise a plain image. */
+/**
+ * Video is LTX 2.5 text-to-video: a short, 720p clip keeps the first take cheap.
+ * Mentions with approved references condition Flux; otherwise a plain image.
+ */
 function studioRequest(
   prompt: string,
   mentions: ReturnType<typeof useMentions>,
+  medium: Medium,
 ): GenerationRequest {
   const payload = mentionPayload(mentions);
+  if (medium === "video")
+    return {
+      workflowKind: "video.ltx",
+      inputs: {
+        prompt: prompt.trim(),
+        durationSeconds: 6,
+        resolution: "1280x720",
+        fps: 25,
+        generateAudio: true,
+        quality: "fast",
+        mentions: payload.mentions.slice(0, 8),
+      },
+    };
   const base = {
     prompt: prompt.trim(),
     aspectRatio: "1:1" as const,

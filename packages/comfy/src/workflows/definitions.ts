@@ -158,7 +158,11 @@ export const backgroundReplaceWorkflow: WorkflowDefinition<"video.background-rep
       const referenceImages = await Promise.all(
         refs.map(async (ref) => {
           const asset = await context.asset(ref);
-          return asset.publicUrl ?? (await asset.dataUri());
+          if (asset.publicUrl) return asset.publicUrl;
+          // Kling takes bare base64 and rejects a data: URI with provider_error.
+          return DEFAULT_BACKGROUND_PIPELINE === "kling"
+            ? await asset.base64()
+            : await asset.dataUri();
         }),
       );
       const media = { videoUrl, referenceImages };
