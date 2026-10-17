@@ -26,7 +26,7 @@ for (const clip of clips) {
   const mark = { x, y, timeMs: 0 };
   const p = preflight(source, mark);
   rows.push(
-    `| ${clip.id} | source | ${p.verdict}${p.reasons.length ? ` (${p.reasons.join(", ")})` : ""} | ${p.faceFrames}/${p.tracked} face, ${p.backFrames} back, largest ${p.largestFace?.toFixed(2) ?? "–"} | | | | |`,
+    `| ${clip.id} | source | ${p.verdict}${p.reasons.length ? ` (${p.reasons.join(", ")})` : ""} | ${p.faceFrames}/${p.tracked} face, ${p.backFrames} back, typical ${p.typicalFace?.toFixed(2) ?? "–"} | | | | |`,
   );
   for (const key of Object.keys(scans).filter(
     (k) => k.startsWith("res-") && k.endsWith(`-${clip.id}`),
