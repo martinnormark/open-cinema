@@ -1,7 +1,10 @@
 import type { GenerationEstimate } from "@open-cinema/contracts";
 
-/** Bria bills per second of source video (Router pricing, read 2026-10-16). */
-const BRIA_CREDITS_PER_SECOND = 10.55;
+/**
+ * Kling 3.0 Omni edits cost about 27 credits per source second (5.4 Kling
+ * credits for 6 s at 720p in Phase 0); see `@open-cinema/comfy/estimates`.
+ */
+const KLING_CREDITS_PER_SECOND = 27;
 
 /**
  * Replacement estimates need the clip length, which the shared estimator does
@@ -18,16 +21,14 @@ export function estimateReplacement(
         clip === null
           ? null
           : {
-              min: BRIA_CREDITS_PER_SECOND * clip,
-              max: BRIA_CREDITS_PER_SECOND * clip,
+              min: KLING_CREDITS_PER_SECOND * clip * 0.9,
+              max: KLING_CREDITS_PER_SECOND * clip * 1.1,
             },
-      seconds: {
-        min: 60,
-        max: Math.max(180, 120 + (clip ?? 20) * 15),
-      },
-      basis: clip === null ? "heuristic" : "published-pricing",
+      // Provider time was 2–4 min; the shared Router queue can add much more.
+      seconds: { min: 150, max: 1800 },
+      basis: "observed",
       ...(clip === null
-        ? { note: "Charged at 10.55 credits per second of source video." }
+        ? { note: "About 27 credits per second of source video." }
         : {}),
     };
   }
