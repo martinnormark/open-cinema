@@ -53,7 +53,7 @@ function ltxEstimate(inputs: LtxVideoInputs): GenerationEstimate {
  */
 export const CLOUD_GRAPH_ESTIMATES = {
   camera: {
-    seconds: [90, 600],
+    seconds: [45, 600],
     note: "Runs LTX-2 with a camera-control LoRA on Comfy Cloud, billed by GPU time.",
   },
   swap: {
@@ -61,11 +61,11 @@ export const CLOUD_GRAPH_ESTIMATES = {
     note: "Runs FLUX.2 Klein and LTX 2.3 on Comfy Cloud, billed by GPU time. Uses the first 4 seconds of the take.",
   },
   restyle: {
-    seconds: [150, 900],
+    seconds: [30, 900],
     note: "Runs FLUX.2 Klein and LTX 2.3 on Comfy Cloud, billed by GPU time. Uses the first 4 seconds of the take.",
   },
   restage: {
-    seconds: [120, 900],
+    seconds: [30, 900],
     note: "Runs LTX 2.3 with the CrossView IC-LoRA on Comfy Cloud, billed by GPU time. Uses the first 4 seconds of the take.",
   },
 } as const;
