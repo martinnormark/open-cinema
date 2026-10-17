@@ -385,7 +385,7 @@ export function ElementCreate({
                       .map((s) => s.label.toLowerCase())
                       .join(
                         " and ",
-                      )}. FLUX 3 Image · uses your Comfy Router credits.`
+                      )}. ${[...new Set(firstViews.map((s) => (s.move ? "LTX 2.5" : "FLUX 3 Image")))].join(" and ")} · uses your Comfy Router credits.`
                   : "Add a description to explore generated looks."}
               </span>
             </span>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   Box,
+  Film,
   KeyRound,
   MapPin,
   UserRound,
@@ -55,7 +56,13 @@ export function ElementCover({
   const move = coverMove(element);
   const Icon = typeIcons[element.type];
   return (
-    <div className={cn("overflow-hidden bg-surface", className)}>
+    <div className={cn("relative overflow-hidden bg-surface", className)}>
+      {move && (
+        <span className="absolute right-2 bottom-2 z-10 flex items-center gap-1 rounded-sm bg-background/90 px-1.5 py-0.5 text-xs font-medium">
+          <Film aria-hidden="true" className="size-3" />
+          Moving reference
+        </span>
+      )}
       {move ? (
         <video
           src={assetUrl(move.asset)}

@@ -151,6 +151,57 @@ it("lists only ready uploads and rejects unsupported media", async () => {
   ).rejects.toThrow("Unsupported");
 });
 
+it("stores a Location's moving reference as a clip and keeps clips and stills apart", async () => {
+  const db = createDatabase(env.DB);
+  const owner = { ownerId: crypto.randomUUID() };
+  const mill = await createElement(db, owner, {
+    type: "location",
+    name: "Tide Mill",
+  });
+  const clip = await readyUpload(db, owner, "video/mp4");
+  const still = await readyUpload(db, owner);
+  const moving = await addElementReference(db, owner, {
+    elementId: mill.id,
+    asset: { type: "media-asset", assetId: clip!.id },
+    status: "approved",
+    view: "push-in",
+  });
+  expect(moving!.references[0]).toMatchObject({ view: "push-in" });
+  // Stills ignore the clip; the move is read on its own.
+  expect(approvedReferences(moving!)).toEqual([]);
+  await expect(
+    updateElementReference(db, owner, {
+      id: moving!.references[0]!.id,
+      view: "establishing",
+    }),
+  ).rejects.toThrow("A clip can only show a move");
+  await expect(
+    addElementReference(db, owner, {
+      elementId: mill.id,
+      asset: { type: "media-asset", assetId: still!.id },
+      view: "drift",
+    }),
+  ).rejects.toThrow("A moving reference is a clip");
+  await expect(
+    addElementReference(db, owner, {
+      elementId: mill.id,
+      asset: { type: "media-asset", assetId: clip!.id },
+      view: "establishing",
+    }),
+  ).rejects.toThrow("Reference sheets hold images");
+  const cal = await createElement(db, owner, {
+    type: "character",
+    name: "Cal",
+  });
+  await expect(
+    addElementReference(db, owner, {
+      elementId: cal.id,
+      asset: { type: "media-asset", assetId: clip!.id },
+      view: "push-in",
+    }),
+  ).rejects.toThrow("Only a Location");
+});
+
 it("keeps the original linked while a revision moves from pending to kept", async () => {
   const db = createDatabase(env.DB);
   const owner = { ownerId: crypto.randomUUID() };

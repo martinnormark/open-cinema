@@ -115,6 +115,16 @@ each mention is described in text, and is where the camera-move LoRAs live.
   references themselves. Bringing reference shots to LTX needs an in-context
   adapter of our own (an IC-LoRA trained on empty-location moves paired with
   shots in the same place); no third-party LoRA is used.
+- **The reference move steers the camera.** In the first live reference shot
+  (Tide Mill, 5 s), the place, the added character and the light ("low sun
+  behind the mill house", where the reference was overcast) all came through,
+  but Kling followed the reference video's camera path almost frame for frame
+  and ignored "the camera stays low on the far bank". With `refer_type:
+"feature"` the words carry the light, the people and their actions; the
+  camera's path comes from the move. A shot gets the camera it asks for when
+  the Location has a move that matches it (push-in, drift, rise), or when the
+  place is sent as stills instead of a video, at the cost of weaker
+  architecture.
 - **Keyframe or references.** A FLUX keyframe fixes the exact first frame the
   creator approved and makes continuity cuts exact. A reference shot composes
   from words, so the frame is less predictable, but nothing is pinned to one

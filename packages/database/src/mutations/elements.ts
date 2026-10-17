@@ -2,6 +2,7 @@ import {
   addElementReferenceInputSchema,
   createElementInputSchema,
   createElementStateInputSchema,
+  isMovingView,
   updateElementStateInputSchema,
   type UpdateElementStateInput,
   toElementHandle,
@@ -127,8 +128,16 @@ export async function addElementReference(
     throw new Error("That state belongs to a different Element");
   const stored = await resolveAssetRef(db, scope, data.asset);
   if (!stored) throw new Error("That media is not available to reference");
-  if (!stored.mediaType.startsWith("image/"))
-    throw new Error("Reference sheets hold images");
+  // A Location's moving references are clips; every other view is a still.
+  const moving = isMovingView(data.view);
+  if (moving && element.type !== "location")
+    throw new Error("Only a Location has moving references");
+  if (!stored.mediaType.startsWith(moving ? "video/" : "image/"))
+    throw new Error(
+      moving
+        ? "A moving reference is a clip"
+        : "Reference sheets hold images; tag a clip of a Location as a move",
+    );
   const client = getClient(db);
   await client.elementReference.create({
     data: {
@@ -164,6 +173,11 @@ export async function updateElementReference(
     where: { id, element: { ownerId: scope.ownerId } },
   });
   if (!ref) return null;
+  if (
+    changes.view !== undefined &&
+    isMovingView(changes.view) !== isMovingView(ref.view as never)
+  )
+    throw new Error("A clip can only show a move, and a still never can");
   await client.elementReference.update({
     where: { id },
     data: {

@@ -227,7 +227,7 @@ export function describeViewRequest(
     request.workflowKind !== "video.ltx"
       ? ["FLUX 3 Image"]
       : request.inputs.firstFrame
-        ? ["FLUX 3 Video", "moving on from the establishing view"]
+        ? ["FLUX 3 Video", "continuing from the establishing view"]
         : [
             "LTX 2.5",
             `${request.inputs.durationSeconds} s from the description`,

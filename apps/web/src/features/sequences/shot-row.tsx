@@ -217,7 +217,11 @@ export function ShotRow({
     >
       <div className="grid gap-5 md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
         <div className="min-w-0">
-          <Picture shot={shot} views={views} />
+          <Picture
+            shot={shot}
+            views={views}
+            referencesFirst={referencesFirst}
+          />
           <Takes
             views={views}
             busy={!!busy}
@@ -618,7 +622,15 @@ function Choice({
 }
 
 /** The shot as it stands: approved motion plays, else the approved keyframe. */
-function Picture({ shot, views }: { shot: Shot; views: TakeView[] }) {
+function Picture({
+  shot,
+  views,
+  referencesFirst,
+}: {
+  shot: Shot;
+  views: TakeView[];
+  referencesFirst: boolean;
+}) {
   const motion = approvedTake(shot, "motion");
   const keyframe = approvedTake(shot, "keyframe");
   const pending = views.find((v) => v.phase === "working");
@@ -652,7 +664,9 @@ function Picture({ shot, views }: { shot: Shot; views: TakeView[] }) {
       <p className="mt-3 max-w-60 text-xs leading-5 text-muted-foreground">
         {pending
           ? (pending.stage ?? "Making the first take…")
-          : "Make a keyframe to set the frame, then animate it."}
+          : referencesFirst
+            ? "Shoot it from the references, or make a keyframe to fix the frame first."
+            : "Make a keyframe to set the frame, then animate it."}
       </p>
     </div>
   );
