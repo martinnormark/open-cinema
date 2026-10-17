@@ -54,7 +54,7 @@ function Settings() {
 
   return (
     <section
-      className="mx-auto w-full max-w-4xl px-6 py-10 md:px-12 md:py-14"
+      className="mx-auto w-full max-w-4xl px-6 pt-10 pb-28 md:px-12 md:pt-14"
       aria-labelledby="page-title"
     >
       <PageHeader
