@@ -9,6 +9,7 @@ import {
   X,
 } from "lucide-react";
 import {
+  RESTAGE_ANGLES,
   approvedReferences,
   assetRefKey,
   outputVariant,
@@ -52,6 +53,23 @@ import {
   variantLabels,
 } from "./model";
 import "./revision.css";
+
+const GENERATING: Record<ReplacementKind, string> = {
+  background: "Replacing the background…",
+  character: "Recasting the character…",
+  object: "Swapping the object…",
+  restyle: "Restyling the shot…",
+  camera: "Re-staging the camera…",
+};
+
+/** What the chosen Element is to this kind of revision. */
+const ELEMENT_ROLE: Record<ReplacementKind, string> = {
+  background: "Location",
+  character: "Character",
+  object: "Swapped in",
+  restyle: "Style",
+  camera: "Element",
+};
 
 const kindOf = (revision: Pick<Revision, "workflowKind">): ReplacementKind =>
   revisionKindOf(revision.workflowKind);
@@ -123,8 +141,20 @@ export function RevisionView({
 
   /** Post-run checks start when the result loads, unless already stored. */
   function checkResult() {
-    if (kind !== "character" || checks || !result || !decisions?.targetPoint)
+    if (checks || !result) return;
+    if (kind === "object" || kind === "restyle") {
+      requestResultChecks({
+        revisionId: revision.id,
+        sourceUrl: assetUrl(revision.source),
+        resultUrl: assetUrl(result),
+        save: (next) =>
+          saveRevisionChecks({
+            data: { revisionId: revision.id, checks: next },
+          }),
+      });
       return;
+    }
+    if (kind !== "character" || !decisions?.targetPoint) return;
     const state = character?.states.find(
       (s) => s.name === decisions.element?.stateName,
     );
@@ -285,6 +315,16 @@ export function RevisionView({
             />
           )}
 
+          {result && (kind === "object" || kind === "restyle") && (
+            <ResultChecksPanel
+              revisionId={revision.id}
+              stored={checks}
+              characterName={null}
+              canCheck
+              preflight={null}
+            />
+          )}
+
           {result && kind === "character" && (
             <ResultChecksPanel
               revisionId={revision.id}
@@ -417,9 +457,7 @@ function PendingStage({
                 : phase === "generating"
                   ? job?.stage
                     ? `${job.stage}…`
-                    : kind === "background"
-                      ? "Replacing the background…"
-                      : "Recasting the character…"
+                    : GENERATING[kind]
                   : "Waiting for a free slot…"}
           </p>
           {!failed && (
@@ -509,7 +547,7 @@ function DecisionList({
           {decisions.element && (
             <div>
               <dt className="text-xs text-muted-foreground">
-                {kind === "background" ? "Location" : "Character"}
+                {ELEMENT_ROLE[kind]}
               </dt>
               <dd className="mt-0.5">
                 {decisions.element.name}
@@ -525,6 +563,23 @@ function DecisionList({
                   {decisions.element.referenceCount === 1
                     ? "reference"
                     : "references"}
+                </span>
+              </dd>
+            </div>
+          )}
+          {decisions.draft?.original && (
+            <div>
+              <dt className="text-xs text-muted-foreground">Replaced</dt>
+              <dd className="mt-0.5">{decisions.draft.original}</dd>
+            </div>
+          )}
+          {decisions.draft?.angle && (
+            <div>
+              <dt className="text-xs text-muted-foreground">New angle</dt>
+              <dd className="mt-0.5">
+                {RESTAGE_ANGLES[decisions.draft.angle].label}
+                <span className="block text-xs text-muted-foreground">
+                  {RESTAGE_ANGLES[decisions.draft.angle].description}
                 </span>
               </dd>
             </div>
@@ -563,11 +618,13 @@ function DecisionList({
                 </span>
               ))}
             </dd>
-            <dd className="mt-1.5 text-xs text-muted-foreground">
-              {decisions.allowIntegration
-                ? "Scoped integration allowed: shadows, edge light, colour match."
-                : "No integration changes allowed."}
-            </dd>
+            {(kind === "background" || kind === "character") && (
+              <dd className="mt-1.5 text-xs text-muted-foreground">
+                {decisions.allowIntegration
+                  ? "Scoped integration allowed: shadows, edge light, colour match."
+                  : "No integration changes allowed."}
+              </dd>
+            )}
           </div>
           {decisions.estimate && (
             <div>

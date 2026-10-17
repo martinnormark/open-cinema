@@ -207,6 +207,7 @@ export * from "./elements";
 export * from "./replacement";
 export * from "./workflows";
 export * from "./sequences";
+export * from "./world";
 export * from "./direction";
 export * from "./capabilities";
 export * from "./recipes";

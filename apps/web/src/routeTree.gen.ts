@@ -17,6 +17,7 @@ import { Route as ProjectsRouteImport } from './routes/projects'
 import { Route as RecipesRouteImport } from './routes/recipes'
 import { Route as SequencesRouteImport } from './routes/sequences'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as WorldRouteImport } from './routes/world'
 import { Route as ApiHealthRouteImport } from './routes/api.health'
 import { Route as ElementsIndexRouteImport } from './routes/elements.index'
 import { Route as ElementsElementIdRouteImport } from './routes/elements.$elementId'
@@ -34,6 +35,7 @@ import { Route as ApiJobsOutputRouteImport } from './routes/api.jobs.output'
 import { Route as ApiJobsStreamRouteImport } from './routes/api.jobs.stream'
 import { Route as ApiMediaIdRouteImport } from './routes/api.media.$id'
 import { Route as ApiMediaUploadRouteImport } from './routes/api.media.upload'
+import { Route as ApiWorldExportRouteImport } from './routes/api.world.export'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -73,6 +75,11 @@ const SequencesRoute = SequencesRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WorldRoute = WorldRouteImport.update({
+  id: '/world',
+  path: '/world',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiHealthRoute = ApiHealthRouteImport.update({
@@ -160,6 +167,11 @@ const ApiMediaUploadRoute = ApiMediaUploadRouteImport.update({
   path: '/api/media/upload',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWorldExportRoute = ApiWorldExportRouteImport.update({
+  id: '/api/world/export',
+  path: '/api/world/export',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -170,6 +182,7 @@ export interface FileRoutesByFullPath {
   '/recipes': typeof RecipesRouteWithChildren
   '/sequences': typeof SequencesRouteWithChildren
   '/settings': typeof SettingsRoute
+  '/world': typeof WorldRoute
   '/api/health': typeof ApiHealthRoute
   '/elements/$elementId': typeof ElementsElementIdRoute
   '/elements/new': typeof ElementsNewRoute
@@ -187,12 +200,14 @@ export interface FileRoutesByFullPath {
   '/api/jobs/stream': typeof ApiJobsStreamRoute
   '/api/media/$id': typeof ApiMediaIdRoute
   '/api/media/upload': typeof ApiMediaUploadRoute
+  '/api/world/export': typeof ApiWorldExportRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
   '/library': typeof LibraryRoute
   '/settings': typeof SettingsRoute
+  '/world': typeof WorldRoute
   '/api/health': typeof ApiHealthRoute
   '/elements/$elementId': typeof ElementsElementIdRoute
   '/elements/new': typeof ElementsNewRoute
@@ -210,6 +225,7 @@ export interface FileRoutesByTo {
   '/api/jobs/stream': typeof ApiJobsStreamRoute
   '/api/media/$id': typeof ApiMediaIdRoute
   '/api/media/upload': typeof ApiMediaUploadRoute
+  '/api/world/export': typeof ApiWorldExportRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -221,6 +237,7 @@ export interface FileRoutesById {
   '/recipes': typeof RecipesRouteWithChildren
   '/sequences': typeof SequencesRouteWithChildren
   '/settings': typeof SettingsRoute
+  '/world': typeof WorldRoute
   '/api/health': typeof ApiHealthRoute
   '/elements/$elementId': typeof ElementsElementIdRoute
   '/elements/new': typeof ElementsNewRoute
@@ -238,6 +255,7 @@ export interface FileRoutesById {
   '/api/jobs/stream': typeof ApiJobsStreamRoute
   '/api/media/$id': typeof ApiMediaIdRoute
   '/api/media/upload': typeof ApiMediaUploadRoute
+  '/api/world/export': typeof ApiWorldExportRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -250,6 +268,7 @@ export interface FileRouteTypes {
     | '/recipes'
     | '/sequences'
     | '/settings'
+    | '/world'
     | '/api/health'
     | '/elements/$elementId'
     | '/elements/new'
@@ -267,12 +286,14 @@ export interface FileRouteTypes {
     | '/api/jobs/stream'
     | '/api/media/$id'
     | '/api/media/upload'
+    | '/api/world/export'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/activity'
     | '/library'
     | '/settings'
+    | '/world'
     | '/api/health'
     | '/elements/$elementId'
     | '/elements/new'
@@ -290,6 +311,7 @@ export interface FileRouteTypes {
     | '/api/jobs/stream'
     | '/api/media/$id'
     | '/api/media/upload'
+    | '/api/world/export'
   id:
     | '__root__'
     | '/'
@@ -300,6 +322,7 @@ export interface FileRouteTypes {
     | '/recipes'
     | '/sequences'
     | '/settings'
+    | '/world'
     | '/api/health'
     | '/elements/$elementId'
     | '/elements/new'
@@ -317,6 +340,7 @@ export interface FileRouteTypes {
     | '/api/jobs/stream'
     | '/api/media/$id'
     | '/api/media/upload'
+    | '/api/world/export'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -328,6 +352,7 @@ export interface RootRouteChildren {
   RecipesRoute: typeof RecipesRouteWithChildren
   SequencesRoute: typeof SequencesRouteWithChildren
   SettingsRoute: typeof SettingsRoute
+  WorldRoute: typeof WorldRoute
   ApiHealthRoute: typeof ApiHealthRoute
   RevisionsRevisionIdRoute: typeof RevisionsRevisionIdRoute
   RevisionsNewRoute: typeof RevisionsNewRoute
@@ -335,6 +360,7 @@ export interface RootRouteChildren {
   ApiJobsStreamRoute: typeof ApiJobsStreamRoute
   ApiMediaIdRoute: typeof ApiMediaIdRoute
   ApiMediaUploadRoute: typeof ApiMediaUploadRoute
+  ApiWorldExportRoute: typeof ApiWorldExportRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -393,6 +419,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/world': {
+      id: '/world'
+      path: '/world'
+      fullPath: '/world'
+      preLoaderRoute: typeof WorldRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/health': {
@@ -514,6 +547,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMediaUploadRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/world/export': {
+      id: '/api/world/export'
+      path: '/api/world/export'
+      fullPath: '/api/world/export'
+      preLoaderRoute: typeof ApiWorldExportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -585,6 +625,7 @@ const rootRouteChildren: RootRouteChildren = {
   RecipesRoute: RecipesRouteWithChildren,
   SequencesRoute: SequencesRouteWithChildren,
   SettingsRoute: SettingsRoute,
+  WorldRoute: WorldRoute,
   ApiHealthRoute: ApiHealthRoute,
   RevisionsRevisionIdRoute: RevisionsRevisionIdRoute,
   RevisionsNewRoute: RevisionsNewRoute,
@@ -592,6 +633,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiJobsStreamRoute: ApiJobsStreamRoute,
   ApiMediaIdRoute: ApiMediaIdRoute,
   ApiMediaUploadRoute: ApiMediaUploadRoute,
+  ApiWorldExportRoute: ApiWorldExportRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -7,11 +7,7 @@ import {
   ltxVideoWorkflow,
   performanceTransferWorkflow,
 } from "./definitions";
-import {
-  objectSwapWorkflow,
-  restageWorkflow,
-  restyleWorkflow,
-} from "./revision-modes";
+import { objectSwapWorkflow, restyleWorkflow } from "./revision-modes";
 import type { WorkflowDefinition, WorkflowStage } from "./types";
 
 export type {
@@ -86,7 +82,6 @@ export {
 export {
   describeObject,
   objectSwapWorkflow,
-  restageWorkflow,
   restyleWorkflow,
   thingReferences,
 } from "./revision-modes";
@@ -97,12 +92,7 @@ export {
   LTX_RECAST_LIMITS,
   LTX_RECAST_MODELS,
 } from "./ltx-recast";
-export {
-  crossViewPrompt,
-  ltxCameraGraph,
-  ltxRestageGraph,
-  LTX_RESTAGE_LIMITS,
-} from "./ltx-camera";
+export { ltxCameraGraph } from "./ltx-camera";
 
 type Registry = { [K in WorkflowKind]?: WorkflowDefinition<K> };
 
@@ -120,7 +110,8 @@ const registry: Registry = {
   "video.performance-transfer": performanceTransferWorkflow,
   "video.object-swap": objectSwapWorkflow,
   "video.restyle": restyleWorkflow,
-  "video.restage": restageWorkflow,
+  // "video.restage" is off: its only model was a community IC-LoRA, and the
+  // app uses no LoRA made by someone else (docs/third-party-ip.md).
 };
 
 export function getWorkflowDefinition<K extends WorkflowKind>(

@@ -2,7 +2,6 @@ import { expect, it } from "vitest";
 import {
   ltxVideoInputsSchema,
   objectSwapInputsSchema,
-  restageInputsSchema,
   restyleInputsSchema,
   type ResolvedMention,
 } from "@open-cinema/contracts";
@@ -160,26 +159,8 @@ it("restyles from a style image or from words alone, but not from nothing", asyn
   await expect(definition.build(nothing, context)).rejects.toThrow(/style/);
 });
 
-it("re-stages a take with the CrossView IC-LoRA and the angle in its prompt", async () => {
-  const definition = getWorkflowDefinition("video.restage")!;
-  const inputs = restageInputsSchema.parse({
-    source,
-    angle: "low-angle",
-    preservation: { preserve: ["performance"] },
-  });
-  const request = (await definition.build(
-    inputs,
-    context,
-  )) as CloudWorkflowRequest;
-  expectWired(request, definition.cloudOutputNodes!);
-  const loras = ofType(request, "LoraLoaderModelOnly").map(
-    (n) => n.inputs.lora_name,
-  );
-  expect(loras.some((name) => String(name).includes("CrossView"))).toBe(true);
-  const prompts = ofType(request, "CLIPTextEncode").map((n) =>
-    String(n.inputs.text),
-  );
-  expect(prompts.some((p) => p.startsWith("crossview."))).toBe(true);
+it("does not run Re-stage, whose only model is someone else's LoRA", () => {
+  expect(getWorkflowDefinition("video.restage")).toBeNull();
 });
 
 it("runs a camera move on Cloud and leaves free-camera LTX on Router", async () => {

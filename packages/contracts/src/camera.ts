@@ -65,9 +65,10 @@ export const CAMERA_MOVES: Record<
 };
 
 /**
- * New angles for re-staging a take, in the vocabulary the CrossView-Prompt
- * IC-LoRA was trained on. Its cameras covered a frontal sector of about ±60°,
- * so there is no reverse angle, and single steps hold up best.
+ * New angles for re-staging a take, as azimuth, elevation and distance steps.
+ * Re-stage is off until it runs on a model of our own: the community IC-LoRA
+ * it was built on is someone else's IP (docs/third-party-ip.md). The angles
+ * stay as the brief for that model.
  */
 export const restageAngleSchema = z.enum([
   "closer",

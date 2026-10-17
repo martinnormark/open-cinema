@@ -1,7 +1,6 @@
 /**
  * Shared pieces of the open-weights LTX graphs that run on Comfy Cloud:
- * camera moves (./ltx-camera.ts), re-staging (./ltx-restage.ts) and the
- * keyframe edits behind Object Swap and Restyle (./ltx-edit.ts).
+ * camera moves (./ltx-camera.ts) and the keyframe edits behind Object Swap and Restyle (./ltx-edit.ts).
  *
  * Every graph reads its media through named loader nodes and saves its result
  * through named SaveVideo / SaveImage nodes, so the same graph runs through the
@@ -28,8 +27,6 @@ export const LTX23_MODELS = {
   textEncoder: "gemma_3_12B_it_fp4_mixed.safetensors",
   /** Lightricks' union IC-LoRA: depth, pose or edges, references at half size. */
   unionControl: "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors",
-  /** Cseti's CrossView-Prompt IC-LoRA (v0.9): the same take from a new angle. */
-  crossView: "LTX2.3-22B_IC-LoRA-CrossView-Prompt_v0.9_13700.safetensors",
 } as const;
 export const FLUX2_KLEIN_MODELS = {
   unet: "flux-2-klein-9b.safetensors",

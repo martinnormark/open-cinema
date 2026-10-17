@@ -74,6 +74,11 @@ async function readDecisions(
 }
 
 /** Post-run likeness and bystander checks, measured in the browser once per result. */
+const CHECKED_KINDS = new Set([
+  "video.character-replace",
+  "video.object-swap",
+  "video.restyle",
+]);
 const checksKey = (ownerId: string, revisionId: string) =>
   `revisions/${ownerId}/${revisionId}/checks.json`;
 
@@ -108,8 +113,7 @@ export const saveRevisionChecks = createServerFn({ method: "POST" })
       { ownerId: session.userId },
       data.revisionId,
     );
-    if (!revision || revision.workflowKind !== "video.character-replace")
-      return false;
+    if (!revision || !CHECKED_KINDS.has(revision.workflowKind)) return false;
     await env.GENERATED_ASSETS.put(
       checksKey(session.userId, revision.id),
       JSON.stringify(data.checks),
@@ -224,10 +228,9 @@ export const getRevisionView = createServerFn({ method: "GET" })
       signedIn: true as const,
       revision,
       project,
-      checks:
-        revision.workflowKind === "video.character-replace"
-          ? await readChecks(session.userId, revision.id)
-          : null,
+      checks: CHECKED_KINDS.has(revision.workflowKind)
+        ? await readChecks(session.userId, revision.id)
+        : null,
       decisions:
         history.find((entry) => entry.revision.id === revision.id)?.decisions ??
         (await readDecisions(session.userId, revision.id)),

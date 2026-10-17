@@ -27,7 +27,11 @@ Primary entry points: [developer documentation](https://docs.comfy.org/developme
 - [Foundation](foundation.md): contracts, persistence, workflow dispatch, and how to add a workflow kind.
 - [Character sheets](character-sheets.md): the three-panel sheet, close portraits with and without a smile, states as sheets of their own, and how heads are removed from the full-body panels.
 - [Character recast on LTX 2.5](recast-ltx.md): an all-Lightricks open-weights recast graph, its live comparison with Kling, and the proposal for our own recast IC-LoRA.
+- [Camera moves, Object Swap and Restyle](revision-modes.md): the FLUX and LTX graphs on Comfy Cloud, their guardrails, check runs and limits.
+- [Third-party IP](third-party-ip.md): every model and LoRA the app uses, its provider and licence, and what the no-borrowed-IP rule removed.
 - [Reuse a performance](performance-transfer.md): the LTX 2.3 Union Control pose graph on Comfy Cloud, its limits and the live run.
+- [Sequences](sequences.md): planning shots from an idea, keyframe and motion approval per shot, continuing from the last frame, playback and the shot list.
+- [World bundles](world-bundles.md): saving Elements, recipes, a project's look and its sequences as one file, and bringing it into another studio.
 - [Media library and uploads](library.md): upload path, limits, the picker and how other features use uploads as sources and references.
 - [Phase 0: background replacement](phase0-background.md): evaluation results, supported envelope, turnaround, cost and the MVP release-bar call.
 - [Background replacement job](background-job.md): the staged job (Kling edit, matte, foreground lock and conform as Comfy Cloud graphs), its variants, and how to check the graphs locally.

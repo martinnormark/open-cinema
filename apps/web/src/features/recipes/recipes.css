@@ -23,6 +23,10 @@
   .recipe-tile:nth-child(5):last-child {
     grid-column: span 2;
   }
+  /* Keeps the widened frame as tall as its neighbour's 16:10. */
+  .recipe-tile:nth-child(5):last-child .recipe-frame {
+    aspect-ratio: 33 / 10;
+  }
 }
 .recipe-frame {
   position: relative;

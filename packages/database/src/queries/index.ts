@@ -18,3 +18,4 @@ export {
 } from "./elements";
 export { getRevision, getRevisionForJob, listRevisions } from "./revisions";
 export { getSequence, getSequenceForShot, listSequences } from "./sequences";
+export { collectWorld, type WorldFile } from "./world";

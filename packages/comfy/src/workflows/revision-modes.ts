@@ -8,10 +8,7 @@ import {
   LTX_CAMERA_MEDIA_INPUTS,
   LTX_CAMERA_MODEL_ID,
   LTX_CAMERA_OUTPUT_NODES,
-  LTX_RESTAGE_MEDIA_INPUTS,
-  LTX_RESTAGE_MODEL_ID,
   ltxCameraGraph,
-  ltxRestageGraph,
 } from "./ltx-camera";
 import {
   LTX_EDIT_LIMITS,
@@ -238,36 +235,6 @@ export const restyleWorkflow: WorkflowDefinition<"video.restyle"> = {
   provider: () => "cloud-workflow",
   cloudOutputNodes: LTX_EDIT_OUTPUT_NODES,
   build: restyleRequest,
-  outputs: noRouterOutputs,
-};
-
-export const restageWorkflow: WorkflowDefinition<"video.restage"> = {
-  kind: "video.restage",
-  displayModel: "LTX 2.3 CrossView",
-  deadlineMs: 45 * 60_000,
-  model: () => LTX_RESTAGE_MODEL_ID,
-  provider: () => "cloud-workflow",
-  cloudOutputNodes: LTX_CAMERA_OUTPUT_NODES,
-  async build(inputs, context) {
-    return {
-      model: LTX_RESTAGE_MODEL_ID,
-      input: {
-        graph: ltxRestageGraph({
-          angle: inputs.angle,
-          description: inputs.prompt ?? "",
-          seed: seedFrom(JSON.stringify(inputs)),
-        }),
-        media: [
-          await cloudMedia(
-            context,
-            LTX_RESTAGE_MEDIA_INPUTS.source,
-            inputs.source,
-            "source",
-          ),
-        ],
-      },
-    };
-  },
   outputs: noRouterOutputs,
 };
 

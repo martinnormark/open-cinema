@@ -17,12 +17,50 @@ interface Line {
 
 const pct = (value: number) => `${Math.round(value * 100)}%`;
 
+/** For a swap or restyle, which should leave every person as they were. */
+function describePeople(checks: ResultChecks): Line[] {
+  const changed = checks.bystanders.filter((b) => b.changed);
+  if (changed.length)
+    return [
+      {
+        tone: "warn",
+        title:
+          changed.length === 1
+            ? "A person changed"
+            : `${changed.length} people changed`,
+        detail:
+          "Their faces no longer match the original. Compare them with the wipe before keeping it.",
+      },
+    ];
+  if (checks.bystanders.length)
+    return [
+      {
+        tone: "ok",
+        title:
+          checks.bystanders.length === 1
+            ? "The person is unchanged"
+            : `All ${checks.bystanders.length} people are unchanged`,
+        detail: `Lowest face match to the original: ${pct(Math.min(...checks.bystanders.map((b) => b.similarity)))}.`,
+      },
+    ];
+  return [
+    {
+      tone: "muted",
+      title: "No faces compared",
+      detail:
+        "No face was seen clearly in both clips. Check the people yourself.",
+    },
+  ];
+}
+
 /** What the post-run checks found, in the creator's terms. */
 export function describeChecks(
   checks: ResultChecks,
-  characterName: string,
+  /** Null for a revision that recasts no one. */
+  characterName: string | null,
   preflight: Preflight | null,
 ): Line[] {
+  if (characterName === null) return describePeople(checks);
   const lines: Line[] = [];
   if (checks.likenessVerdict === "unmeasured")
     lines.push({
@@ -97,7 +135,7 @@ export function ResultChecksPanel({
 }: {
   revisionId: string;
   stored: ResultChecks | null;
-  characterName: string;
+  characterName: string | null;
   canCheck: boolean;
   preflight: Preflight | null;
 }) {
@@ -166,7 +204,9 @@ export function ResultChecksPanel({
             aria-hidden="true"
             className="shot-check-spin size-3.5"
           />
-          Comparing faces with the original and {characterName}…
+          {characterName
+            ? `Comparing faces with the original and ${characterName}…`
+            : "Comparing faces with the original…"}
         </p>
       )}
       <p className="mt-3 text-[0.6875rem] leading-4 text-subtle-foreground">
