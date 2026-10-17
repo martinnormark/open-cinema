@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { env, waitUntil } from "cloudflare:workers";
+import { env } from "cloudflare:workers";
 import { storeUpload, UploadError, uploadObjectKey } from "@open-cinema/assets";
 import { mediaKindFor } from "@open-cinema/contracts";
 import { createDatabase } from "@open-cinema/database";
@@ -10,7 +10,6 @@ import {
 } from "@open-cinema/database/mutations";
 import { requireSameOrigin, requireSession } from "@/server/session";
 import { assetToItem } from "@/server/media-items";
-import { getCoordinator } from "@/server/jobs";
 import { MAX_VIDEO_SECONDS } from "@/features/library/model";
 
 function dimension(value: string | null) {
@@ -109,14 +108,6 @@ async function upload(request: Request) {
     );
     const asset = await markMediaAssetReady(db, scope, id, stored);
     if (asset?.status !== "ready") throw new Error("Upload was not recorded");
-    // The poster is made after the response; a thumbnail requested meanwhile
-    // waits for the same render (see /api/media/<id>?variant=poster).
-    if (video)
-      waitUntil(
-        getCoordinator(session.userId)
-          .ensurePoster(scope, { type: "media-asset", assetId: id })
-          .catch(() => null),
-      );
     return json(assetToItem(asset), 201);
   } catch (error) {
     if (pending) await markMediaAssetFailed(db, scope, id).catch(() => {});

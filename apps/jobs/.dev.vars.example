@@ -13,11 +13,6 @@ COMFY_API_KEY=""
 # The signing secret is production-only: `wrangler secret put MEDIA_SIGNING_SECRET`
 # with the web Worker's LOCAL_SESSION_SECRET. .dev.vars does not load it.
 
-# Development only: the media server that locks and conforms background
-# replacements (docs/background-job.md). `wrangler dev` does not run the
-# container; start `node apps/jobs/media/server.mjs` or the Docker image.
-# MEDIA_ORIGIN="http://127.0.0.1:8080"
-
 # Jobs one creator may run at Router or Comfy Cloud at once, 1 to 4. Unset
 # means one, so a recast waits behind a background job. Raising it spends
 # credits faster. Set it in production under the Worker's variables.

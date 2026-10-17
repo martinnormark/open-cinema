@@ -12,7 +12,7 @@ import {
 } from "@open-cinema/comfy";
 import { createDatabase } from "@open-cinema/database";
 import { resolveAssetRef } from "@open-cinema/database/queries";
-import { renderMedia } from "./media";
+import { renderCloudMedia } from "./media";
 
 /** Optional deployment settings for provider-fetchable upload links. */
 interface MediaLinkEnv {
@@ -27,7 +27,8 @@ export class AssetUnavailableError extends Error {}
 
 /**
  * A clip whose pixels are not square (e.g. a 639:640 sample aspect). Kling
- * answers those with a bare provider_error, so they are conformed first.
+ * answers those with a bare provider_error, so they are conformed first. The
+ * browser converts them at upload; this covers clips it could not convert.
  */
 export function needsSquarePixels(pixelAspect: number | null | undefined) {
   return pixelAspect != null && Math.abs(pixelAspect - 1) > 0.001;
@@ -59,7 +60,7 @@ export async function storedAsset(
         r2Key: own.r2Key!,
         mediaType: own.mediaType,
         sizeBytes: own.sizeBytes,
-        // Outputs the media container wrote have square pixels.
+        // Generated outputs have square pixels.
         pixelAspect: null,
         posterKey: own.posterKey ?? null,
       };
@@ -118,12 +119,20 @@ export function createAssetResolver(
         let size: number;
         let contentType = stored.mediaType;
         if (square) {
-          // Resampled to its display size with square pixels; see media/server.mjs.
-          ({ body, size } = await renderMedia(
+          // Resampled to its display size with square pixels as a Comfy Cloud
+          // graph (packages/comfy/src/workflows/media-graphs.ts).
+          ({ body, size } = await renderCloudMedia(
             env,
             "square",
-            [{ name: "source", r2Key: stored.r2Key }],
+            [
+              {
+                name: "source",
+                r2Key: stored.r2Key,
+                mediaType: stored.mediaType,
+              },
+            ],
             signal,
+            stored.pixelAspect,
           ));
           contentType = "video/mp4";
         } else {

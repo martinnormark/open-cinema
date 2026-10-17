@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { useGeneration } from "@/features/generation/store";
-import { useLibrary } from "@/features/library";
+import { repairOnError, useLibrary } from "@/features/library";
 import { cancelGeneration, reconcileGeneration } from "@/server/functions";
 import {
   decideRevision,
@@ -396,6 +396,7 @@ function PendingStage({
           src={posterUrl(revision.source)}
           alt=""
           decoding="async"
+          onError={repairOnError}
           className={cn(
             "absolute inset-0 size-full object-contain transition-opacity duration-(--duration-slow)",
             failed ? "opacity-40" : "opacity-55",

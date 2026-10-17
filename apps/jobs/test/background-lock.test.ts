@@ -5,15 +5,7 @@ import {
   runDurableObjectAlarm,
   runInDurableObject,
 } from "cloudflare:test";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from "vitest";
 import { setupNetwork } from "@msw/cloudflare";
 import { http, HttpResponse } from "msw";
 import { resultOutputs, type CommandResult } from "@open-cinema/contracts";
@@ -153,27 +145,6 @@ it("locks the source performers over Kling's edit, conforms both variants, and p
   });
   asset(editUrl, edit, "video/mp4");
   asset(matteUrl, matte, "video/webm");
-  // Posters come from the media container; the lock and conform from Cloud.
-  const media: { operation: string; parts: string; body: Uint8Array }[] = [];
-  network.use(
-    http.post(
-      "http://127.0.0.1:8791/:operation",
-      async ({ request, params }) => {
-        const operation = String(params.operation) as keyof typeof rendered;
-        media.push({
-          operation,
-          parts: request.headers.get("x-media-parts") ?? "",
-          body: new Uint8Array(await request.arrayBuffer()),
-        });
-        return new HttpResponse(rendered[operation], {
-          headers: {
-            "Content-Type": "video/mp4",
-            "Content-Length": String(rendered[operation].length),
-          },
-        });
-      },
-    ),
-  );
   const cloud = cloudMedia(rendered);
   network.use(...cloud.handlers);
 
@@ -231,15 +202,6 @@ it("locks the source performers over Kling's edit, conforms both variants, and p
   ]);
   expect(cloud.runs[0]!.parts).toEqual({ source: take, edit, matte });
   expect(cloud.runs[0]!.graph.result!.class_type).toBe("ImageCompositeMasked");
-  // Saving the result makes each variant's poster, so it shows at once.
-  await vi.waitFor(() => expect(media).toHaveLength(2));
-  expect(media.map((m) => `${m.operation}:${m.parts}`).sort()).toEqual(
-    [
-      `poster:source=${rendered.lock.length}`,
-      `poster:source=${rendered.conform.length}`,
-    ].sort(),
-  );
-
   expect(done.outputs.map((o) => o.providerAssetId)).toEqual([
     "v1",
     "matte:video",

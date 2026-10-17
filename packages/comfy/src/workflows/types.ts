@@ -42,7 +42,7 @@ export interface StageContext extends BuildContext {
   saved: readonly string[];
 }
 
-/** Media steps: lock and conform run as Comfy Cloud graphs (./media-graphs.ts); square also runs in the jobs media container. */
+/** Media steps that run as Comfy Cloud graphs (./media-graphs.ts). The browser squares pixels at upload; `square` covers clips it could not. */
 export type MediaOperation = "lock" | "conform" | "square";
 /** One media step that produces one output from named media parts. */
 export interface MediaTask {

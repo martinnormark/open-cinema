@@ -93,60 +93,6 @@ export function posterObjectKey(ownerId: string, ref: AssetRef, r2Key: string) {
     : `${r2Key}/poster`;
 }
 
-/** Facts the media container measured while making a poster, kept on the object. */
-export interface PosterFacts {
-  width?: number | undefined;
-  height?: number | undefined;
-  durationMs?: number | undefined;
-}
-function posterFacts(object: R2Object): PosterFacts {
-  const read = (name: string) => {
-    const n = Number(object.customMetadata?.[name]);
-    return Number.isSafeInteger(n) && n > 0 ? n : undefined;
-  };
-  return {
-    width: read("width"),
-    height: read("height"),
-    durationMs: read("durationMs"),
-  };
-}
-
-/** A poster already stored for this video, with what was measured making it. */
-export async function storedPoster(bucket: R2Bucket, key: string) {
-  const object = await bucket.head(key);
-  return object ? posterFacts(object) : null;
-}
-
-/** Saves the media container's poster still under `key`. */
-export async function storeRenderedPoster(
-  bucket: R2Bucket,
-  key: string,
-  ownerId: string,
-  rendered: { body: ReadableStream<Uint8Array>; size: number },
-  facts: PosterFacts,
-): Promise<PosterFacts> {
-  if (rendered.size <= 0 || rendered.size > UPLOAD_LIMITS.poster) {
-    await rendered.body.cancel();
-    throw new Error("Invalid poster");
-  }
-  const { readable, writable } = new FixedLengthStream(rendered.size);
-  const [object] = await Promise.all([
-    bucket.put(key, readable, {
-      httpMetadata: { contentType: "image/webp" },
-      customMetadata: {
-        ownerId,
-        ...Object.fromEntries(
-          Object.entries(facts)
-            .filter(([, value]) => value !== undefined)
-            .map(([name, value]) => [name, String(value)]),
-        ),
-      },
-    }),
-    rendered.body.pipeTo(writable),
-  ]);
-  return posterFacts(object);
-}
-
 function metadata(object: R2Object, kind: UploadKind): StoredUpload {
   return {
     r2Key: object.key,
@@ -242,11 +188,14 @@ export async function storeUpload(
   }
 }
 
-/** Small browser-rendered still used for grid thumbnails and video posters. */
+/**
+ * Small browser-rendered still used for grid thumbnails and video posters,
+ * saved under `key` (see `uploadObjectKey` and `posterObjectKey`).
+ */
 export async function storePoster(
   bucket: R2Bucket,
+  key: string,
   ownerId: string,
-  uploadId: string,
   body: ArrayBuffer,
   declaredType: string,
 ): Promise<StoredUpload> {
@@ -257,14 +206,10 @@ export async function storePoster(
     throw new UploadError("The poster is too large.", 413);
   if (!matchesSignature(mediaType, new Uint8Array(body, 0, 16)))
     throw new UploadError("The poster contents do not match its type.", 415);
-  const object = await bucket.put(
-    uploadObjectKey(ownerId, uploadId, "poster"),
-    body,
-    {
-      httpMetadata: { contentType: mediaType },
-      customMetadata: { ownerId, uploadId },
-    },
-  );
+  const object = await bucket.put(key, body, {
+    httpMetadata: { contentType: mediaType },
+    customMetadata: { ownerId },
+  });
   return metadata(object, "image");
 }
 

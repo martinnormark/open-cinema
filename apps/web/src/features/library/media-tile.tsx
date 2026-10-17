@@ -1,8 +1,9 @@
-import { memo, type SyntheticEvent } from "react";
+import { memo } from "react";
 import { Film, ImageIcon, RotateCcw, X } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { formatBytes, formatDuration, type MediaItem } from "./model";
+import { repairOnError } from "./poster-repair";
 import {
   cancelUpload,
   dismissUpload,
@@ -17,21 +18,8 @@ function revealWhenLoaded(img: HTMLImageElement | null) {
 }
 
 /**
- * A video's poster can take a moment on first view (the media container may be
- * starting); one quiet retry covers that before the icon is left in place.
- */
-function retryOnce(event: SyntheticEvent<HTMLImageElement>) {
-  const img = event.currentTarget;
-  if (img.dataset.retried || img.src.startsWith("blob:")) return;
-  img.dataset.retried = "true";
-  const url = new URL(img.src);
-  url.searchParams.set("retry", "1");
-  setTimeout(() => (img.src = url.href), 2000);
-}
-
-/**
  * Fades in over a placeholder icon, which stays while a video's poster is
- * still being made and when a load fails.
+ * still being drawn (an older clip's, on first view) and when a load fails.
  */
 export function Thumbnail({
   src,
@@ -59,7 +47,7 @@ export function Thumbnail({
           decoding="async"
           draggable={false}
           onLoad={(event) => (event.currentTarget.dataset.loaded = "true")}
-          onError={retryOnce}
+          onError={kind === "video" ? repairOnError : undefined}
           className="library-thumb absolute inset-0 size-full object-cover"
         />
       )}
@@ -148,6 +136,7 @@ export const MediaTile = memo(function MediaTile({
 
 const phaseLabel: Record<UploadEntry["phase"], string> = {
   preparing: "Preparing",
+  converting: "Converting",
   uploading: "Uploading",
   finishing: "Saving",
   failed: "Not uploaded",
@@ -159,6 +148,7 @@ export function UploadTile({ uploadKey }: { uploadKey: string }) {
   if (!entry) return null;
   const failed = entry.phase === "failed";
   const percent = Math.round(entry.progress * 100);
+  const metered = entry.phase === "uploading" || entry.phase === "converting";
   return (
     <li className="library-tile library-tile-enter">
       <div className="relative">
@@ -170,8 +160,8 @@ export function UploadTile({ uploadKey }: { uploadKey: string }) {
         <div className="absolute inset-x-3 bottom-3">
           {!failed && (
             <Progress
-              value={entry.phase === "uploading" ? percent : 100}
-              aria-label={`Uploading ${entry.name}`}
+              value={metered ? percent : 100}
+              aria-label={`${phaseLabel[entry.phase]} ${entry.name}`}
               className="bg-background/70 [&>[data-slot=progress-indicator]]:bg-tungsten"
             />
           )}
@@ -209,7 +199,7 @@ export function UploadTile({ uploadKey }: { uploadKey: string }) {
       >
         {failed
           ? entry.error
-          : `${phaseLabel[entry.phase]}${entry.phase === "uploading" ? ` · ${percent}%` : ""}`}
+          : `${phaseLabel[entry.phase]}${metered ? ` · ${percent}%` : ""}`}
       </span>
     </li>
   );

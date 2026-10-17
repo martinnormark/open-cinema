@@ -47,7 +47,7 @@ export const mediaAssetSchema = z.object({
   pixelAspect: z.number().positive().nullable().default(null),
   /** Whether the clip has a sound track; null when it was not measured. */
   hasAudio: z.boolean().nullable().default(null),
-  /** The poster still: browser-rendered for images, ffmpeg's for videos. */
+  /** The poster still, browser-rendered (for a video, a frame drawn with WebCodecs). */
   posterKey: z.string().nullable().default(null),
   createdAt: z.string(),
   updatedAt: z.string(),

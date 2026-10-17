@@ -194,14 +194,6 @@ export interface GenerationCoordinatorApi {
     jobId: string,
     outputId: string,
   ): Promise<JobOutput | null>;
-  /**
-   * Makes a video's poster still with the media container's ffmpeg, once, and
-   * records it with the upload or output. Null when the ref is not a stored video.
-   */
-  ensurePoster(
-    scope: OwnerScope,
-    ref: AssetRef,
-  ): Promise<{ posterKey: string } | null>;
 }
 
 export * from "./media";

@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { deleteMedia, listMedia } from "@/server/media";
-import { probeMedia } from "./media-probe";
+import { probeMedia, type MediaProbe } from "./media-probe";
+import { convertToSquarePixels } from "./video-frames-client";
 import {
   MAX_IMAGE_BYTES,
   MAX_VIDEO_BYTES,
@@ -10,14 +11,15 @@ import {
   type MediaItem,
 } from "./model";
 
-export type UploadPhase = "preparing" | "uploading" | "finishing" | "failed";
+export type UploadPhase =
+  "preparing" | "converting" | "uploading" | "finishing" | "failed";
 export interface UploadEntry {
   key: string;
   file: File;
   name: string;
   kind: "image" | "video";
   phase: UploadPhase;
-  /** 0–1 while uploading. */
+  /** 0–1 while converting or uploading. */
   progress: number;
   previewUrl: string | null;
   error: string | null;
@@ -211,22 +213,33 @@ async function run(entry: UploadEntry) {
     : entry.kind === "image"
       ? URL.createObjectURL(entry.file)
       : null;
+  const { file, pixelAspect, ...size } = await squarePixels(
+    entry,
+    probe,
+    previewUrl,
+  );
+  const width = size.width ?? probe.width;
+  const height = size.height ?? probe.height;
+  if (!state.uploads.some((u) => u.key === entry.key)) {
+    requests.delete(entry.key);
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    return;
+  }
   patchUpload(entry.key, { phase: "uploading", progress: 0, previewUrl });
   try {
     const headers: Record<string, string> = {
-      "Content-Type": entry.file.type,
+      "Content-Type": file.type,
       "X-Media-Filename": encodeURIComponent(entry.name),
     };
-    if (probe.width) headers["X-Media-Width"] = String(probe.width);
-    if (probe.height) headers["X-Media-Height"] = String(probe.height);
+    if (width) headers["X-Media-Width"] = String(width);
+    if (height) headers["X-Media-Height"] = String(height);
     if (probe.durationSeconds)
       headers["X-Media-Duration"] = String(probe.durationSeconds);
     if (probe.fps) headers["X-Media-Fps"] = String(probe.fps);
-    if (probe.pixelAspect)
-      headers["X-Media-Pixel-Aspect"] = String(probe.pixelAspect);
+    if (pixelAspect) headers["X-Media-Pixel-Aspect"] = String(pixelAspect);
     if (probe.hasAudio !== null)
       headers["X-Media-Audio"] = probe.hasAudio ? "1" : "0";
-    const response = await send(entry.key, entry.file, headers);
+    const response = await send(entry.key, file, headers);
     if (response.status !== 201) {
       const message =
         typeof response.body === "object" &&
@@ -239,20 +252,23 @@ async function run(entry: UploadEntry) {
       throw new Error(message);
     }
     const uploaded = mediaItemSchema.parse(response.body);
-    // The server makes a video's poster with ffmpeg; until this page reloads,
-    // the frame the browser already drew stands in for it.
-    const keepPreview = entry.kind === "video" && previewUrl !== null;
+    const posterSaved = probe.poster
+      ? await fetch(`${uploaded.url}?variant=poster`, {
+          method: "PUT",
+          headers: { "Content-Type": probe.poster.type },
+          body: probe.poster,
+        })
+          .then((r) => r.ok)
+          // A missing poster only costs the thumbnail; keep the upload.
+          .catch(() => false)
+      : false;
+    // Until this page reloads, the frame already drawn stands in for a video
+    // poster that did not save; the next view draws it again.
+    const keepPreview =
+      entry.kind === "video" && previewUrl !== null && !posterSaved;
     const item = keepPreview
       ? { ...uploaded, thumbnailUrl: previewUrl }
       : uploaded;
-    if (probe.poster && entry.kind === "image") {
-      await fetch(`${item.url}?variant=poster`, {
-        method: "PUT",
-        headers: { "Content-Type": probe.poster.type },
-        body: probe.poster,
-        // A missing poster only costs the thumbnail; keep the upload.
-      }).catch(() => null);
-    }
     requests.delete(entry.key);
     if (previewUrl && !keepPreview) URL.revokeObjectURL(previewUrl);
     update({
@@ -277,6 +293,43 @@ async function run(entry: UploadEntry) {
     settle(entry.key, null);
   } finally {
     pump();
+  }
+}
+
+/**
+ * Kling refuses clips with non-square pixels, so they are resampled here before
+ * upload. A browser that cannot (no H.264 encoder, an undecodable codec) sends
+ * the original with its pixel aspect, and the job converts it on Comfy Cloud.
+ */
+async function squarePixels(
+  entry: UploadEntry,
+  probe: MediaProbe,
+  previewUrl: string | null,
+): Promise<{
+  file: File;
+  pixelAspect: number | null;
+  width?: number;
+  height?: number;
+}> {
+  const aspect = probe.pixelAspect;
+  if (entry.kind !== "video" || !aspect || Math.abs(aspect - 1) <= 0.001)
+    return { file: entry.file, pixelAspect: aspect };
+  patchUpload(entry.key, { phase: "converting", progress: 0, previewUrl });
+  try {
+    let shown = 0;
+    const squared = await convertToSquarePixels(entry.file, (progress) => {
+      // Whole percents only: one tile render per step, not per frame.
+      const percent = Math.floor(progress * 100);
+      if (percent > shown)
+        patchUpload(entry.key, { progress: (shown = percent) / 100 });
+    });
+    return { ...squared, pixelAspect: null };
+  } catch (error) {
+    console.warn(
+      "Square-pixel conversion failed; uploading the original.",
+      error,
+    );
+    return { file: entry.file, pixelAspect: aspect };
   }
 }
 

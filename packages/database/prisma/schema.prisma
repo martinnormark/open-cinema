@@ -68,7 +68,7 @@ model JobOutput {
   r2Key           String?       @unique
   sizeBytes       Int?
   etag            String?
-  /// Videos: the poster still and the size and length ffmpeg measured making it.
+  /// Videos: the poster still and the size and length the browser measured drawing it.
   posterKey       String?
   width           Int?
   height          Int?

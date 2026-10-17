@@ -1,10 +1,11 @@
-import { readContainerMeta, type ContainerMeta } from "./mp4-meta";
+import { POSTER_EDGE } from "./video-frames";
+import { posterFromElement, readVideo } from "./video-frames-client";
 
 export interface MediaProbe {
   width: number | null;
   height: number | null;
   durationSeconds: number | null;
-  /** Video only, from the MP4/MOV container; null when unknown (WebM). */
+  /** Video only, from the frames' timestamps; null when unknown. */
   fps: number | null;
   /** Sample aspect ratio; 1 means square pixels. */
   pixelAspect: number | null;
@@ -13,12 +14,6 @@ export interface MediaProbe {
 }
 
 const noVideoMeta = { fps: null, pixelAspect: null, hasAudio: null };
-const containerMeta = (file: File): Promise<ContainerMeta | null> =>
-  file.type === "video/mp4" || file.type === "video/quicktime"
-    ? readContainerMeta(file).catch(() => null)
-    : Promise.resolve(null);
-
-const POSTER_EDGE = 640;
 
 function drawPoster(
   source: CanvasImageSource,
@@ -58,65 +53,20 @@ async function probeImage(file: File): Promise<MediaProbe> {
   }
 }
 
-function once(target: HTMLVideoElement, event: string, timeoutMs = 15_000) {
-  return new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error(`${event} timed out`)),
-      timeoutMs,
-    );
-    target.addEventListener(
-      event,
-      () => {
-        clearTimeout(timer);
-        resolve();
-      },
-      { once: true },
-    );
-    target.addEventListener(
-      "error",
-      () => {
-        clearTimeout(timer);
-        reject(new Error("Video could not be decoded"));
-      },
-      { once: true },
-    );
-  });
-}
-
 async function probeVideo(file: File): Promise<MediaProbe> {
-  const meta = containerMeta(file);
-  const url = URL.createObjectURL(file);
-  const video = document.createElement("video");
-  video.muted = true;
-  video.playsInline = true;
-  video.preload = "auto";
-  try {
-    const metadata = once(video, "loadedmetadata");
-    video.src = url;
-    await metadata;
-    const duration = Number.isFinite(video.duration) ? video.duration : null;
-    const seeked = once(video, "seeked");
-    // A frame slightly in avoids black fade-in frames.
-    video.currentTime = Math.min(1, (duration ?? 0) * 0.1);
-    await seeked;
-    const container = await meta;
-    return {
-      // Browsers report the display size, already corrected for pixel aspect.
-      width: video.videoWidth || null,
-      height: video.videoHeight || null,
-      durationSeconds: duration,
-      fps: container?.fps ?? null,
-      pixelAspect: container?.pixelAspect ?? null,
-      hasAudio: container?.hasAudio ?? null,
-      poster: video.videoWidth
-        ? await drawPoster(video, video.videoWidth, video.videoHeight)
-        : null,
-    };
-  } finally {
-    video.removeAttribute("src");
-    video.load();
-    URL.revokeObjectURL(url);
-  }
+  // Mediabunny reads the container without decoding; the poster needs WebCodecs
+  // and falls back to the <video> element's decoder.
+  const read = await readVideo(file).catch(() => null);
+  const poster = read?.poster ?? (await posterFromElement(file));
+  return {
+    width: read?.width ?? poster?.width ?? null,
+    height: read?.height ?? poster?.height ?? null,
+    durationSeconds: read?.durationSeconds ?? poster?.durationSeconds ?? null,
+    fps: read?.fps ?? null,
+    pixelAspect: read?.pixelAspect ?? null,
+    hasAudio: read?.hasAudio ?? null,
+    poster: poster?.blob ?? null,
+  };
 }
 
 /** Browser-side measurements. Failure is non-fatal: the upload proceeds without them. */
@@ -126,15 +76,11 @@ export async function probeMedia(file: File): Promise<MediaProbe> {
       ? await probeVideo(file)
       : await probeImage(file);
   } catch {
-    // Undecodable codec: the container still knows duration and frame size.
-    const meta = await containerMeta(file);
     return {
-      width: meta?.width || null,
-      height: meta?.height || null,
-      durationSeconds: meta?.durationSeconds || null,
-      fps: meta?.fps ?? null,
-      pixelAspect: meta?.pixelAspect ?? null,
-      hasAudio: meta?.hasAudio ?? null,
+      width: null,
+      height: null,
+      durationSeconds: null,
+      ...noVideoMeta,
       poster: null,
     };
   }
