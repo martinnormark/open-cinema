@@ -176,21 +176,31 @@ def lock(clip, pipeline):
     out_dir = os.path.join(ART, "runs", f"{clip}-{pipeline}+lock")
     os.makedirs(out_dir, exist_ok=True)
     out = os.path.join(out_dir, "out0_lock.mp4")
-    cs, cr, cm = cv2.VideoCapture(source_path(clip)), cv2.VideoCapture(res), cv2.VideoCapture(matte)
+    cs, cm = cv2.VideoCapture(source_path(clip)), cv2.VideoCapture(matte)
     fps = cs.get(cv2.CAP_PROP_FPS)
     w, h = int(cs.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cs.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    cr = cv2.VideoCapture(res)
+    r_fps = cr.get(cv2.CAP_PROP_FPS) or fps
+    r_frames = []
+    while True:
+        ok, f = cr.read()
+        if not ok:
+            break
+        r_frames.append(cv2.resize(f, (w, h)))
     raw = out + ".raw.mp4"
     vw = cv2.VideoWriter(raw, cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
-    last_r = last_m = None
+    last_m = None
+    i = 0
     while True:
         ok, s = cs.read()
         if not ok:
             break
-        okr, r = cr.read()
+        # Providers may change the frame rate; pick the result frame nearest in time.
+        r = r_frames[min(len(r_frames) - 1, int(round(i / fps * r_fps)))]
         okm, m = cm.read()
-        r = cv2.resize(r, (w, h)) if okr else last_r
         m = cv2.resize(m, (w, h)) if okm else last_m
-        last_r, last_m = r, m
+        last_m = m
+        i += 1
         a = cv2.GaussianBlur(cv2.cvtColor(m, cv2.COLOR_BGR2GRAY), (5, 5), 0).astype(np.float32)[..., None] / 255.0
         vw.write((s.astype(np.float32) * a + r.astype(np.float32) * (1 - a)).astype(np.uint8))
     vw.release()
@@ -206,8 +216,13 @@ def compare(clip, run_name):
     res = result_video(run_dir)
     if not res:
         return None
-    args = [sys.executable, os.path.join(HERE, "compare.py"), source_path(clip), res, os.path.join(run_dir, "review"), "--label", run_name.split("-", 1)[1]]
+    metrics = os.path.join(run_dir, "review", "metrics.json")
     m = matte_for(clip)
+    inputs = [res, os.path.join(HERE, "compare.py")] + ([m] if m else [])
+    newest_input = max(os.path.getmtime(p) for p in inputs)
+    if os.path.exists(metrics) and os.path.getmtime(metrics) > newest_input:
+        return metrics
+    args = [sys.executable, os.path.join(HERE, "compare.py"), source_path(clip), res, os.path.join(run_dir, "review"), "--label", run_name.split("-", 1)[1]]
     if m:
         args += ["--matte", m]
     subprocess.run(args, check=True, stdout=subprocess.DEVNULL)

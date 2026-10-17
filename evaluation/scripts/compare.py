@@ -96,6 +96,10 @@ def main():
     size = (sp["width"], sp["height"])
     src = frames(args.source)
     res = frames(args.result, size)
+    if res and abs(rp["fps"] - sp["fps"]) > 0.01:
+        # Different frame rates (e.g. a 24 fps provider on a 25 fps source): compare
+        # each source frame with the result frame nearest in time, not by index.
+        res = [res[min(len(res) - 1, int(round(i / sp["fps"] * rp["fps"])))] for i in range(len(src)) if i / sp["fps"] <= rp["duration"] + 1e-6]
     n = min(len(src), len(res))
     mattes = frames(args.matte, size) if args.matte else []
 

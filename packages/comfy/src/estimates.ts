@@ -85,11 +85,13 @@ export function estimateGeneration(
     }
     case "video.background-replace":
       return {
-        // Bria bills 10.55 credits per output second; source length is unknown here.
+        // Kling 3.0 Omni std edit: 5.4 Kling credits for a 6 s 720p clip in Phase 0
+        // (29.54 Router credits each), so ~27 credits per source second. Length is
+        // unknown here. Provider time was 2–4 min; the shared queue added the rest.
         credits: null,
-        seconds: round(60, 600),
-        basis: "heuristic",
-        note: "Charged at 10.55 credits per second of source video.",
+        seconds: round(150, 1800),
+        basis: "observed",
+        note: "About 27 credits per second of source video (Kling 3.0 Omni, 720p).",
       };
     case "video.character-replace":
       return {

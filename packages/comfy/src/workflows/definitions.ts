@@ -1,5 +1,14 @@
 import type { AssetRef } from "@open-cinema/contracts";
 import { fluxImageInput, FLUX_IMAGE_MODEL } from "./flux-image";
+import {
+  backgroundReplaceOutputs,
+  DEFAULT_BACKGROUND_PIPELINE,
+  BACKGROUND_REPLACE_MODELS,
+  klingBackgroundRequest,
+  KLING_EDIT_LIMITS,
+  locationReferences,
+  switchxBackgroundRequest,
+} from "./background-replace";
 import { MAX_REFERENCE_IMAGES } from "./flux-reference";
 import { ltxVideoModel, ltxVideoRequest } from "./ltx-video";
 import {
@@ -121,3 +130,47 @@ export const ltxVideoWorkflow: WorkflowDefinition<"video.ltx"> = {
   },
   outputs: ltxVideoOutputs,
 };
+
+export const backgroundReplaceWorkflow: WorkflowDefinition<"video.background-replace"> =
+  {
+    kind: "video.background-replace",
+    displayModel:
+      DEFAULT_BACKGROUND_PIPELINE === "kling"
+        ? "Kling 3.0 Omni"
+        : "Beeble SwitchX",
+    deadlineMs: 60 * 60_000,
+    model: () => BACKGROUND_REPLACE_MODELS[DEFAULT_BACKGROUND_PIPELINE],
+    async build(inputs, context) {
+      const source = await context.asset(inputs.source);
+      if (!source.publicUrl)
+        throw new Error(
+          "Background replacement needs a public media origin: providers fetch the source clip by URL",
+        );
+      const location = context.mentions.find(
+        (m) => m.elementId === inputs.location?.elementId,
+      );
+      const refs = [
+        ...(inputs.background ? [inputs.background] : []),
+        ...locationReferences(location),
+      ].slice(0, KLING_EDIT_LIMITS.maxReferenceImages);
+      const referenceImages = await Promise.all(
+        refs.map(async (ref) => {
+          const asset = await context.asset(ref);
+          return asset.publicUrl ?? (await asset.dataUri());
+        }),
+      );
+      const media = { videoUrl: source.publicUrl, referenceImages };
+      if (DEFAULT_BACKGROUND_PIPELINE === "switchx") {
+        const matte =
+          inputs.target.type === "mask"
+            ? (await context.asset(inputs.target.mask)).publicUrl
+            : null;
+        return switchxBackgroundRequest(inputs, location, {
+          ...media,
+          matteUrl: matte ?? undefined,
+        });
+      }
+      return klingBackgroundRequest(inputs, location, media);
+    },
+    outputs: backgroundReplaceOutputs,
+  };
