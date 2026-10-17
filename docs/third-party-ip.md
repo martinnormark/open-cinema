@@ -21,18 +21,18 @@ The rule for the competition entry: the app does not rely on other people's IP, 
 
 ## Open weights run on Comfy Cloud
 
-| Model                                                            | Used by                                                           | Provider                                  | Licence                     | Allowed                      |
-| ---------------------------------------------------------------- | ----------------------------------------------------------------- | ----------------------------------------- | --------------------------- | ---------------------------- |
-| LTX-2 19B distilled                                              | Camera moves                                                      | Lightricks                                | LTX-2 Community License     | Yes                          |
-| LTX 2.3 22B distilled                                            | Object Swap, Restyle, Re-stage, performance transfer              | Lightricks                                | LTX-2 Community License     | Yes                          |
-| LTX 2.5 22B distilled, video and audio VAEs                      | Background replacement, LTX path                                  | Lightricks                                | LTX-2.x Community License   | Yes                          |
-| Gemma 3 12B (LTX-2, 2.3) and Gemma 4 12B (LTX 2.5) text encoders | Every LTX graph                                                   | Google, packaged for LTX by Lightricks    | Gemma Terms of Use          | Yes, part of the LTX release |
-| FLUX.2 Klein 9B, FLUX.2 VAE, Qwen 3 8B encoder                   | Object Swap and Restyle keyframe                                  | Black Forest Labs                         | FLUX Non-Commercial License | Yes for the entry; see notes |
-| FLUX 3 Klein, Qwen3-VL 4B encoder                                | Cloud connection check (`flux-klein.ts`)                          | Black Forest Labs, Qwen                   | BFL licence, Apache 2.0     | Yes                          |
-| MoGe-2 ViT-L (`moge_2_vitl_normal_fp16`)                         | Re-stage geometry                                                 | Microsoft Research (Ruicheng Wang et al.) | MIT                         | Yes                          |
-| SAM 3.1 (`sam3.1_multiplex_fp16`)                                | Object Swap composite; the LTX recast experiment                  | Meta                                      | SAM License                 | Yes                          |
-| Depth Anything V2 Large (`depth_anything_v2_vitl`)               | Depth guide for Object Swap, Restyle, performance transfer        | Depth Anything team                       | CC BY-NC 4.0                | Yes for the entry; see notes |
-| DWPose (`dw-ll_ucoco_384`) with YOLOX-L detector                 | Pose guide for performance transfer and the LTX recast experiment | Yang et al., Megvii                       | Apache 2.0                  | Yes                          |
+| Model                                                            | Used by                                                   | Provider                                  | Licence                     | Allowed                      |
+| ---------------------------------------------------------------- | --------------------------------------------------------- | ----------------------------------------- | --------------------------- | ---------------------------- |
+| LTX-2 19B distilled                                              | Camera moves                                              | Lightricks                                | LTX-2 Community License     | Yes                          |
+| LTX 2.3 22B distilled                                            | Object Swap, Restyle, Re-stage, performance transfer      | Lightricks                                | LTX-2 Community License     | Yes                          |
+| LTX 2.5 22B distilled, video and audio VAEs                      | Background replacement, LTX path                          | Lightricks                                | LTX-2.x Community License   | Yes                          |
+| Gemma 3 12B (LTX-2, 2.3) and Gemma 4 12B (LTX 2.5) text encoders | Every LTX graph                                           | Google, packaged for LTX by Lightricks    | Gemma Terms of Use          | Yes, part of the LTX release |
+| FLUX.2 Klein 9B, FLUX.2 VAE, Qwen 3 8B encoder                   | Object Swap and Restyle keyframe                          | Black Forest Labs                         | FLUX Non-Commercial License | Yes for the entry; see notes |
+| FLUX 3 Klein, Qwen3-VL 4B encoder                                | Cloud connection check (`flux-klein.ts`)                  | Black Forest Labs, Qwen                   | BFL licence, Apache 2.0     | Yes                          |
+| MoGe-2 ViT-L (`moge_2_vitl_normal_fp16`)                         | Re-stage geometry                                         | Microsoft Research (Ruicheng Wang et al.) | MIT                         | Yes                          |
+| SAM 3.1 (`sam3.1_multiplex_fp16`)                                | Object Swap composite; the LTX recast experiment          | Meta                                      | SAM License                 | Yes                          |
+| Depth Anything V2 Large (`depth_anything_v2_vitl`)               | Depth guide for Object Swap and Restyle                   | Depth Anything team                       | CC BY-NC 4.0                | Yes for the entry; see notes |
+| DWPose (`dw-ll_ucoco_384`) with YOLOX-L detector                 | Pose guide for the LTX recast experiment (not in the app) | Yang et al., Megvii                       | Apache 2.0                  | Yes                          |
 
 ## Hosted models through Comfy Router
 

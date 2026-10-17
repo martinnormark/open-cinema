@@ -251,7 +251,7 @@ function performance(control: PerformanceControl): WorkflowExport {
   });
   return {
     file: `performance/${control}.api.json`,
-    title: `Performance transfer, ${control === "pose" ? "pose" : "pose and depth"} control`,
+    title: `Performance transfer, ${control === "edges" ? "soft" : "detailed"} edge control`,
     usedBy: `video.performance-transfer (${LTX_PERFORMANCE_MODEL_ID})`,
     ...withFiles(graph, [
       [LTX_PERFORMANCE_MEDIA_INPUTS.source, "source.mp4"],
@@ -306,8 +306,8 @@ export function workflowExports(): WorkflowExport[] {
     edit("swap"),
     edit("restyle"),
     ...(Object.keys(RESTAGE_ANGLES) as RestageAngle[]).map(restage),
-    performance("pose"),
-    performance("pose-depth"),
+    performance("edges"),
+    performance("edges-detailed"),
     recast(),
   ];
 }

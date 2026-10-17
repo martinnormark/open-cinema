@@ -115,7 +115,7 @@ export type CharacterReplaceInputs = z.infer<
   typeof characterReplaceInputsSchema
 >;
 
-export const performanceControlSchema = z.enum(["pose", "pose-depth"]);
+export const performanceControlSchema = z.enum(["edges", "edges-detailed"]);
 export type PerformanceControl = z.infer<typeof performanceControlSchema>;
 
 /**
@@ -137,11 +137,13 @@ export const performanceTransferInputsSchema = z.object({
   /** What the new shot shows. */
   prompt,
   /**
-   * `pose` reads only a skeleton, so the Character's build and outfit are free.
-   * `pose-depth` adds the source's depth for tighter blocking, at the cost of
-   * carrying the original performer's silhouette.
+   * Motion is read as edges traced from each frame, with no third-party
+   * weights. `edges` softens the frame first so mostly outlines and large
+   * shapes guide the motion, leaving the Character's look to the keyframe;
+   * `edges-detailed` keeps finer lines (folds, fingers) for tighter blocking,
+   * at the cost of carrying more of the original performer's look.
    */
-  control: performanceControlSchema.default("pose"),
+  control: performanceControlSchema.default("edges"),
   /** How closely the new clip follows the source's motion. */
   strength: z.number().min(0.3).max(1).default(0.9),
   mentions,
@@ -409,7 +411,7 @@ export const WORKFLOW_DESCRIPTORS = {
     kind: "video.performance-transfer",
     label: "Reuse performance",
     output: "video",
-    models: ["comfy-cloud/ltx-2.3-union-pose"],
+    models: ["comfy-cloud/ltx-2.3-union-edges"],
   },
   "video.object-swap": {
     kind: "video.object-swap",

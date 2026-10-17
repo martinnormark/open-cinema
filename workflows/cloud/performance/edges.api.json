@@ -94,39 +94,26 @@
       "crop": "center"
     }
   },
-  "pose": {
-    "class_type": "DWPreprocessor",
+  "soften": {
+    "class_type": "ImageBlur",
     "inputs": {
       "image": [
         "clip_fit",
         0
       ],
-      "detect_hand": "enable",
-      "detect_body": "enable",
-      "detect_face": "enable",
-      "resolution": 512,
-      "bbox_detector": "yolox_l.torchscript.pt",
-      "pose_estimator": "dw-ll_ucoco_384_bs5.torchscript.pt",
-      "scale_stick_for_xinsr_cn": "disable"
+      "blur_radius": 4,
+      "sigma": 2
     }
   },
-  "pose_fit": {
-    "class_type": "ImageScale",
+  "edges": {
+    "class_type": "Canny",
     "inputs": {
       "image": [
-        "pose",
+        "soften",
         0
       ],
-      "upscale_method": "bilinear",
-      "width": [
-        "out_width",
-        1
-      ],
-      "height": [
-        "out_height",
-        1
-      ],
-      "crop": "disabled"
+      "low_threshold": 0.2,
+      "high_threshold": 0.5
     }
   },
   "checkpoint": {
@@ -244,7 +231,7 @@
         0
       ],
       "image": [
-        "pose_fit",
+        "edges",
         0
       ],
       "frame_idx": 0,
@@ -392,7 +379,7 @@
     "class_type": "CreateVideo",
     "inputs": {
       "images": [
-        "pose_fit",
+        "edges",
         0
       ],
       "fps": [

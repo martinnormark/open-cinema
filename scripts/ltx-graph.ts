@@ -9,6 +9,7 @@
  *   bun scripts/ltx-graph.ts <server> <out-dir> swap source=<clip> ref=<img> original="a red mug" replacement="a brass lantern" [name="Lantern"]
  *   bun scripts/ltx-graph.ts <server> <out-dir> recast source=<clip> ref=<img>[,<img>] [sheet=<img>] box=x,y,w,h \
  *     target="the woman on the left" name=Mara identity="..." wardrobe="..." action="..." [pose=0.9]
+ *   bun scripts/ltx-graph.ts <server> <out-dir> performance source=<clip> prompt="..." [keyframe=<img>] [control=edges|edges-detailed] [strength=0.9]
  *
  * Add submit-only=1 to stop once the server has accepted the graph (a check
  * against a local ComfyUI with placeholder model files).
@@ -25,6 +26,10 @@ import {
   ltxEditPrompts,
 } from "../packages/comfy/src/workflows/ltx-edit";
 import type { Graph } from "../packages/comfy/src/workflows/ltx-graph";
+import {
+  ltxPerformanceGraph,
+  type PerformanceControl,
+} from "../packages/comfy/src/workflows/ltx-performance-transfer";
 import {
   ltxRecastGraph,
   ltxRecastPrompts,
@@ -137,6 +142,16 @@ if (kind === "camera") {
   files.push(["source", "file", args.source!]);
   refs.forEach((path, i) => files.push([`reference_${i}`, "image", path]));
   if (sheet) files.push(["sheet", "image", args.sheet!]);
+} else if (kind === "performance") {
+  graph = ltxPerformanceGraph({
+    prompt: args.prompt ?? "",
+    control: (args.control ?? "edges") as PerformanceControl,
+    strength: Number(args.strength ?? 0.9),
+    keyframeStrength: args.keyframe ? 1 : null,
+    seed,
+  });
+  files.push(["source", "file", args.source!]);
+  if (args.keyframe) files.push(["keyframe", "image", args.keyframe]);
 } else throw new Error(`unknown graph ${kind}`);
 
 for (const [node, field, path] of files) {

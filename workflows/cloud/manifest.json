@@ -498,9 +498,9 @@
     ]
   },
   {
-    "file": "performance/pose.api.json",
-    "title": "Performance transfer, pose control",
-    "usedBy": "video.performance-transfer (comfy-cloud/ltx-2.3-union-pose)",
+    "file": "performance/edges.api.json",
+    "title": "Performance transfer, soft edge control",
+    "usedBy": "video.performance-transfer (comfy-cloud/ltx-2.3-union-edges)",
     "inputs": [
       {
         "node": "source",
@@ -518,17 +518,15 @@
       "save_control"
     ],
     "models": [
-      "dw-ll_ucoco_384_bs5.torchscript.pt",
       "gemma_3_12B_it_fp4_mixed.safetensors",
       "ltx-2.3-22b-distilled-fp8.safetensors",
-      "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors",
-      "yolox_l.torchscript.pt"
+      "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors"
     ]
   },
   {
-    "file": "performance/pose-depth.api.json",
-    "title": "Performance transfer, pose and depth control",
-    "usedBy": "video.performance-transfer (comfy-cloud/ltx-2.3-union-pose)",
+    "file": "performance/edges-detailed.api.json",
+    "title": "Performance transfer, detailed edge control",
+    "usedBy": "video.performance-transfer (comfy-cloud/ltx-2.3-union-edges)",
     "inputs": [
       {
         "node": "source",
@@ -546,12 +544,9 @@
       "save_control"
     ],
     "models": [
-      "depth_anything_v2_vitl.pth",
-      "dw-ll_ucoco_384_bs5.torchscript.pt",
       "gemma_3_12B_it_fp4_mixed.safetensors",
       "ltx-2.3-22b-distilled-fp8.safetensors",
-      "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors",
-      "yolox_l.torchscript.pt"
+      "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors"
     ]
   },
   {

@@ -1,16 +1,18 @@
 /**
  * "Reuse a performance": LTX 2.3 Union Control IC-LoRA, run as a ComfyUI graph
- * on Comfy Cloud. The source clip supplies only motion: DWPose reads a
- * skeleton from every frame, and the IC-LoRA makes a new clip whose body
- * follows that skeleton frame for frame. Who is performing and where comes
+ * on Comfy Cloud. The source clip supplies only motion: ComfyUI's own Canny
+ * node traces edges from every frame, and the IC-LoRA makes a new clip whose
+ * shapes follow those edges frame for frame. No third-party weights are used:
+ * the checkpoint and IC-LoRA are Lightricks', and edge tracing is plain image
+ * processing. Who is performing and where comes
  * from the prompt and a keyframe at frame 0 (a FLUX keyframe the app composes
  * from the Character and Location, or the Character's own reference).
  *
- * A pose skeleton carries no face, hair, wardrobe or build, so the new
- * Character's appearance is free while choreography and timing are the take's.
- * `pose-depth` adds a depth map under the skeleton for tighter blocking; it also
- * carries the source performer's silhouette, so the new Character's build and
- * outline drift toward the original's.
+ * Edges carry the performer's outline, so the new Character's build and
+ * silhouette lean toward the original's. `edges` blurs each frame before
+ * tracing so texture (fabric, hair strands, faces) drops out and mostly
+ * outlines and large shapes remain; the keyframe then decides the look.
+ * `edges-detailed` traces the sharp frame for tighter blocking.
  *
  * The sampling half follows Comfy's own Cloud template `video_ltx2_3_ic_lora`
  * (github.com/Comfy-Org/workflow_templates), itself based on Lightricks'
@@ -18,8 +20,8 @@
  * checkpoint, the fp4 Gemma encoder, the IC-LoRA's own guide parameters read
  * by GetICLoRAParameters, and an 8-step KSampler. Lightricks' example (bf16 dev
  * checkpoint plus the distilled LoRA) crashed the Cloud worker on 2026-10-17;
- * see docs/performance-transfer.md. The control side is the example's DWPose
- * annotator. The source's audio is kept instead of the model's, since the
+ * see docs/performance-transfer.md. The example's DWPose annotator was replaced
+ * by edge tracing so the entry relies on no other lab's weights. The source's audio is kept instead of the model's, since the
  * timing is the take's.
  */
 
@@ -40,11 +42,10 @@ export const LTX_PERFORMANCE_MODELS = {
   textEncoder: LTX23_MODELS.textEncoder,
   /** Depth, pose and edges in one adapter; guides are read at half resolution. */
   unionControlLora: LTX23_MODELS.unionControl,
-  depthModel: "depth_anything_v2_vitl.pth",
 } as const;
 
 /** The pipeline's id in job records; Comfy Cloud runs it, not Router. */
-export const LTX_PERFORMANCE_MODEL_ID = "comfy-cloud/ltx-2.3-union-pose";
+export const LTX_PERFORMANCE_MODEL_ID = "comfy-cloud/ltx-2.3-union-edges";
 
 export const LTX_PERFORMANCE_LIMITS = {
   /** 8n+1 frames; about 4 s at 24 fps keeps one run cheap and inside memory. */
@@ -74,7 +75,16 @@ export const LTX_PERFORMANCE_OUTPUT_NODES = [
   "save_control",
 ] as const;
 
-export type PerformanceControl = "pose" | "pose-depth";
+export type PerformanceControl = "edges" | "edges-detailed";
+
+/** Blur and Canny thresholds per control; softer edges carry less of the original look. */
+export const PERFORMANCE_EDGES = {
+  edges: { blurRadius: 4, sigma: 2, low: 0.2, high: 0.5 },
+  "edges-detailed": { blurRadius: 1, sigma: 0.6, low: 0.4, high: 0.8 },
+} as const satisfies Record<
+  PerformanceControl,
+  { blurRadius: number; sigma: number; low: number; high: number }
+>;
 
 export interface LtxPerformanceGraphOptions {
   prompt: string;
@@ -105,8 +115,8 @@ export function ltxPerformanceGraph(
   const width: Link = ["out_width", 1];
   const height: Link = ["out_height", 1];
   const length: Link = ["frame_count", 1];
-  const control: Link =
-    options.control === "pose-depth" ? ["pose_over_depth", 0] : ["pose_fit", 0];
+  const control: Link = ["edges", 0];
+  const edges = PERFORMANCE_EDGES[options.control];
   const latent: Link =
     options.keyframeStrength === null
       ? ["empty_video", 0]
@@ -157,31 +167,22 @@ export function ltxPerformanceGraph(
         crop: "center",
       },
     },
-    // Body, hands and face landmarks: hands and face carry gesture and
-    // expression timing, not identity.
-    pose: {
-      class_type: "DWPreprocessor",
+    // Softening first drops texture so mostly outlines and large shapes guide
+    // the motion; the Canny node is ComfyUI's own, with no model weights.
+    soften: {
+      class_type: "ImageBlur",
       inputs: {
         image: ["clip_fit", 0],
-        detect_hand: "enable",
-        detect_body: "enable",
-        detect_face: "enable",
-        resolution: 512,
-        // Both stages as TorchScript, so the annotator needs no onnxruntime on the worker.
-        bbox_detector: "yolox_l.torchscript.pt",
-        pose_estimator: "dw-ll_ucoco_384_bs5.torchscript.pt",
-        scale_stick_for_xinsr_cn: "disable",
+        blur_radius: edges.blurRadius,
+        sigma: edges.sigma,
       },
     },
-    // The annotator returns its own resolution; the guide must match the clip.
-    pose_fit: {
-      class_type: "ImageScale",
+    edges: {
+      class_type: "Canny",
       inputs: {
-        image: ["pose", 0],
-        upscale_method: "bilinear",
-        width,
-        height,
-        crop: "disabled",
+        image: ["soften", 0],
+        low_threshold: edges.low,
+        high_threshold: edges.high,
       },
     },
 
@@ -330,37 +331,6 @@ export function ltxPerformanceGraph(
     },
   };
 
-  if (options.control === "pose-depth") {
-    graph.depth = {
-      class_type: "DepthAnythingV2Preprocessor",
-      inputs: {
-        image: ["clip_fit", 0],
-        ckpt_name: LTX_PERFORMANCE_MODELS.depthModel,
-        resolution: 512,
-      },
-    };
-    graph.depth_fit = {
-      class_type: "ImageScale",
-      inputs: {
-        image: ["depth", 0],
-        upscale_method: "bilinear",
-        width,
-        height,
-        crop: "disabled",
-      },
-    };
-    // Screen keeps the skeleton's colours readable over the grey depth.
-    graph.pose_over_depth = {
-      class_type: "ImageBlend",
-      inputs: {
-        image1: ["depth_fit", 0],
-        image2: ["pose_fit", 0],
-        blend_factor: 1,
-        blend_mode: "screen",
-      },
-    };
-  }
-
   if (options.keyframeStrength !== null) {
     graph.keyframe = { class_type: "LoadImage", inputs: { image: "" } };
     graph.keyframe_fit = {
@@ -427,7 +397,7 @@ function describe(mention: ResolvedMention) {
 }
 
 /**
- * The pose carries no identity, so who and where must be in the text: the
+ * Edges carry no identity, so who and where must be in the text: the
  * creator's prompt with mentions expanded, then each Element's description.
  */
 export function performancePrompt(

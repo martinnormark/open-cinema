@@ -88,12 +88,12 @@ const build = async (extra?: Record<string, unknown>) =>
 
 it("is a Cloud graph with no follow-up stages", () => {
   expect(definition.provider?.(inputs())).toBe("cloud-workflow");
-  expect(definition.model(inputs())).toBe("comfy-cloud/ltx-2.3-union-pose");
+  expect(definition.model(inputs())).toBe("comfy-cloud/ltx-2.3-union-edges");
   expect(workflowStages("video.performance-transfer", inputs())).toEqual([]);
   expect(definition.cloudOutputNodes).toEqual(["save_result", "save_control"]);
 });
 
-it("drives LTX 2.3 Union Control with the source's pose and holds a given keyframe", async () => {
+it("drives LTX 2.3 Union Control with the source's edges and holds a given keyframe", async () => {
   const request = await build({
     firstFrame: { type: "media-asset", assetId: "keyframe" },
   });
@@ -119,15 +119,21 @@ it("drives LTX 2.3 Union Control with the source's pose and holds a given keyfra
   expect(node(request, "checkpoint")?.inputs.ckpt_name).toBe(
     "ltx-2.3-22b-distilled-fp8.safetensors",
   );
-  // Only the skeleton reaches the guide, so the Character's look is free.
+  // Softened edges from ComfyUI's own nodes reach the guide; no other weights.
   expect(node(request, "guide")?.inputs).toMatchObject({
-    image: ["pose_fit", 0],
+    image: ["edges", 0],
     strength: 0.9,
     latent: ["keyframe_condition", 0],
     // The adapter reads its guide at half size, as its metadata says.
     iclora_parameters: ["iclora_parameters", 0],
   });
-  expect(request.input.graph).not.toHaveProperty("depth");
+  expect(node(request, "edges")?.class_type).toBe("Canny");
+  expect(node(request, "soften")?.inputs.blur_radius).toBe(4);
+  const classes = Object.values(request.input.graph).map(
+    (n) => (n as Node).class_type,
+  );
+  expect(classes).not.toContain("DWPreprocessor");
+  expect(classes).not.toContain("DepthAnythingV2Preprocessor");
   expect(node(request, "keyframe_condition")?.inputs.strength).toBe(1);
   // Who and where are carried by text: the mention and each description.
   const text = node(request, "positive_text")?.inputs.text as string;
@@ -152,15 +158,14 @@ it("generates from the prompt alone when there is no keyframe or Character", asy
   expect(node(request, "guide")?.inputs.latent).toEqual(["empty_video", 0]);
 });
 
-it("adds the source's depth under the skeleton for pose-depth", async () => {
-  const request = await build({ control: "pose-depth", strength: 0.5 });
+it("traces sharper edges for edges-detailed", async () => {
+  const request = await build({ control: "edges-detailed", strength: 0.5 });
   expect(node(request, "guide")?.inputs).toMatchObject({
-    image: ["pose_over_depth", 0],
+    image: ["edges", 0],
     strength: 0.5,
   });
-  expect(node(request, "depth")?.class_type).toBe(
-    "DepthAnythingV2Preprocessor",
-  );
+  expect(node(request, "soften")?.inputs.blur_radius).toBe(1);
+  expect(node(request, "edges")?.inputs.high_threshold).toBe(0.8);
 });
 
 it("keeps runs short: at most 97 frames (8n+1) and 768 px, on a 64 px grid", async () => {

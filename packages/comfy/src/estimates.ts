@@ -189,7 +189,7 @@ export function estimateGeneration(
       };
     case "video.performance-transfer":
       return {
-        // One 8-step distilled pass of LTX 2.3 22B plus DWPose over every
+        // One 8-step distilled pass of LTX 2.3 22B plus edge tracing over every
         // frame, on a Cloud GPU billed by time. Observed once: 73 frames at
         // 640×384 in 28 s end to end on a warm worker (checkpoint cached).
         // A cold worker loads ~35 GB of weights first, which is not measured.
