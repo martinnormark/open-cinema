@@ -42,7 +42,7 @@ Kling returned 24 fps and 121 frames both times; the lock and conform put both v
 
 Read with care: the protected-region numbers use the job's own Bria matte, so the locked variant scores high by construction; they confirm the source pixels survive, not that the matte is right. The contact sheets were reviewed by an AI, not a person. The one visible weakness is the known one: U2's flat indoor light over a sunlit exterior reads as composited (A3 about 2), which is what the Relit variant is for. Evidence: `real-take-u1-*` and `real-take-u2-*` in the project's `phase-closeout/` folder.
 
-With these, five generated and two real takes pass every gate, and the proposed bar in the [rubric](../evaluation/rubric.md#proposed-mvp-release-bar-per-mode) is met for background replacement. The bar is still a proposal until the project owner agrees it.
+With these, five generated and two real takes pass every gate, and the proposed bar in the [rubric](../evaluation/rubric.md#proposed-mvp-release-bar-per-mode) is met for background replacement. The project owner agreed this bar as the MVP threshold on 2026-10-17, which closes Phase 0 (#3).
 
 ## Supported envelope
 

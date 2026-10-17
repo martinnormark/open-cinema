@@ -78,7 +78,7 @@ Region masks come from a matte of the **source** (never the result), so the meas
 
 ## Proposed MVP release bar (per mode)
 
-To be confirmed against measured baselines in each mode's Phase 0 report:
+**Agreed by the project owner on 2026-10-17 as the MVP bar for background replacement**, after five generated and two real camera takes passed it ([phase0-background.md](../docs/phase0-background.md#real-camera-footage-2026-10-17)). Character recast is out of the MVP gate; the same bar applies when it returns:
 
 - Across the representative evaluation set, at least **80 % of runs pass all gates**.
 - Median **Preservation score ≥ 3.0** with **no protected criterion below 2** on a passing run.
