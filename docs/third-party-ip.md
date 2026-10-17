@@ -3,7 +3,7 @@
 The rule, as Martin set it on 2026-10-17: the app does not rely on other people's IP. A model, LoRA or component is allowed when it is one of these:
 
 1. **Lightricks' own**, under the LTX Community Licenses, since Lightricks makes the LTX base models (their official IC-LoRAs and camera LoRAs included).
-2. **Black Forest Labs' FLUX models**, under their FLUX licences. Martin confirmed the FLUX and LTX licences are fine.
+2. **Black Forest Labs' FLUX models**, under their FLUX licences. Martin confirmed the FLUX and LTX licences are fine, including their non-commercial ones such as FLUX.2 Klein 9B's (confirmed again on 2026-10-17).
 3. **Ours**: written or trained in this repository.
 4. **MIT or Apache 2.0**, whoever made it.
 
@@ -48,7 +48,7 @@ Audited on 2026-10-17 against `packages/comfy/src/workflows`, `packages/comfy/sr
 
 ## Hosted models through Comfy Router
 
-These are platform services the competition names ("Comfy API, Comfy Router"), not borrowed weights. Each provider's terms still govern its output.
+These are platform services the competition names ("Comfy API, Comfy Router"), not borrowed weights; Martin confirmed this on 2026-10-17. Each provider's terms still govern its output.
 
 | Model                                 | Used by                                                                     | Provider          | Terms                                                                                                  |
 | ------------------------------------- | --------------------------------------------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------ |
