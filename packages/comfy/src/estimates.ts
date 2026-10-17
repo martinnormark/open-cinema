@@ -95,9 +95,13 @@ export function estimateGeneration(
       };
     case "video.character-replace":
       return {
+        // Kling 3.0 Omni pro edit: 6 Kling credits (29.54 Router credits each,
+        // ~177 credits / $0.84) per 5 s clip in Phase 0, so ~35 credits per source
+        // second. Length is unknown here. The shared Router queue dominated time.
         credits: null,
-        seconds: round(120, 900),
-        basis: "heuristic",
+        seconds: round(180, 2400),
+        basis: "observed",
+        note: "About 35 credits per second of source video (Kling 3.0 Omni, 1080p).",
       };
   }
 }

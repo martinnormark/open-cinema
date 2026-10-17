@@ -17,6 +17,10 @@ import {
   mediaTypeFromUrl,
   resultField,
 } from "./results";
+import {
+  CHARACTER_REPLACE_MODEL,
+  characterReplaceRequest,
+} from "./character-replace";
 import type { BuildContext, ProviderOutput, WorkflowDefinition } from "./types";
 
 /** Reads one URL field of a Router result as a single output. */
@@ -170,5 +174,16 @@ export const backgroundReplaceWorkflow: WorkflowDefinition<"video.background-rep
       }
       return klingBackgroundRequest(inputs, location, media);
     },
+    outputs: backgroundReplaceOutputs,
+  };
+
+export const characterReplaceWorkflow: WorkflowDefinition<"video.character-replace"> =
+  {
+    kind: "video.character-replace",
+    displayModel: "Kling 3.0 Omni",
+    deadlineMs: 60 * 60_000,
+    model: () => CHARACTER_REPLACE_MODEL,
+    build: characterReplaceRequest,
+    // Same Kling edit result document as background replacement.
     outputs: backgroundReplaceOutputs,
   };

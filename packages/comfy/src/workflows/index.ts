@@ -1,6 +1,7 @@
 import type { WorkflowKind } from "@open-cinema/contracts";
 import {
   backgroundReplaceWorkflow,
+  characterReplaceWorkflow,
   fluxImageWorkflow,
   fluxReferenceWorkflow,
   ltxVideoWorkflow,
@@ -28,7 +29,15 @@ export {
   routerSampleOutputs,
   ltxVideoWorkflow,
   backgroundReplaceWorkflow,
+  characterReplaceWorkflow,
 } from "./definitions";
+export {
+  CHARACTER_REPLACE_MODEL,
+  characterReferences,
+  characterReplacePrompt,
+  characterReplaceRequest,
+  describeTarget,
+} from "./character-replace";
 export {
   BACKGROUND_REPLACE_MODELS,
   DEFAULT_BACKGROUND_PIPELINE,
@@ -50,6 +59,7 @@ const registry: Registry = {
   "image.flux-reference": fluxReferenceWorkflow,
   "video.ltx": ltxVideoWorkflow,
   "video.background-replace": backgroundReplaceWorkflow,
+  "video.character-replace": characterReplaceWorkflow,
 };
 
 export function getWorkflowDefinition<K extends WorkflowKind>(
