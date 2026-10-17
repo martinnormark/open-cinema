@@ -51,6 +51,17 @@ const LINK_GRACE_MS = 60 * 60_000;
 /** Router's shared queue can hold a job for hours; past this, ask the creator. */
 const MAX_QUEUE_WAIT_MS = 6 * 60 * 60_000;
 type Execution = CoordinatorRecord["executions"][string];
+/**
+ * When signed media links expire. They must outlive the whole watch window,
+ * since a provider may fetch them only after hours in Router's queue. Fixed per
+ * job so a request rebuilt after a lost receipt is byte-identical.
+ */
+export function mediaLinkExpiry(createdAt: string, deadline: number) {
+  return (
+    Math.max(Date.parse(createdAt) + MAX_QUEUE_WAIT_MS, deadline) +
+    LINK_GRACE_MS
+  );
+}
 const deadlineFor = (execution: Execution) =>
   getWorkflowDefinition(execution.workflowKind)?.deadlineMs ?? DEADLINE_MS;
 async function sha256(value: unknown) {
@@ -336,6 +347,7 @@ export class GenerationCoordinator
    */
   private async providerRequest(
     ownerId: string,
+    createdAt: string,
     execution: Execution,
   ): Promise<Record<string, unknown>> {
     if (execution.provider !== "router" || "input" in execution.workflow)
@@ -352,7 +364,7 @@ export class GenerationCoordinator
         asset: createAssetResolver(
           this.env,
           { ownerId },
-          execution.deadline + LINK_GRACE_MS,
+          mediaLinkExpiry(createdAt, execution.deadline),
         ),
       },
     );
@@ -539,6 +551,7 @@ export class GenerationCoordinator
         try {
           providerRequest = await this.providerRequest(
             record.ownerId,
+            job.createdAt,
             execution,
           );
         } catch (error) {
