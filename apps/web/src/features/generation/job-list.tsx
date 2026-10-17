@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { isActiveJob, type Job } from "@open-cinema/contracts";
 import { cancelGeneration, reconcileGeneration } from "@/server/functions";
 import { Button } from "@/components/ui/button";
@@ -106,6 +107,15 @@ function JobRow({ job }: { job: Job }) {
                   ? "Open video"
                   : "Open asset"}
             </a>
+            {job.state === "succeeded" && (
+              <Link
+                to="/recipes/new"
+                search={{ job: job.id }}
+                className="mt-2 ml-4 inline-block text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+              >
+                Save as recipe
+              </Link>
+            )}
           </figure>
         ))}
       {(job.error || error) && (

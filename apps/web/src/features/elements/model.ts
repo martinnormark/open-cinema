@@ -13,7 +13,11 @@ import {
   approvedReferences,
   generationRequestSchema,
 } from "@open-cinema/contracts";
-import type { ImageAspectRatio, ImageResolution } from "@open-cinema/contracts";
+import type {
+  ImageAspectRatio,
+  ImageResolution,
+  StateKind,
+} from "@open-cinema/contracts";
 import { characterShotPrompt, type CharacterShot } from "./sheet-prompt";
 
 export type {
@@ -48,7 +52,8 @@ export interface ElementTypeInfo {
   establishes: string;
   placeholderName: string;
   placeholderThought: string;
-  stateExamples: string[];
+  /** Suggested states, each with the kind of change it is. */
+  stateExamples: { name: string; kind: StateKind }[];
   slots: GuidanceSlot[];
 }
 
@@ -62,7 +67,15 @@ export const elementTypes: Record<ElementType, ElementTypeInfo> = {
     placeholderName: "Mara",
     placeholderThought:
       "A lighthouse keeper in her late thirties, weathered olive skin, short salt-and-pepper hair, a thin scar through her left eyebrow, wears a heavy wool sweater.",
-    stateExamples: ["Wet", "Injured", "Formal wear", "Disguised"],
+    stateExamples: [
+      { name: "Wet", kind: "condition" },
+      { name: "Injured", kind: "condition" },
+      { name: "Frightened", kind: "emotion" },
+      { name: "Joyful", kind: "emotion" },
+      { name: "Formal wear", kind: "wardrobe" },
+      { name: "Disguised", kind: "wardrobe" },
+      { name: "Aged 70", kind: "era" },
+    ],
     slots: [
       {
         id: "face-closeup",
@@ -106,7 +119,15 @@ export const elementTypes: Record<ElementType, ElementTypeInfo> = {
     placeholderName: "Harbor",
     placeholderThought:
       "A small working fishing harbor on a rocky northern coast, a red-and-white lighthouse at the end of a stone breakwater, weathered timber boathouses, moored wooden boats.",
-    stateExamples: ["Dawn", "Storm", "Winter night", "Abandoned"],
+    stateExamples: [
+      { name: "Dawn", kind: "time" },
+      { name: "Night", kind: "time" },
+      { name: "Storm", kind: "weather" },
+      { name: "Fog", kind: "weather" },
+      { name: "Deep winter", kind: "season" },
+      { name: "Abandoned", kind: "condition" },
+      { name: "1920s", kind: "era" },
+    ],
     slots: [
       {
         id: "establishing",
@@ -151,7 +172,13 @@ export const elementTypes: Record<ElementType, ElementTypeInfo> = {
     placeholderName: "RedCoat",
     placeholderThought:
       "A knee-length double-breasted wool coat in deep crimson, brass buttons, wide notched lapels, a slightly frayed left cuff.",
-    stateExamples: ["Doors open", "Worn", "Damaged", "Folded"],
+    stateExamples: [
+      { name: "Doors open", kind: "use" },
+      { name: "Lit", kind: "use" },
+      { name: "Worn", kind: "condition" },
+      { name: "Damaged", kind: "condition" },
+      { name: "Brand new", kind: "era" },
+    ],
     slots: [
       {
         id: "three-quarter",

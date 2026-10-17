@@ -1,0 +1,25 @@
+/* Direction disclosure: grid-rows 0fr ↔ 1fr, no height measuring (transitions.dev accordion). */
+.direction-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--duration-fast) var(--ease-smooth-out);
+}
+.direction-panel[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+.direction-panel > div {
+  min-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity var(--duration-quick) var(--ease-smooth-out);
+}
+.direction-panel[data-open="true"] > div {
+  opacity: 1;
+  transition: opacity var(--duration-fast) var(--ease-smooth-out);
+}
+.direction-chevron {
+  transition: transform var(--duration-fast) var(--ease-smooth-out);
+}
+[aria-expanded="true"] > .direction-chevron {
+  transform: scaleY(-1);
+}
