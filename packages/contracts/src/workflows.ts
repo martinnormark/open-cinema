@@ -243,7 +243,7 @@ export const WORKFLOW_DESCRIPTORS = {
     kind: "video.character-replace",
     label: "Recast character",
     output: "video",
-    models: ["higgsfield/higgsfield-genjutsu-motion-transfer-v1.0"],
+    models: ["kling/kling-v3-omni"],
   },
 } as const satisfies Record<WorkflowKind, WorkflowDescriptor>;
 
