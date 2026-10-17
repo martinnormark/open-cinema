@@ -1,9 +1,10 @@
 /**
- * Runs one of the open-weights LTX graphs (camera move, Object Swap, Restyle)
- * on a ComfyUI server and saves every output, to check a graph
+ * Runs one of the open-weights LTX graphs (camera move, re-stage, Object
+ * Swap, Restyle) on a ComfyUI server and saves every output, to check a graph
  * without the jobs Worker.
  *
  *   bun scripts/ltx-graph.ts <server> <out-dir> camera move=dolly-in prompt="..." [image=<file>] [seconds=3] [side=512]
+ *   bun scripts/ltx-graph.ts <server> <out-dir> restage source=<clip> angle=from-left [prompt="..."] [frames=49] [side=512]
  *   bun scripts/ltx-graph.ts <server> <out-dir> restyle source=<clip> ref=<img>[,<img>] prompt="..." [style="..."]
  *   bun scripts/ltx-graph.ts <server> <out-dir> swap source=<clip> ref=<img> original="a red mug" replacement="a brass lantern" [name="Lantern"]
  *
@@ -13,12 +14,16 @@
  */
 import { mkdir } from "node:fs/promises";
 import { ltxCameraGraph } from "../packages/comfy/src/workflows/ltx-camera";
+import { ltxRestageGraph } from "../packages/comfy/src/workflows/ltx-restage";
 import {
   ltxEditGraph,
   ltxEditPrompts,
 } from "../packages/comfy/src/workflows/ltx-edit";
 import type { Graph } from "../packages/comfy/src/workflows/ltx-graph";
-import type { CameraMove } from "../packages/contracts/src/camera";
+import type {
+  CameraMove,
+  RestageAngle,
+} from "../packages/contracts/src/camera";
 
 const [server, outDir, kind, ...rest] = process.argv.slice(2);
 if (!server || !outDir || !kind) {
@@ -71,6 +76,17 @@ if (kind === "camera") {
     previewSide: args.side ? Number(args.side) : undefined,
   });
   if (args.image) files.push(["first_frame", "image", args.image]);
+} else if (kind === "restage") {
+  graph = ltxRestageGraph({
+    angle: (args.angle ?? "from-left") as RestageAngle,
+    description: args.prompt ?? "",
+    seed,
+    limits: {
+      maxFrames: Number(args.frames ?? 97),
+      maxSide: Number(args.side ?? 768),
+    },
+  });
+  files.push(["source", "file", args.source!]);
 } else if (kind === "restyle" || kind === "swap") {
   const prompts = ltxEditPrompts({
     mode: kind,

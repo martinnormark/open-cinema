@@ -64,6 +64,10 @@ export const CLOUD_GRAPH_ESTIMATES = {
     seconds: [30, 900],
     note: "Runs FLUX.2 Klein and LTX 2.3 on Comfy Cloud, billed by GPU time. Uses the first 4 seconds of the take.",
   },
+  restage: {
+    seconds: [60, 1200],
+    note: "Re-projects the take with MoGe-2 and fills the gaps with LTX 2.3 on Comfy Cloud, billed by GPU time. Uses the first 4 seconds of the take.",
+  },
 } as const;
 
 export function cloudEstimate(
@@ -163,12 +167,6 @@ export function estimateGeneration(
     case "video.restyle":
       return cloudEstimate("restyle");
     case "video.restage":
-      // Off until it runs on a model of our own; submission is rejected.
-      return {
-        credits: null,
-        seconds: round(30, 900),
-        basis: "heuristic",
-        note: "Re-stage is not available yet.",
-      };
+      return cloudEstimate("restage");
   }
 }

@@ -2,6 +2,7 @@ import { expect, it } from "vitest";
 import {
   ltxVideoInputsSchema,
   objectSwapInputsSchema,
+  restageInputsSchema,
   restyleInputsSchema,
   type ResolvedMention,
 } from "@open-cinema/contracts";
@@ -159,8 +160,25 @@ it("restyles from a style image or from words alone, but not from nothing", asyn
   await expect(definition.build(nothing, context)).rejects.toThrow(/style/);
 });
 
-it("does not run Re-stage, whose only model is someone else's LoRA", () => {
-  expect(getWorkflowDefinition("video.restage")).toBeNull();
+it("re-stages a take by re-projecting every frame and filling with Lightricks' own IC-LoRA", async () => {
+  const definition = getWorkflowDefinition("video.restage")!;
+  const inputs = restageInputsSchema.parse({
+    source,
+    angle: "from-left",
+    preservation: { preserve: ["performance"] },
+  });
+  const request = (await definition.build(
+    inputs,
+    context,
+  )) as CloudWorkflowRequest;
+  expectWired(request, definition.cloudOutputNodes!);
+  const loras = ofType(request, "LoraLoaderModelOnly").map((n) =>
+    String(n.inputs.lora_name),
+  );
+  expect(loras).toEqual(["ltx-2.3-22b-ic-lora-in-outpainting-0.9.safetensors"]);
+  expect(ofType(request, "RenderMesh")).toHaveLength(97);
+  const [camera] = ofType(request, "CreateCameraInfo");
+  expect(camera!.inputs["mode.position_x"]).toBeLessThan(0);
 });
 
 it("runs a camera move on Cloud and leaves free-camera LTX on Router", async () => {

@@ -65,10 +65,11 @@ export const CAMERA_MOVES: Record<
 };
 
 /**
- * New angles for re-staging a take, as azimuth, elevation and distance steps.
- * Re-stage is off until it runs on a model of our own: the community IC-LoRA
- * it was built on is someone else's IP (docs/third-party-ip.md). The angles
- * stay as the brief for that model.
+ * New angles for re-staging a take. Each is a small camera move from where the
+ * take was shot: the take is re-projected through its own depth to the new
+ * position, so only small moves hold up: about a hand's width sideways
+ * or a step in or out. They are sized for people 1.5 to 3 m from the camera. There is no
+ * reverse angle.
  */
 export const restageAngleSchema = z.enum([
   "closer",
@@ -86,58 +87,47 @@ export const RESTAGE_ANGLES: Record<
   {
     label: string;
     description: string;
-    azimuth: string;
-    elevation: string;
-    distance: string;
+    /**
+     * Where the camera moves, in metres from the original position: x to the
+     * right, y up, z toward the original camera (negative moves in). It keeps
+     * aiming at a point 2 m ahead, where a subject usually stands.
+     */
+    move: { x: number; y: number; z: number };
   }
 > = {
   closer: {
     label: "Move in",
-    description: "Same angle, a tighter frame.",
-    azimuth: "same angle",
-    elevation: "same height",
-    distance: "closer",
+    description: "Same angle, a step closer.",
+    move: { x: 0, y: 0, z: -0.3 },
   },
   wider: {
     label: "Pull out",
-    description: "Same angle, a wider frame.",
-    azimuth: "same angle",
-    elevation: "same height",
-    distance: "further",
+    description: "Same angle, a step back. The new edges are filled in.",
+    move: { x: 0, y: 0, z: 0.3 },
   },
   "low-angle": {
     label: "Low angle",
-    description: "The camera drops and looks up.",
-    azimuth: "same angle",
-    elevation: "lower",
-    distance: "same distance",
+    description: "The camera drops and looks up a little.",
+    move: { x: 0, y: -0.15, z: 0 },
   },
   "high-angle": {
     label: "High angle",
-    description: "The camera rises and looks down.",
-    azimuth: "same angle",
-    elevation: "higher",
-    distance: "same distance",
+    description: "The camera rises and looks down a little.",
+    move: { x: 0, y: 0.15, z: 0 },
   },
   "from-left": {
     label: "Swing left",
-    description: "The camera moves around to the left.",
-    azimuth: "to the left",
-    elevation: "same height",
-    distance: "same distance",
+    description: "The camera moves a little to the left.",
+    move: { x: -0.15, y: 0, z: 0 },
   },
   "from-right": {
     label: "Swing right",
-    description: "The camera moves around to the right.",
-    azimuth: "to the right",
-    elevation: "same height",
-    distance: "same distance",
+    description: "The camera moves a little to the right.",
+    move: { x: 0.15, y: 0, z: 0 },
   },
   hero: {
     label: "Hero",
-    description: "Lower and closer, slightly to the side.",
-    azimuth: "slightly to the right",
-    elevation: "lower",
-    distance: "closer",
+    description: "Lower and a step closer.",
+    move: { x: 0.08, y: -0.12, z: -0.2 },
   },
 };

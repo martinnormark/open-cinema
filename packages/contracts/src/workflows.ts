@@ -431,8 +431,7 @@ export const WORKFLOW_DESCRIPTORS = {
     kind: "video.restage",
     label: "Re-stage the camera",
     output: "video",
-    // Not registered: no model of our own yet (docs/third-party-ip.md).
-    models: [],
+    models: ["comfy-cloud/ltx-2.3-restage"],
   },
 } as const satisfies Record<WorkflowKind, WorkflowDescriptor>;
 

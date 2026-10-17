@@ -60,7 +60,6 @@ import {
   formatEstimate,
   formatTimecode,
   preservedLabels,
-  offeredKinds,
   replacementKinds,
   wardrobeIntents,
   type ReplacementKind,
@@ -174,10 +173,7 @@ export function ReplacementStudio({
     sourceKey === null
       ? (videos[0] ?? null)
       : (videos.find((v) => assetRefKey(v.ref) === sourceKey) ?? null);
-  const [kind, setKind] = useState<ReplacementKind>(() => {
-    const wanted = draft?.kind ?? initialKind;
-    return offeredKinds.includes(wanted) ? wanted : "background";
-  });
+  const [kind, setKind] = useState<ReplacementKind>(draft?.kind ?? initialKind);
   const [elementId, setElementId] = useState<string | null>(
     draft?.element?.id ?? null,
   );
@@ -700,13 +696,15 @@ export function ReplacementStudio({
         <fieldset>
           <legend className="text-sm font-medium">What changes</legend>
           <div className="mt-3 grid grid-cols-2 gap-2">
-            {offeredKinds.map((option) => {
+            {(Object.keys(KIND_ICONS) as ReplacementKind[]).map((option) => {
               const Icon = KIND_ICONS[option];
               return (
                 <label
                   key={option}
                   className={cn(
                     "flex cursor-pointer flex-col gap-1.5 rounded-xl border p-3 transition-colors has-focus-visible:ring-2 has-focus-visible:ring-ring",
+                    // Five choices: the last one spans the row.
+                    option === "camera" && "col-span-2",
                     kind === option
                       ? "border-tungsten/70 bg-surface"
                       : "border-border hover:bg-surface",
@@ -1070,9 +1068,9 @@ export function ReplacementStudio({
           )}
           {kind === "camera" && (
             <p className="mt-2 text-xs leading-5 text-muted-foreground">
-              Small moves hold up best, and the angle is a direction rather than
-              an exact position: an early model makes it. It has not seen angles
-              from behind the subject, so there is no reverse shot.
+              The camera moves a hand’s width or a step, not around the subject:
+              the take is re-projected through its own depth and only what it
+              never saw is filled in. There is no reverse shot.
             </p>
           )}
           {sourceCheck.notes.map((note) => (

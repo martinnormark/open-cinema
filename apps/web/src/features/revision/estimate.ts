@@ -28,14 +28,7 @@ export function estimateReplacement(
 ): GenerationEstimate {
   if (kind === "object") return cloudEstimate("swap");
   if (kind === "restyle") return cloudEstimate("restyle");
-  if (kind === "camera")
-    // Re-stage is off until it has a model of our own; the studio hides it.
-    return {
-      credits: null,
-      seconds: { min: 30, max: 900 },
-      basis: "heuristic",
-      note: "Re-stage is not available yet.",
-    };
+  if (kind === "camera") return cloudEstimate("restage");
   if (kind === "background" && pipeline === "ltx-alpha")
     return {
       // Not yet measured: one 8-step pass of the 22B model on a Cloud GPU.
