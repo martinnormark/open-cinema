@@ -5,6 +5,7 @@ Researched on **2026-10-16** from official Comfy sources. These files summarize 
 ## Competition
 
 - [Open Source Higgsfield competition](competition.md): dates, prizes, eligibility, submission checklist, events, and source notes.
+- [Our submission plan](competition-submission.md): prize targets, the two-minute demo script, and submission status.
 
 ## Developer capabilities
 

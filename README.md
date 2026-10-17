@@ -1,88 +1,146 @@
 # Open Cinema
 
-A creative studio for images, films, and reusable worlds. This Bun monorepo includes a local generation MVP: prompt input, durable job orchestration, live updates, and an activity Orb. Account authentication is not implemented yet. See [generation MVP](docs/generation-mvp.md) for setup, lifecycle details, and validation limits.
+An open creative studio for images, films and reusable worlds, built on the [Comfy Developer Platform](https://docs.comfy.org/development/overview). Describe an idea, explore directions, save the people, places and things that work as **Elements**, and keep directing the same world across stills and video. Complexity lives in Comfy workflows; the studio keeps your attention on the picture.
 
-## Local development
+Open Cinema is an early preview and our entry to Comfy's [Open Source Higgsfield](https://comfy.org/open-source-higgsfield) competition. Product direction lives in [GOALS.md](GOALS.md) and [PRODUCT.md](PRODUCT.md); the roadmap is [issue #2](https://github.com/martinnormark/open-cinema/issues/2).
 
-Use **Bun 1.4.2** and **Node.js 24+**. Node is required by the development tools; production runs on Cloudflare Workers.
+## What you can do today
+
+- **Generate images** from a written idea with FLUX 3 through Comfy Router, with live progress that survives reloads, closed tabs and dropped connections.
+- **Follow every job** in Activity or from the floating Orb, cancel work in flight and recover jobs that need attention.
+- **Keep everything**: generated media is copied into your own R2 storage before a job is marked ready.
+
+Elements authoring, the media library, LTX video and selective video revision (background replacement and character recasting) are being built on `main`; see the roadmap for status.
+
+## Run it locally
+
+You need:
+
+- [Bun](https://bun.sh) **1.4.2** and [Node.js](https://nodejs.org) **24+** (Node runs the dev tooling; production runs on Cloudflare Workers).
+- A **Comfy API key** with Router credits from [platform.comfy.org](https://platform.comfy.org). Router bills per request in credits (211 credits = $1); no subscription is needed.
+- No Cloudflare account. D1, R2 and Durable Objects are emulated locally.
 
 ```sh
+git clone https://github.com/martinnormark/open-cinema.git
+cd open-cinema
 bun install --frozen-lockfile
+```
+
+Create the two local secret files from their examples. Both are gitignored.
+
+```sh
+cp apps/jobs/.dev.vars.example apps/jobs/.dev.vars
+cp apps/web/.dev.vars.example apps/web/.dev.vars
+```
+
+1. In `apps/jobs/.dev.vars`, set `COMFY_API_KEY="…"` (keep the quotes). Only the private jobs Worker ever sees this key.
+2. In `apps/web/.dev.vars`, set `LOCAL_SESSION_SECRET` to a random value of at least 32 characters, for example the output of `openssl rand -base64 48`. Leave `LOCAL_MVP_ENABLED=true`.
+
+Then prepare the local database and start both Workers:
+
+```sh
 bun run setup
 bun run dev
 ```
 
-Open the URL printed by Vite. The web Worker and jobs Worker run together, with local D1 and Durable Object bindings. No Cloudflare account is needed for local development. Generation needs Comfy Router API credentials and a local test session; see [setup](docs/generation-mvp.md#run-locally). Both Workers share the local state directory at `.wrangler/state`; remote bindings are disabled in Vite.
+Open the URL Vite prints (normally <http://127.0.0.1:5173>), choose **Start local session**, write a prompt or pick **Surprise me**, and select **Generate image**. **Settings** shows whether your Comfy key and sign-in are configured.
 
-The UI includes a responsive shadcn sidebar, a Studio prompt form with five sample prompts, live Activity, and placeholder Projects, Elements, Recipes, Library, and Settings pages. The Studio introduction uses TanStack Start's experimental React Server Components path. Generation uses the Router model `bfl/flux-3-image`; the existing credential has been verified against its queued request API.
+If something is off:
 
-## Workspace layout
+| Symptom                                       | Fix                                                                                            |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| "Local testing is not configured"             | Check `apps/web/.dev.vars`, and open the app on `127.0.0.1` or `localhost`, not a LAN address. |
+| "Comfy Router credentials are not configured" | Set `COMFY_API_KEY` in `apps/jobs/.dev.vars` and restart `bun run dev`.                        |
+| A job fails with a billing or access error    | Add credits to the workspace that owns the key on platform.comfy.org.                          |
+| Database errors after pulling new code        | Run `bun run setup` again to apply new migrations.                                             |
 
-| Workspace            | Purpose                                                                          |
-| -------------------- | -------------------------------------------------------------------------------- |
-| `apps/web`           | TanStack Start, Tailwind, shadcn, server functions, public HTTP routes           |
-| `apps/jobs`          | Private Worker and SQLite-backed `GenerationCoordinator` Durable Object          |
-| `packages/contracts` | Browser-safe runtime schemas, job states, event and RPC contracts                |
-| `packages/database`  | Prisma client, schema, D1 migrations, queries, mutations, DO persistence helpers |
-| `packages/assets`    | Server-only R2 archival and authenticated streaming delivery                     |
-| `packages/comfy`     | Server-only adapter for the official TypeScript Comfy SDK                        |
+## Deploy to Cloudflare
 
-Applications import shared packages through their declared exports. All database access lives in `packages/database`; Prisma delegates remain private. The web app must not import the Comfy adapter. Read [ARCHITECTURE.md](ARCHITECTURE.md), [GOALS.md](GOALS.md), and [PRODUCT.md](PRODUCT.md) before extending the scaffold.
+Open Cinema runs as two Workers: `open-cinema-web` (UI, server functions, sign-in) and the private `open-cinema-jobs` (Comfy calls, Durable Object coordinators, R2 archival).
+
+1. **Create resources** for each environment:
+
+   ```sh
+   bunx wrangler d1 create open-cinema
+   bunx wrangler r2 bucket create open-cinema-generated-assets
+   ```
+
+   Put the D1 `database_id` into **both** `apps/web/wrangler.jsonc` and `apps/jobs/wrangler.jsonc` (the all-zero IDs are local placeholders). Keep the bucket private and do not enable object expiry.
+
+2. **Set up sign-in.** Public deployments refuse every request until real authentication is configured. Put the web Worker behind Cloudflare Access and set `AUTH_MODE`, `CF_ACCESS_TEAM_DOMAIN` and `CF_ACCESS_AUD` as described in [docs/auth.md](docs/auth.md).
+
+3. **Add secrets**:
+
+   ```sh
+   bunx wrangler secret put COMFY_API_KEY --name open-cinema-jobs
+   bunx wrangler secret put LOCAL_MVP_ENABLED --name open-cinema-web      # enter: false
+   bunx wrangler secret put LOCAL_SESSION_SECRET --name open-cinema-web   # any random value; unused with Access
+   ```
+
+4. **Apply migrations and build**:
+
+   ```sh
+   bunx wrangler d1 migrations apply open-cinema --remote --config apps/jobs/wrangler.jsonc
+   bun run build
+   ```
+
+5. **Deploy jobs first, then web**, using the configs Vite generates so the RSC environment and client assets are included:
+
+   ```sh
+   bunx wrangler deploy --config apps/web/dist/open_cinema_jobs/wrangler.json
+   bunx wrangler deploy --config apps/web/dist/server/wrangler.json
+   ```
+
+Use separate D1 databases, buckets and secrets for preview and production. Nothing in this repository deploys automatically.
 
 ## Commands
 
-| Command                    | Effect                                                               |
-| -------------------------- | -------------------------------------------------------------------- |
-| `bun run setup`            | Generate Prisma/Worker types and apply local D1 migrations           |
-| `bun run dev`              | Run both Workers with Vite and hot reload                            |
-| `bun run typecheck`        | Regenerate types and check all workspaces                            |
-| `bun run test`             | Run integration tests in `workerd` with isolated test storage        |
-| `bun run build`            | Generate Prisma and build client, SSR/RSC, and jobs Worker artifacts |
-| `bun run preview`          | Serve the production build locally                                   |
-| `bun run build:jobs`       | Independently validate jobs Worker packaging with Wrangler dry run   |
-| `bun run check`            | Type-check, test, and build                                          |
-| `bun run db:migrate:local` | Apply committed migrations to local D1                               |
-| `bun run format`           | Format scaffold code and configuration                               |
-| `bun run format:check`     | Check formatting                                                     |
+| Command                    | Effect                                                      |
+| -------------------------- | ----------------------------------------------------------- |
+| `bun run setup`            | Generate Prisma and Worker types, apply local D1 migrations |
+| `bun run dev`              | Run both Workers with Vite and hot reload                   |
+| `bun run typecheck`        | Regenerate types and check all workspaces                   |
+| `bun run test`             | Jobs integration tests in `workerd`, plus web unit tests    |
+| `bun run build`            | Build client, SSR/RSC and jobs Worker artifacts             |
+| `bun run preview`          | Serve the production build locally                          |
+| `bun run check`            | Type-check, test and build                                  |
+| `bun run db:migrate:local` | Apply committed migrations to local D1                      |
+| `bun run format`           | Format code and configuration                               |
 
-Generated Prisma code is ignored and recreated by setup/build/typecheck. Worker binding declarations and the router's generated route tree are checked in; regenerate them when bindings/routes change. The build currently emits upstream RSC source-map warnings, which do not prevent compilation.
+The build emits upstream RSC source-map warnings; they do not affect the output.
 
-## Database changes
+## How it is built
 
-Keep schema edits and migrations inside `packages/database`. Prisma CLI/client/adapter are pinned together at 7.10.1; the registry's Prisma 8 release candidate is deliberately not used.
+| Workspace            | Purpose                                                                  |
+| -------------------- | ------------------------------------------------------------------------ |
+| `apps/web`           | TanStack Start, React, Tailwind, shadcn/ui, server functions, sign-in    |
+| `apps/jobs`          | Private Worker with a per-creator `GenerationCoordinator` Durable Object |
+| `packages/contracts` | Browser-safe schemas for jobs, workflows, Elements and media             |
+| `packages/database`  | Prisma schema, D1 migrations, queries and mutations                      |
+| `packages/assets`    | Server-only R2 archival and authenticated streaming                      |
+| `packages/comfy`     | Server-only adapter for the official Comfy TypeScript SDK                |
 
-To create the next migration, first apply existing migrations locally, edit `packages/database/prisma/schema.prisma`, and use the pinned `prisma migrate diff` tooling against the prior schema/local D1 state. Review the generated SQL, save it under the next ordered filename in `packages/database/migrations`, then run:
+- The web Worker validates input and owns sessions; it never imports the Comfy adapter or sees the API key.
+- A Durable Object per creator accepts idempotent commands, persists checkpoints and alarms, polls Comfy, and pushes authoritative snapshots over hibernatable WebSockets.
+- All database access goes through `packages/database`. To change the schema, edit `packages/database/prisma/schema.prisma`, generate the next ordered SQL migration with the pinned Prisma tooling, then run `bun run db:generate`, `bun run db:migrate:local` and `bun run test`. Do not use `prisma migrate deploy` with D1.
+- R2 holds generated bytes; D1 holds metadata only.
 
-```sh
-bun run db:generate
-bun run db:migrate:local
-bun run test
-```
+Read [ARCHITECTURE.md](ARCHITECTURE.md) before extending the app, and [AGENTS.md](AGENTS.md) for repository rules (60 fps UI, no direct `useEffect`, design skills).
 
-Do not use `prisma migrate deploy` for D1. Do not regenerate the initial migration from an empty database for an incremental change. Both Worker configurations reference the same migration directory; migration application is a single release step.
+## Documentation
 
-## Runtime boundaries
+- [Sign-in and public deployment](docs/auth.md)
+- [Design system](docs/design.md)
+- [Generation pipeline and verification](docs/generation-mvp.md)
+- [Competition submission](docs/competition-submission.md) and [competition rules](docs/competition.md)
+- [Comfy developer reference](docs/README.md)
 
-- The web Worker owns validation and signed local sessions. Public deployments fail closed until real authentication is configured.
-- The private jobs Worker owns all Comfy SDK calls, durable submission, polling, cancellation, and output archival into R2.
-- A per-owner Durable Object accepts idempotent commands, persists alarms/checkpoints, and broadcasts authoritative snapshots over hibernatable WebSockets.
-- Database queries, mutations, migrations, and checkpoint/alarm operations live in `packages/database`.
-- R2 stores generated bytes; each `JobOutput` stores its key, size, ETag, and content type. Ready means every output is saved. The web Worker serves authorized R2 streams without consulting Comfy.
+## Known limitations
 
-See [generation MVP](docs/generation-mvp.md) for exact limits and recovery behavior.
+- Everyone allowed into a deployment shares its Comfy key and credits; there are no per-creator spending limits yet.
+- The Orb29 activity shader carries a non-commercial restriction from its author (see [LICENSE](LICENSE)). Replace it or obtain permission before commercial use.
+- Sustained 60 fps has been profiled in headless Chrome only, not yet on representative physical devices.
 
-## Deployment preparation
+## License
 
-The all-zero D1 IDs in `apps/*/wrangler.jsonc` are **local placeholders**, not provisioned Cloudflare resources. Before deploying, provision a private R2 bucket for each environment, bind the same bucket to both Workers as `GENERATED_ASSETS`, and create the intended D1 database and set its actual ID in both configurations. Disable automatic expiry for completed R2 objects; configure cleanup of incomplete multipart uploads. Local R2 data shares the `.wrangler/state` directory with D1 and DO data. Configure distinct resources and secrets for preview/production; this scaffold does not deploy either environment automatically.
-
-After applying the intended database migrations and building, deploy the jobs Worker before the web Worker. Vite emits their configurations to `apps/web/dist/open_cinema_jobs/wrangler.json` and `apps/web/dist/server/wrangler.json`. Use those generated configs for deployment so the RSC child environment and client assets are included. No remote resources were created by scaffolding.
-
-## Remaining implementation work
-
-- Replace local test sessions with account authentication before public deployment.
-- Add provider-wide capacity, archival, and operator reconciliation for submissions without receipts.
-- Add user-directed asset deletion, backup/recovery policy, and the creative authoring flows.
-- Resolve Orb29's upstream non-commercial shader restriction before commercial use.
-- Verify sustained 60 fps on representative devices with realistic media and live traffic.
-
-[Generation implementation and verification notes](docs/generation-mvp.md) describe what is tested and what remains unverified. The earlier [scaffold report](docs/scaffold-verification.md) is historical.
+[MIT](LICENSE), except third-party components noted in the license file.

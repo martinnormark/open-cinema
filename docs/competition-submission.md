@@ -1,0 +1,67 @@
+# Competition submission plan
+
+Our entry to Comfy's [Open Source Higgsfield](https://comfy.org/open-source-higgsfield) competition. Rules, dates and prize conditions are summarised in [competition.md](competition.md) (verified 2026-10-16); re-check the landing page before submitting. Direction comes from [issue #1](https://github.com/martinnormark/open-cinema/issues/1) and the roadmap in [issue #2](https://github.com/martinnormark/open-cinema/issues/2).
+
+**Deadline: October 30, 2026, 9:00am Pacific (17:00 Copenhagen).** One submission per person, through the [entry form](https://form.typeform.com/to/V1dSQrkS).
+
+## The pitch in one sentence
+
+Open Cinema is an open, Comfy-powered Cinema Studio: build a cast, a place and the things in it once as Elements, direct them across stills and video, then replace a shot's background or recast a character while the performance and everything else you approved stays put.
+
+## Prize targets
+
+| Target                      | Prize                       | Why we qualify, and what must be true                                                                                                                  |
+| --------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Best Overall / Grand Prize  | $10,000                     | Automatic. Win on the complete journey: Elements → continuity across shots → selective revision, in a polished, runnable open-source app.              |
+| VFX Workflow Built with LTX | $2,000                      | LTX must be the **core video model**. Shot generation uses `ltx/ltx-2-5-*`; keep LTX central in the demo and say so explicitly.                        |
+| Most Viral                  | RTX 5090                    | A 30-second, share-first cut (issue #1): one character, three locations, then a live recast. Post natively on X and TikTok with #OpenSourceHiggsfield. |
+| Built with FLUX             | Up to $1,000 in API credits | FLUX 3 (`bfl/flux-3-image`) is the core image model for Elements and stills. Mention it by name in the video.                                          |
+| Most Innovative (stretch)   | RTX 5090                    | Only if we can state the innovation crisply: Elements that carry identity and approved references into any workflow via `@` mentions, not prompt text. |
+
+Not targeted: **Open Weights Only** (we use partner models through Comfy Router) and **MiniMax H3**.
+
+## Two-minute demo script
+
+Target 1:50. Screen recording of the deployed studio at 1440×900, cursor visible, real generations (cut waiting time, never fake results). Voice-over in plain language; captions burned in for silent autoplay.
+
+| Time      | On screen                                                                                                                 | Voice-over                                                                                                                          |
+| --------- | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| 0:00–0:08 | Finished 10-second sequence: the same character in three shots.                                                           | "Same character, same coat, same car, three different shots. Made in Open Cinema, an open studio built on Comfy."                   |
+| 0:08–0:28 | Elements: create **@Mara** (Character), curate front, profile and close-up references; add **@Harbor** and **@Roadster**. | "Instead of re-prompting every time, I build my world once. Elements keep a curated reference sheet: these views are Mara."         |
+| 0:28–0:48 | Studio: "@Mara beside @Roadster at @Harbor, just before sunrise." FLUX 3 stills appear; save one as a reference.          | "I mention Elements by name. FLUX 3 renders the shot from the approved references, not from a description."                         |
+| 0:48–1:08 | Animate the approved still with LTX; Activity and Orb show live progress; play the clip.                                  | "The still becomes a shot with LTX as the core video model. Jobs are durable: close the tab and they keep running."                 |
+| 1:08–1:28 | Revision: replace the background with @Harbor at dusk; wipe-compare original and result across the clip.                  | "Now change one decision. Move the scene to dusk. The performance, timing and camera move stay exactly as approved."                |
+| 1:28–1:42 | Recast: replace the person on the left with @Mara; side-by-side comparison; keep the variant.                             | "Or recast. Mara takes over the performance; everyone and everything else is preserved, and the original is always one click away." |
+| 1:42–1:50 | README on GitHub, MIT license, Settings showing the Comfy key; end card with repo URL and hashtag.                        | "It's open source and runs on your own Comfy key. Clone it, run two commands, start directing. #OpenSourceHiggsfield"               |
+
+How it was built (required in the video; keep to one caption line per point during 1:42–1:50, or a 10-second card if time allows): TanStack Start on Cloudflare Workers, a Durable Object per creator coordinating Comfy Router jobs, FLUX 3 for images, LTX for video, R2 for media you keep.
+
+Only show capabilities that work end to end on the day of recording. If recast or background replacement is not convincing on representative footage, cut that beat rather than choosing a single favourable example (roadmap guardrail).
+
+## The 30-second viral cut
+
+Hook in the first two seconds: the recast happening live on a split screen. Then three fast shots of the same Element in different places, then the end card. Vertical 9:16 export for TikTok/Reels, 16:9 for X and YouTube.
+
+## Submission checklist
+
+Status as of this document; update it as items land.
+
+- [x] Public GitHub repository with application code
+- [x] Open-source license ([MIT](../LICENSE))
+- [x] Setup instructions a stranger can follow ([README](../README.md))
+- [x] Uses Comfy Router through the official Comfy SDK
+- [ ] Workflow files for each supported capability committed alongside the code
+- [ ] Deployed instance behind [Cloudflare Access](auth.md), with a demo account or public read-only gallery for judges
+- [ ] Example outputs in the README (stills, a short sequence, before/after revisions)
+- [ ] Demo video, ≤ 2:00, explaining how it was built and naming FLUX 3 and LTX
+- [ ] Social post with #OpenSourceHiggsfield; link captured for the form
+- [ ] Entry form submitted before the deadline
+
+## Judge access
+
+Judges should not need a Comfy key. Options, in order of preference:
+
+1. A deployed instance with an Access policy that admits judges by one-time email PIN, funded by our Comfy credits with a per-day budget we monitor.
+2. A public gallery of saved results and comparisons that needs no sign-in, alongside the repository's local setup.
+
+Record the deployment URL and Access policy here once it exists.
