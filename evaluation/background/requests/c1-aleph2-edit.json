@@ -1,0 +1,8 @@
+{
+ "model": "runway/aleph2",
+ "body": {
+  "promptText": "Replace only the background and setting with a small working fishing harbor at dusk: weathered wooden pier, moored fishing boats, stacked lobster crates and coiled ropes, warm sodium lamps glowing against a deep blue evening sky, calm dark water. Keep every person and every object they touch exactly as in the source: same faces, hair, clothing, poses, gestures, expressions and timing. Keep the camera movement and framing identical. Adjust light on the people only as needed to sit naturally in the new setting.",
+  "videoUri": "<source:c1>",
+  "seed": 1207
+ }
+}

@@ -157,3 +157,6 @@ vite.config.ts.timestamp-*
 packages/database/src/generated/
 packages/database/prisma/*.db*
 artifacts/
+
+# Python bytecode
+__pycache__/

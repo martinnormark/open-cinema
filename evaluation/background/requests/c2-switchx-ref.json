@@ -1,0 +1,11 @@
+{
+ "model": "beeble/switchx",
+ "body": {
+  "generation_type": "video",
+  "source_uri": "<source:c2>",
+  "alpha_mode": "auto",
+  "reference_image_uri": "<plate:loc-greenhouse>",
+  "prompt": "The same people in the interior of a large Victorian glass greenhouse in bright late-morning sun: white painted iron frames, tall palms and ferns, terracotta pots on wooden benches, a gravel path, dappled sunlight.",
+  "max_resolution": 720
+ }
+}

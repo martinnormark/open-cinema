@@ -1,0 +1,8 @@
+{
+ "model": "runway/aleph2",
+ "body": {
+  "promptText": "Replace only the background and setting with the interior of a large Victorian glass greenhouse in bright late-morning sun: white painted iron frames, tall palms and ferns, terracotta pots on wooden benches, a gravel path, dappled sunlight. Keep every person and every object they touch exactly as in the source: same faces, hair, clothing, poses, gestures, expressions and timing. Keep the camera movement and framing identical. Adjust light on the people only as needed to sit naturally in the new setting.",
+  "videoUri": "<source:c4>",
+  "seed": 1207
+ }
+}

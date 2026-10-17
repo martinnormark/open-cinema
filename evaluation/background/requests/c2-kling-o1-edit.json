@@ -1,0 +1,20 @@
+{
+ "model": "kling/kling-v3-omni",
+ "body": {
+  "prompt": "Replace only the background of <<<video_1>>> with the place in <<<image_1>>>: the interior of a large Victorian glass greenhouse in bright late-morning sun: white painted iron frames, tall palms and ferns, terracotta pots on wooden benches, a gravel path, dappled sunlight. Keep every person and every object they touch exactly as in the source: same faces, hair, clothing, poses, gestures, expressions and timing. Keep the camera movement and framing identical. Adjust light on the people only as needed to sit naturally in the new setting.",
+  "video_list": [
+   {
+    "video_url": "<source:c2>",
+    "refer_type": "base",
+    "keep_original_sound": "no"
+   }
+  ],
+  "image_list": [
+   {
+    "image_url": "<plate:loc-greenhouse>"
+   }
+  ],
+  "mode": "std",
+  "sound": "off"
+ }
+}
