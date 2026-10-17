@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { ExternalLink } from "lucide-react";
 import { WORKFLOW_DESCRIPTORS } from "@open-cinema/contracts";
 import { PageHeader } from "@/components/page-header";
@@ -82,6 +82,20 @@ function Settings() {
             Manage keys and credits on platform.comfy.org
             <ExternalLink aria-hidden="true" className="size-3.5" />
           </a>
+        </SettingsSection>
+
+        <Separator />
+
+        <SettingsSection
+          title="Your world"
+          description="Save Elements, recipes, a project's look and its sequences as one file, or bring one in from another studio."
+        >
+          <Link
+            to="/world"
+            className="inline-flex items-center gap-1.5 text-sm text-foreground underline decoration-border hover:decoration-foreground"
+          >
+            Move your world
+          </Link>
         </SettingsSection>
 
         <Separator />

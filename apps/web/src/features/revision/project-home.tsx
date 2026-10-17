@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowLeft, Clapperboard, Plus, Wand2 } from "lucide-react";
+import { ArrowLeft, Clapperboard, PackageOpen, Plus, Wand2 } from "lucide-react";
 import {
   assetRefKey,
   type Project,
@@ -73,6 +73,11 @@ export function ProjectHome({
           )}
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button variant="ghost" asChild>
+            <Link to="/world" search={{ project: project.id }}>
+              <PackageOpen aria-hidden="true" /> Save as world
+            </Link>
+          </Button>
           <Button variant="outline" asChild>
             <Link to="/revisions/new" search={{ project: project.id }}>
               <Wand2 aria-hidden="true" /> New revision
