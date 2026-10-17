@@ -5,6 +5,7 @@ import {
   referenceRoleSchema,
   referenceViewSchema,
 } from "./elements";
+import { cameraMoveSchema, restageAngleSchema } from "./camera";
 import { assetRefSchema, type AssetRef } from "./media";
 import { directionSnapshotSchema } from "./direction";
 import { preservationIntentSchema, targetSelectionSchema } from "./replacement";
@@ -65,6 +66,11 @@ export const ltxVideoInputsSchema = z.object({
   quality: z.enum(["fast", "pro"]).default("fast"),
   /** Animates this image. Router's LTX is text-only, so this runs on FLUX 3 Video. */
   firstFrame: assetRefSchema.optional(),
+  /**
+   * A camera move made by an LTX-2 camera-control LoRA on Comfy Cloud, with or
+   * without a first frame. Without one, the prompt alone directs the camera.
+   */
+  camera: cameraMoveSchema.optional(),
   mentions,
   direction,
 });
@@ -143,6 +149,48 @@ export const performanceTransferInputsSchema = z.object({
 export type PerformanceTransferInputs = z.infer<
   typeof performanceTransferInputsSchema
 >;
+/** Short descriptions SAM 3 can find in every frame, e.g. "the table lamp". */
+const objectPhrase = z.string().trim().min(3).max(200);
+
+export const objectSwapInputsSchema = z.object({
+  source: assetRefSchema,
+  /** The Thing that takes the object's place, with its approved sheet. */
+  thing: elementMentionSchema,
+  /** The object in the take that is replaced, in words. */
+  original: objectPhrase,
+  /** Where the creator marked the object, to word the instruction. */
+  point: z
+    .object({
+      x: z.number().min(0).max(1),
+      y: z.number().min(0).max(1),
+      timeMs: z.number().int().nonnegative().optional(),
+    })
+    .optional(),
+  prompt: prompt.optional(),
+  preservation: preservationIntentSchema,
+});
+export type ObjectSwapInputs = z.infer<typeof objectSwapInputsSchema>;
+
+export const restyleInputsSchema = z.object({
+  source: assetRefSchema,
+  /** A Location (or any Element) whose approved references set the look. */
+  style: elementMentionSchema.optional(),
+  /** Or an explicit style reference image. */
+  styleImage: assetRefSchema.optional(),
+  /** The look in words; required when no reference is given. */
+  prompt: prompt.optional(),
+  preservation: preservationIntentSchema,
+});
+export type RestyleInputs = z.infer<typeof restyleInputsSchema>;
+
+export const restageInputsSchema = z.object({
+  source: assetRefSchema,
+  angle: restageAngleSchema,
+  /** What is in the shot, so the new angle keeps it. */
+  prompt: prompt.optional(),
+  preservation: preservationIntentSchema,
+});
+export type RestageInputs = z.infer<typeof restageInputsSchema>;
 
 export const workflowInputsSchemas = {
   "image.flux": fluxImageInputsSchema,
@@ -151,6 +199,9 @@ export const workflowInputsSchemas = {
   "video.background-replace": backgroundReplaceInputsSchema,
   "video.character-replace": characterReplaceInputsSchema,
   "video.performance-transfer": performanceTransferInputsSchema,
+  "video.object-swap": objectSwapInputsSchema,
+  "video.restyle": restyleInputsSchema,
+  "video.restage": restageInputsSchema,
 } as const satisfies Record<WorkflowKind, z.ZodType>;
 
 export type WorkflowInputs<K extends WorkflowKind = WorkflowKind> = z.infer<
@@ -182,6 +233,18 @@ export const generationRequestSchema = z.discriminatedUnion("workflowKind", [
   z.object({
     workflowKind: z.literal("video.performance-transfer"),
     inputs: performanceTransferInputsSchema,
+  }),
+  z.object({
+    workflowKind: z.literal("video.object-swap"),
+    inputs: objectSwapInputsSchema,
+  }),
+  z.object({
+    workflowKind: z.literal("video.restyle"),
+    inputs: restyleInputsSchema,
+  }),
+  z.object({
+    workflowKind: z.literal("video.restage"),
+    inputs: restageInputsSchema,
   }),
 ]);
 export type GenerationRequest = z.infer<typeof generationRequestSchema>;
@@ -232,6 +295,14 @@ export function requestAssetRefs(request: GenerationRequest): AssetRef[] {
         request.inputs.source,
         ...(request.inputs.firstFrame ? [request.inputs.firstFrame] : []),
       ];
+    case "video.object-swap":
+    case "video.restage":
+      return [request.inputs.source];
+    case "video.restyle":
+      return [
+        request.inputs.source,
+        ...(request.inputs.styleImage ? [request.inputs.styleImage] : []),
+      ];
   }
 }
 
@@ -261,6 +332,12 @@ export function requestMentions(request: GenerationRequest) {
         (m, i) => all.findIndex((n) => n.elementId === m.elementId) === i,
       );
     }
+    case "video.object-swap":
+      return [request.inputs.thing];
+    case "video.restyle":
+      return request.inputs.style ? [request.inputs.style] : [];
+    case "video.restage":
+      return [];
     default:
       return request.inputs.mentions;
   }
@@ -309,7 +386,12 @@ export const WORKFLOW_DESCRIPTORS = {
     kind: "video.ltx",
     label: "Video",
     output: "video",
-    models: ["ltx/ltx-2-5-fast", "ltx/ltx-2-5-pro", "bfl/flux-3-video"],
+    models: [
+      "ltx/ltx-2-5-fast",
+      "ltx/ltx-2-5-pro",
+      "bfl/flux-3-video",
+      "comfy-cloud/ltx-2-camera-lora",
+    ],
   },
   "video.background-replace": {
     kind: "video.background-replace",
@@ -332,6 +414,24 @@ export const WORKFLOW_DESCRIPTORS = {
     label: "Reuse performance",
     output: "video",
     models: ["comfy-cloud/ltx-2.3-union-pose"],
+  },
+  "video.object-swap": {
+    kind: "video.object-swap",
+    label: "Swap an object",
+    output: "video",
+    models: ["comfy-cloud/ltx-2.3-object-swap"],
+  },
+  "video.restyle": {
+    kind: "video.restyle",
+    label: "Restyle",
+    output: "video",
+    models: ["comfy-cloud/ltx-2.3-restyle"],
+  },
+  "video.restage": {
+    kind: "video.restage",
+    label: "Re-stage the camera",
+    output: "video",
+    models: ["comfy-cloud/ltx-2.3-crossview"],
   },
 } as const satisfies Record<WorkflowKind, WorkflowDescriptor>;
 

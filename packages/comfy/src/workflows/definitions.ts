@@ -46,6 +46,11 @@ import {
   characterReferences,
   characterReplaceRequest,
 } from "./character-replace";
+import {
+  LTX_CAMERA_MODEL_ID,
+  LTX_CAMERA_OUTPUT_NODES,
+  ltxCameraRequest,
+} from "./revision-modes";
 import type {
   BuildContext,
   CloudMediaInput,
@@ -185,10 +190,20 @@ export const fluxReferenceWorkflow: WorkflowDefinition<"image.flux-reference"> =
 
 export const ltxVideoWorkflow: WorkflowDefinition<"video.ltx"> = {
   kind: "video.ltx",
-  displayModel: (inputs) => (inputs.firstFrame ? "FLUX 3 Video" : "LTX 2.5"),
+  displayModel: (inputs) =>
+    inputs.camera
+      ? "LTX-2 camera LoRA"
+      : inputs.firstFrame
+        ? "FLUX 3 Video"
+        : "LTX 2.5",
   deadlineMs: 45 * 60_000,
-  model: ltxVideoModel,
+  model: (inputs) =>
+    inputs.camera ? LTX_CAMERA_MODEL_ID : ltxVideoModel(inputs),
+  // A camera move needs a LoRA, which only the open weights on Cloud take.
+  provider: (inputs) => (inputs.camera ? "cloud-workflow" : "router"),
+  cloudOutputNodes: LTX_CAMERA_OUTPUT_NODES,
   async build(inputs, context) {
+    if (inputs.camera) return ltxCameraRequest(inputs, context);
     const frame = inputs.firstFrame && (await context.asset(inputs.firstFrame));
     // Router's LTX reads text only: mentions say who they are, not just a name.
     const prompt = expandMentions(

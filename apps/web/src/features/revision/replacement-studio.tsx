@@ -13,16 +13,21 @@ import {
   ScanFace,
   TriangleAlert,
   Ban,
+  Package,
+  Palette,
   UserRound,
+  Video,
 } from "lucide-react";
 import {
   DEFAULT_PRESERVATION,
+  RESTAGE_ANGLES,
   approvedReferences,
   assetRefKey,
   type AssetRef,
   type BackgroundPipelineChoice,
   type GenerationRequestInput,
   type PreservedAspect,
+  type RestageAngle,
 } from "@open-cinema/contracts";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -50,6 +55,7 @@ import { estimateReplacement } from "./estimate";
 import { preflight, type Preflight } from "./shot-checks";
 import { requestScan, useShotScan, type ScanState } from "./shot-checks-client";
 import {
+  LTX_REVISION_SECONDS,
   checkKlingSource,
   formatEstimate,
   formatTimecode,
@@ -79,6 +85,11 @@ interface Target {
 const LOCKED: Record<ReplacementKind, readonly PreservedAspect[]> = {
   background: ["foreground", "performance"],
   character: ["performance", "background"],
+  // The swap puts the take's own pixels back everywhere but the object.
+  object: ["performance", "background", "other-people"],
+  // Restyle and re-staging follow the take's depth or the take itself.
+  restyle: ["performance", "camera", "framing"],
+  camera: ["performance", "timing"],
 };
 const OFFERED: Record<ReplacementKind, readonly PreservedAspect[]> = {
   background: [
@@ -101,7 +112,35 @@ const OFFERED: Record<ReplacementKind, readonly PreservedAspect[]> = {
     "audio",
     "lighting",
   ],
+  object: [
+    "performance",
+    "background",
+    "other-people",
+    "timing",
+    "camera",
+    "framing",
+    "audio",
+  ],
+  restyle: ["performance", "camera", "framing", "timing", "audio"],
+  camera: ["performance", "timing", "audio"],
 };
+
+/** What runs where, so the composer reads the right limits. */
+const KLING_KINDS: readonly ReplacementKind[] = ["background", "character"];
+const KIND_ICONS = {
+  background: Mountain,
+  character: UserRound,
+  object: Package,
+  restyle: Palette,
+  camera: Video,
+} as const;
+const ELEMENT_TYPES = {
+  background: "location",
+  character: "character",
+  object: "thing",
+  restyle: "location",
+  camera: null,
+} as const;
 
 export function ReplacementStudio({
   initialSource,
@@ -163,7 +202,35 @@ export function ReplacementStudio({
         ? draft.preserve
         : DEFAULT_PRESERVATION.character.preserve,
     ),
+    object: new Set(
+      draft?.kind === "object"
+        ? draft.preserve
+        : DEFAULT_PRESERVATION.object.preserve,
+    ),
+    restyle: new Set(
+      draft?.kind === "restyle"
+        ? draft.preserve
+        : DEFAULT_PRESERVATION.restyle.preserve,
+    ),
+    camera: new Set(
+      draft?.kind === "camera"
+        ? draft.preserve
+        : DEFAULT_PRESERVATION.restage.preserve,
+    ),
   }));
+  const [angle, setAngle] = useState<RestageAngle>(
+    draft?.draft?.angle ?? "closer",
+  );
+  const [original, setOriginal] = useState(draft?.draft?.original ?? "");
+  const [styleKey, setStyleKey] = useState<string | null>(
+    draft?.draft?.styleImage ?? null,
+  );
+  const styleImage =
+    styleKey === null
+      ? null
+      : (items.find(
+          (item) => item.kind === "image" && assetRefKey(item.ref) === styleKey,
+        ) ?? null);
   const [allowIntegration, setAllowIntegration] = useState(
     draft?.allowIntegration ?? true,
   );
@@ -182,8 +249,11 @@ export function ReplacementStudio({
       ? null
       : (items.find((item) => assetRefKey(item.ref) === plateKey) ?? null);
 
-  const elementType = kind === "background" ? "location" : "character";
-  const candidates = elements.filter((e) => e.type === elementType);
+  const elementType = ELEMENT_TYPES[kind];
+  const candidates = elementType
+    ? elements.filter((e) => e.type === elementType)
+    : [];
+  const kling = KLING_KINDS.includes(kind);
   const element = candidates.find((e) => e.id === elementId) ?? null;
   const state = element?.states.find((s) => s.id === stateId) ?? null;
   const references = element ? approvedReferences(element, state?.id) : [];
@@ -201,7 +271,7 @@ export function ReplacementStudio({
     (a) => !unavailable.includes(a),
   );
   const sourceCheck =
-    source && !alpha
+    source && !alpha && kling
       ? checkKlingSource({
           seconds: clipSeconds,
           width: source.width ?? measured?.width ?? null,
@@ -265,6 +335,23 @@ export function ReplacementStudio({
     problems.push(
       "Recasting needs a shot where this person’s face is seen at some point.",
     );
+  if (!kling && clipSeconds !== null && clipSeconds < 1)
+    problems.push("This revision needs a clip of at least 1 second.");
+  if (kind === "object" && !element)
+    problems.push("Choose the Thing that takes the object’s place.");
+  if (kind === "object" && element && !references.length)
+    problems.push(`${element.name} needs an approved reference first.`);
+  if (kind === "object" && original.trim().length < 3)
+    problems.push("Name the object in the shot that is replaced.");
+  if (kind === "restyle" && element && !references.length)
+    problems.push(`${element.name} needs an approved reference first.`);
+  if (
+    kind === "restyle" &&
+    !element &&
+    !styleImage &&
+    direction.trim().length < 3
+  )
+    problems.push("Choose a Location or style image, or describe the look.");
 
   function chooseKind(next: ReplacementKind) {
     if (next === kind) return;
@@ -299,6 +386,30 @@ export function ReplacementStudio({
       const where = plate ? `“${plate.title}”` : (mention ?? "a new plate");
       return `Put the performers, exactly as shot, in front of ${where}.`;
     }
+    const note = direction.trim().replace(/[.\s]+$/, "");
+    const after = note ? ` ${note[0]!.toUpperCase()}${note.slice(1)}.` : "";
+    if (kind === "object") {
+      const what =
+        original
+          .trim()
+          .replace(/[.\s]+$/, "")
+          .replace(/^(The|A|An) /, (article) => article.toLowerCase()) ||
+        "the marked object";
+      return `Swap ${/^(the|a|an) /i.test(what) ? what : `the ${what}`} for ${mention ?? "a Thing"}, keeping everyone and everything else exactly as shot.${after}`;
+    }
+    if (kind === "restyle") {
+      const look = [
+        mention,
+        styleImage ? `“${styleImage.title}”` : null,
+      ].filter(Boolean);
+      if (!look.length)
+        return note
+          ? `Restyle this shot: ${note}, keeping the action and camera.`
+          : "Restyle this shot, keeping the action and camera.";
+      return `Restyle this shot in the look of ${look.join(" and ")}, keeping the action and camera.${after}`;
+    }
+    if (kind === "camera")
+      return `Re-stage this take from a new angle: ${RESTAGE_ANGLES[angle].label.toLowerCase()}, keeping the performance and timing.${after}`;
     if (kind === "background") {
       const how = direction.trim().replace(/[.\s]+$/, "");
       if (!mention)
@@ -344,66 +455,115 @@ export function ReplacementStudio({
         ? { elementId: element.id, ...(state ? { stateId: state.id } : {}) }
         : undefined;
       const request: GenerationRequestInput =
-        kind === "background"
+        kind === "object"
           ? {
-              workflowKind: "video.background-replace",
+              workflowKind: "video.object-swap",
               inputs: {
                 source: source.ref,
-                ...(mention ? { location: mention } : {}),
-                ...(alpha && plate ? { background: plate.ref } : {}),
-                ...(!alpha && direction.trim().length >= 3
+                thing: mention!,
+                original: original.trim(),
+                ...(target
+                  ? {
+                      point: {
+                        x: target.x,
+                        y: target.y,
+                        timeMs: target.timeMs,
+                      },
+                    }
+                  : {}),
+                ...(direction.trim().length >= 3
                   ? { prompt: direction.trim() }
                   : {}),
-                target: { type: "background" },
                 preservation,
-                pipeline,
               },
             }
-          : {
-              workflowKind: "video.character-replace",
-              inputs: {
-                source: source.ref,
-                character: mention!,
-                references: [],
-                target: {
-                  type: "person",
-                  ...(target
-                    ? {
-                        point: {
-                          x: target.x,
-                          y: target.y,
-                          timeMs: target.timeMs,
-                        },
-                      }
+          : kind === "restyle"
+            ? {
+                workflowKind: "video.restyle",
+                inputs: {
+                  source: source.ref,
+                  ...(mention ? { style: mention } : {}),
+                  ...(styleImage ? { styleImage: styleImage.ref } : {}),
+                  ...(direction.trim().length >= 3
+                    ? { prompt: direction.trim() }
                     : {}),
-                  ...(targetNote.trim()
-                    ? { description: targetNote.trim() }
-                    : {}),
+                  preservation,
                 },
-                // Keeping the source wardrobe or the Character's own look is
-                // already worded by the request builder from `preservation`.
-                prompt: [
-                  wardrobe === "describe"
-                    ? `Wardrobe for this shot: ${wardrobeNote.trim()}.`
-                    : "",
-                  direction.trim(),
-                ]
-                  .filter(Boolean)
-                  .join(" "),
-                preservation: {
-                  ...preservation,
-                  preserve:
-                    wardrobe === "keep"
-                      ? [
-                          ...new Set([
-                            ...preservation.preserve,
-                            "wardrobe" as const,
-                          ]),
-                        ]
-                      : preservation.preserve.filter((a) => a !== "wardrobe"),
-                },
-              },
-            };
+              }
+            : kind === "camera"
+              ? {
+                  workflowKind: "video.restage",
+                  inputs: {
+                    source: source.ref,
+                    angle,
+                    ...(direction.trim().length >= 3
+                      ? { prompt: direction.trim() }
+                      : {}),
+                    preservation,
+                  },
+                }
+              : kind === "background"
+                ? {
+                    workflowKind: "video.background-replace",
+                    inputs: {
+                      source: source.ref,
+                      ...(mention ? { location: mention } : {}),
+                      ...(alpha && plate ? { background: plate.ref } : {}),
+                      ...(!alpha && direction.trim().length >= 3
+                        ? { prompt: direction.trim() }
+                        : {}),
+                      target: { type: "background" },
+                      preservation,
+                      pipeline,
+                    },
+                  }
+                : {
+                    workflowKind: "video.character-replace",
+                    inputs: {
+                      source: source.ref,
+                      character: mention!,
+                      references: [],
+                      target: {
+                        type: "person",
+                        ...(target
+                          ? {
+                              point: {
+                                x: target.x,
+                                y: target.y,
+                                timeMs: target.timeMs,
+                              },
+                            }
+                          : {}),
+                        ...(targetNote.trim()
+                          ? { description: targetNote.trim() }
+                          : {}),
+                      },
+                      // Keeping the source wardrobe or the Character's own look is
+                      // already worded by the request builder from `preservation`.
+                      prompt: [
+                        wardrobe === "describe"
+                          ? `Wardrobe for this shot: ${wardrobeNote.trim()}.`
+                          : "",
+                        direction.trim(),
+                      ]
+                        .filter(Boolean)
+                        .join(" "),
+                      preservation: {
+                        ...preservation,
+                        preserve:
+                          wardrobe === "keep"
+                            ? [
+                                ...new Set([
+                                  ...preservation.preserve,
+                                  "wardrobe" as const,
+                                ]),
+                              ]
+                            : preservation.preserve.filter(
+                                (a) => a !== "wardrobe",
+                              ),
+                      },
+                    },
+                  };
       const decisions: RevisionDecisions = {
         kind,
         sourceTitle: source.title.slice(0, 300),
@@ -418,21 +578,34 @@ export function ReplacementStudio({
           : null,
         direction: direction.trim(),
         target:
-          kind === "character"
+          kind === "object"
             ? [
-                targetNote.trim(),
+                original.trim(),
                 target
                   ? `marked at ${formatTimecode(target.timeMs / 1000)}`
                   : "",
               ]
                 .filter(Boolean)
                 .join(", ")
-            : "Background",
+                .slice(0, 300)
+            : kind === "restyle"
+              ? "The whole look"
+              : kind === "camera"
+                ? `New angle: ${RESTAGE_ANGLES[angle].label}`
+                : kind === "character"
+                  ? [
+                      targetNote.trim(),
+                      target
+                        ? `marked at ${formatTimecode(target.timeMs / 1000)}`
+                        : "",
+                    ]
+                      .filter(Boolean)
+                      .join(", ")
+                  : "Background",
         wardrobe: kind === "character" ? wardrobe : null,
         wardrobeNote: kind === "character" ? wardrobeNote.trim() : "",
         preserve:
-          request.workflowKind === "video.character-replace" ||
-          request.workflowKind === "video.background-replace"
+          "preservation" in request.inputs && request.inputs.preservation
             ? [...request.inputs.preservation.preserve]
             : [],
         allowIntegration,
@@ -448,6 +621,9 @@ export function ReplacementStudio({
           targetNote: targetNote.trim().slice(0, 300),
           pipeline,
           plate: alpha ? plateKey : null,
+          angle: kind === "camera" ? angle : null,
+          original: kind === "object" ? original.trim().slice(0, 200) : null,
+          styleImage: kind === "restyle" ? styleKey : null,
         },
       };
       const result = await submitRevision({
@@ -487,7 +663,12 @@ export function ReplacementStudio({
       <div className="min-w-0">
         <SourceStage
           source={source}
-          markTarget={kind === "character"}
+          markTarget={kind === "character" || kind === "object"}
+          markLabel={
+            kind === "object"
+              ? "Click the object to swap"
+              : "Click the person to recast"
+          }
           target={target}
           onTarget={(next) => {
             setTarget(next);
@@ -515,13 +696,15 @@ export function ReplacementStudio({
         <fieldset>
           <legend className="text-sm font-medium">What changes</legend>
           <div className="mt-3 grid grid-cols-2 gap-2">
-            {(["background", "character"] as const).map((option) => {
-              const Icon = option === "background" ? Mountain : UserRound;
+            {(Object.keys(KIND_ICONS) as ReplacementKind[]).map((option) => {
+              const Icon = KIND_ICONS[option];
               return (
                 <label
                   key={option}
                   className={cn(
                     "flex cursor-pointer flex-col gap-1.5 rounded-xl border p-3 transition-colors has-focus-visible:ring-2 has-focus-visible:ring-ring",
+                    // Five choices: the last one spans the row.
+                    option === "camera" && "col-span-2",
                     kind === option
                       ? "border-tungsten/70 bg-surface"
                       : "border-border hover:bg-surface",
@@ -555,19 +738,61 @@ export function ReplacementStudio({
           </div>
         </fieldset>
 
-        <ElementChoice
-          key={kind}
-          kind={kind}
-          loading={elementsStatus === "loading"}
-          candidates={candidates}
-          elementId={elementId}
-          stateId={stateId}
-          onChoose={(id, nextState) => {
-            setElementId(id);
-            setStateId(nextState);
-            setPendingKey(null);
-          }}
-        />
+        {kind === "object" && (
+          <fieldset className="revision-reveal">
+            <legend className="text-sm font-medium">What is replaced</legend>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              {target
+                ? `Marked at ${formatTimecode(target.timeMs / 1000)}. Name it in a few plain words so it can be found in every frame.`
+                : "Name the object in a few plain words. You can also click it on the frame."}
+            </p>
+            <input
+              value={original}
+              onChange={(event) => {
+                setOriginal(event.target.value);
+                setPendingKey(null);
+              }}
+              maxLength={200}
+              placeholder="The table lamp with the white shade"
+              aria-label="The object to replace"
+              className="mt-2 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          </fieldset>
+        )}
+
+        {kind === "camera" ? (
+          <AngleChoice
+            angle={angle}
+            onAngle={(next) => {
+              setAngle(next);
+              setPendingKey(null);
+            }}
+          />
+        ) : (
+          <ElementChoice
+            key={kind}
+            kind={kind}
+            loading={elementsStatus === "loading"}
+            candidates={candidates}
+            elementId={elementId}
+            stateId={stateId}
+            onChoose={(id, nextState) => {
+              setElementId(id);
+              setStateId(nextState);
+              setPendingKey(null);
+            }}
+          />
+        )}
+
+        {kind === "restyle" && (
+          <StyleImageChoice
+            image={styleImage}
+            onImage={(next) => {
+              setStyleKey(next ? assetRefKey(next.ref) : null);
+              setPendingKey(null);
+            }}
+          />
+        )}
 
         {kind === "background" && (
           <BackgroundMethod
@@ -690,7 +915,13 @@ export function ReplacementStudio({
                 ? element
                   ? "Direction (optional)"
                   : "Describe the new setting"
-                : "Direction (optional)"}
+                : kind === "restyle"
+                  ? element || styleImage
+                    ? "Describe the look (optional)"
+                    : "Describe the look"
+                  : kind === "camera"
+                    ? "What is in the shot (optional)"
+                    : "Direction (optional)"}
             </label>
             <Textarea
               id="revision-direction"
@@ -705,7 +936,13 @@ export function ReplacementStudio({
               placeholder={
                 kind === "background"
                   ? "Harbor at dusk, sodium lights coming on, light rain"
-                  : "Slightly older, the same quiet intensity"
+                  : kind === "object"
+                    ? "Lit, with a soft flicker on the table"
+                    : kind === "restyle"
+                      ? "Hand-painted gouache, warm dusk palette, visible brush texture"
+                      : kind === "camera"
+                        ? "Two people talking across a kitchen table at night"
+                        : "Slightly older, the same quiet intensity"
               }
             />
           </div>
@@ -757,7 +994,7 @@ export function ReplacementStudio({
               );
             })}
           </ul>
-          {!alpha && (
+          {!alpha && kling && (
             <label className="mt-3 flex cursor-pointer items-start gap-2.5 text-xs leading-5 text-muted-foreground">
               <input
                 type="checkbox"
@@ -785,7 +1022,13 @@ export function ReplacementStudio({
                 ? "Everything outside the matted people and Things"
                 : kind === "background"
                   ? "Only the setting behind the people and Things"
-                  : "Only the marked person"}
+                  : kind === "object"
+                    ? "Only the object, and the light it casts nearby"
+                    : kind === "restyle"
+                      ? "The look of every frame, people included"
+                      : kind === "camera"
+                        ? "Where the camera stands"
+                        : "Only the marked person"}
             </dd>
             <dt className="text-muted-foreground">Keeps</dt>
             <dd>
@@ -806,6 +1049,27 @@ export function ReplacementStudio({
           {estimate.note && (
             <p className="mt-2 text-xs leading-5 text-muted-foreground">
               {estimate.note}
+            </p>
+          )}
+          {!kling &&
+            clipSeconds !== null &&
+            clipSeconds > LTX_REVISION_SECONDS + 0.2 && (
+              <p className="mt-2 text-xs leading-5 text-foreground">
+                Only the first {LTX_REVISION_SECONDS} seconds are revised, so
+                the result is {LTX_REVISION_SECONDS} seconds long.
+              </p>
+            )}
+          {kind === "restyle" && (
+            <p className="mt-2 text-xs leading-5 text-foreground">
+              People are restyled too. Their faces follow the new look and can
+              drift from the actors’ likeness; the check after the run says
+              where.
+            </p>
+          )}
+          {kind === "camera" && (
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">
+              Small moves hold up best. The model has not seen angles from
+              behind the subject, so there is no reverse shot.
             </p>
           )}
           {sourceCheck.notes.map((note) => (
@@ -859,6 +1123,7 @@ export function ReplacementStudio({
 function SourceStage({
   source,
   markTarget,
+  markLabel,
   target,
   onTarget,
   onMetadata,
@@ -866,6 +1131,7 @@ function SourceStage({
 }: {
   source: MediaItem | null;
   markTarget: boolean;
+  markLabel: string;
   target: Target | null;
   onTarget: (target: Target) => void;
   onMetadata: (metadata: ClipMetadata) => void;
@@ -957,8 +1223,7 @@ function SourceStage({
         <span>· {source.origin === "upload" ? "Uploaded" : "Generated"}</span>
         {markTarget && (
           <span className="ml-auto flex items-center gap-1">
-            <Crosshair aria-hidden="true" className="size-3" /> Click the person
-            to recast
+            <Crosshair aria-hidden="true" className="size-3" /> {markLabel}
           </span>
         )}
       </figcaption>
@@ -1358,7 +1623,13 @@ function ElementChoice({
   stateId: string | null;
   onChoose: (elementId: string | null, stateId: string | null) => void;
 }) {
-  const noun = kind === "background" ? "Location" : "Character";
+  const noun =
+    kind === "character"
+      ? "Character"
+      : kind === "object"
+        ? "Thing"
+        : "Location";
+  const optional = kind === "background" || kind === "restyle";
   const selected = candidates.find((e) => e.id === elementId) ?? null;
   const cover = (element: Element, state: ElementState | null) => {
     const reference = approvedReferences(element, state?.id)[0];
@@ -1367,7 +1638,13 @@ function ElementChoice({
   return (
     <fieldset>
       <legend className="text-sm font-medium">
-        {kind === "background" ? "New setting" : "New character"}
+        {kind === "background"
+          ? "New setting"
+          : kind === "object"
+            ? "Swap in"
+            : kind === "restyle"
+              ? "Look from a Location"
+              : "New character"}
       </legend>
       {loading ? (
         <p className="mt-2 text-xs text-muted-foreground">Loading Elements…</p>
@@ -1379,7 +1656,11 @@ function ElementChoice({
           </Link>{" "}
           {kind === "background"
             ? "to reuse a place across shots, or describe the setting below."
-            : "with approved references to cast them."}
+            : kind === "object"
+              ? "with approved references to swap it into shots."
+              : kind === "restyle"
+                ? "to borrow its look, or use a style image or words below."
+                : "with approved references to cast them."}
         </p>
       ) : (
         <ul className="mt-2 flex flex-col gap-1" aria-label={`${noun}s`}>
@@ -1393,10 +1674,7 @@ function ElementChoice({
                   type="button"
                   aria-pressed={active}
                   onClick={() =>
-                    onChoose(
-                      active && kind === "background" ? null : element.id,
-                      null,
-                    )
+                    onChoose(active && optional ? null : element.id, null)
                   }
                   className={cn(
                     "flex w-full items-center gap-3 rounded-lg p-1.5 text-left outline-none transition-colors hover:bg-surface focus-visible:ring-2 focus-visible:ring-ring",
@@ -1477,6 +1755,116 @@ function ElementChoice({
           </div>
         </div>
       )}
+    </fieldset>
+  );
+}
+
+function AngleChoice({
+  angle,
+  onAngle,
+}: {
+  angle: RestageAngle;
+  onAngle: (angle: RestageAngle) => void;
+}) {
+  return (
+    <fieldset>
+      <legend className="text-sm font-medium">New angle</legend>
+      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+        The take is filmed again from here: same performance, same timing.
+      </p>
+      <div className="mt-2 grid grid-cols-2 gap-1.5">
+        {(Object.keys(RESTAGE_ANGLES) as RestageAngle[]).map((option) => (
+          <label
+            key={option}
+            className={cn(
+              "flex cursor-pointer flex-col rounded-lg border px-2.5 py-2 transition-colors has-focus-visible:ring-2 has-focus-visible:ring-ring",
+              angle === option
+                ? "border-tungsten/70 bg-surface"
+                : "border-border hover:bg-surface",
+            )}
+          >
+            <input
+              type="radio"
+              name="restage-angle"
+              className="sr-only"
+              checked={angle === option}
+              onChange={() => onAngle(option)}
+            />
+            <span className="text-sm">{RESTAGE_ANGLES[option].label}</span>
+            <span className="text-xs leading-5 text-muted-foreground">
+              {RESTAGE_ANGLES[option].description}
+            </span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+function StyleImageChoice({
+  image,
+  onImage,
+}: {
+  image: MediaItem | null;
+  onImage: (image: MediaItem | null) => void;
+}) {
+  const [picking, setPicking] = useState(false);
+  return (
+    <fieldset className="min-w-0">
+      <legend className="text-sm font-medium">Or a style image</legend>
+      <div className="mt-2 flex items-center gap-3 rounded-lg bg-surface p-2">
+        {image ? (
+          <Thumbnail
+            src={image.thumbnailUrl}
+            kind={image.kind}
+            className="aspect-video w-20 shrink-0 rounded-md"
+          />
+        ) : (
+          <span className="grid aspect-video w-20 shrink-0 place-items-center rounded-md border border-dashed border-border">
+            <Palette
+              aria-hidden="true"
+              className="size-4 text-subtle-foreground"
+            />
+          </span>
+        )}
+        <span className="min-w-0 flex-1 text-xs leading-5">
+          <span className="block truncate text-sm">
+            {image ? image.title : "No style image"}
+          </span>
+          <span className="block text-muted-foreground">
+            {image
+              ? "Its palette, light and texture set the look."
+              : "A painting, a still or a frame whose look you want."}
+          </span>
+        </span>
+        {image ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => onImage(null)}
+          >
+            Clear
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setPicking(true)}
+          >
+            <Library aria-hidden="true" /> Choose image
+          </Button>
+        )}
+        <MediaPicker
+          open={picking}
+          onOpenChange={setPicking}
+          title="Choose a style image"
+          description="A still whose look the shot should take on."
+          kind="image"
+          onSelect={onImage}
+        />
+      </div>
     </fieldset>
   );
 }

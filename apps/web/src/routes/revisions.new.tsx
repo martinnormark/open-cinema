@@ -9,7 +9,9 @@ import { getProjectHome, getRevisionView } from "@/server/revisions";
 export const Route = createFileRoute("/revisions/new")({
   validateSearch: z.object({
     source: z.string().max(400).optional(),
-    kind: z.enum(["background", "character"]).optional(),
+    kind: z
+      .enum(["background", "character", "object", "restyle", "camera"])
+      .optional(),
     project: z.string().max(100).optional(),
     parent: z.string().max(100).optional(),
     /** A failed revision whose choices "Try again" starts from. */

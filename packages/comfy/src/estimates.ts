@@ -46,6 +46,42 @@ function ltxEstimate(inputs: LtxVideoInputs): GenerationEstimate {
   };
 }
 
+/**
+ * The open-weights graphs on Comfy Cloud bill GPU time, which Cloud does not
+ * report per job. Times are from the check runs in docs/revision-modes.md;
+ * a cold worker spends most of them loading weights.
+ */
+export const CLOUD_GRAPH_ESTIMATES = {
+  camera: {
+    seconds: [90, 600],
+    note: "Runs LTX-2 with a camera-control LoRA on Comfy Cloud, billed by GPU time.",
+  },
+  swap: {
+    seconds: [60, 900],
+    note: "Runs FLUX.2 Klein and LTX 2.3 on Comfy Cloud, billed by GPU time. Uses the first 4 seconds of the take.",
+  },
+  restyle: {
+    seconds: [150, 900],
+    note: "Runs FLUX.2 Klein and LTX 2.3 on Comfy Cloud, billed by GPU time. Uses the first 4 seconds of the take.",
+  },
+  restage: {
+    seconds: [120, 900],
+    note: "Runs LTX 2.3 with the CrossView IC-LoRA on Comfy Cloud, billed by GPU time. Uses the first 4 seconds of the take.",
+  },
+} as const;
+
+export function cloudEstimate(
+  graph: keyof typeof CLOUD_GRAPH_ESTIMATES,
+): GenerationEstimate {
+  const { seconds, note } = CLOUD_GRAPH_ESTIMATES[graph];
+  return {
+    credits: null,
+    seconds: round(seconds[0], seconds[1]),
+    basis: "observed",
+    note,
+  };
+}
+
 export function estimateGeneration(
   request: GenerationRequest,
   /** Resolved reference count, including Element sheets from mentions. */
@@ -71,6 +107,7 @@ export function estimateGeneration(
       };
     }
     case "video.ltx": {
+      if (request.inputs.camera) return cloudEstimate("camera");
       if (!request.inputs.firstFrame) return ltxEstimate(request.inputs);
       // FLUX 3 Video bills GPU-seconds Router does not report back; BFL reported 75 of
       // its own credits ($0.75) for 5 s at hd. Scale that by length, with margin.
@@ -125,5 +162,11 @@ export function estimateGeneration(
         basis: "heuristic",
         note: "Runs LTX 2.3 Union Control on Comfy Cloud, billed by GPU time. Reuses the first 4 seconds (97 frames) of the take, at most 768 px wide.",
       };
+    case "video.object-swap":
+      return cloudEstimate("swap");
+    case "video.restyle":
+      return cloudEstimate("restyle");
+    case "video.restage":
+      return cloudEstimate("restage");
   }
 }

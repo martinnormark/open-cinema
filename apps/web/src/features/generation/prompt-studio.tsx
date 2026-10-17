@@ -1,6 +1,8 @@
 import { useState, type ReactNode } from "react";
 import {
+  CAMERA_MOVES,
   WORKFLOW_DESCRIPTORS,
+  type CameraMove,
   type GenerationRequest,
   type WorkflowCommandInput,
 } from "@open-cinema/contracts";
@@ -38,11 +40,12 @@ export function PromptStudio({ introduction }: { introduction: ReactNode }) {
   const { snapshot, connection } = useGeneration();
   const [prompt, setPrompt] = useState("");
   const [medium, setMedium] = useState<Medium>("image");
+  const [camera, setCamera] = useState<CameraMove | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [uncertain, setUncertain] = useState<WorkflowCommandInput | null>(null);
   const mentions = useMentions(prompt);
-  const request = studioRequest(prompt, mentions, medium);
+  const request = studioRequest(prompt, mentions, medium, camera);
   const preferences = useCostPreferences();
   const estimate = estimateGeneration(request);
   async function start() {
@@ -115,6 +118,13 @@ export function PromptStudio({ introduction }: { introduction: ReactNode }) {
           aria-describedby="generation-estimate"
         />
         <MentionSummary mentions={mentions} className="mt-3" />
+        {medium === "video" && (
+          <CameraMoves
+            value={camera}
+            onChange={setCamera}
+            disabled={!!uncertain}
+          />
+        )}
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <ToggleGroup
@@ -171,13 +181,19 @@ export function PromptStudio({ introduction }: { introduction: ReactNode }) {
         >
           {WORKFLOW_DESCRIPTORS[request.workflowKind].label} ·{" "}
           {request.workflowKind === "video.ltx"
-            ? `LTX 2.5 Fast · ${request.inputs.durationSeconds} s · 720p with sound`
+            ? request.inputs.camera
+              ? `LTX-2 with the ${CAMERA_MOVES[request.inputs.camera].label.toLowerCase()} camera LoRA · ${request.inputs.durationSeconds} s · 720p with sound · on Comfy Cloud`
+              : `LTX 2.5 Fast · ${request.inputs.durationSeconds} s · 720p with sound`
             : "FLUX 3 · 1K square"}
           {request.workflowKind === "image.flux-reference" &&
             ` · ${request.inputs.references.length} ${request.inputs.references.length === 1 ? "reference" : "references"} from your Elements`}
           {shouldShowEstimate(preferences, "image") &&
             estimate.credits &&
             ` · about ${formatCost(estimate.credits, preferences.unit)}, ${Math.round(estimate.seconds.min)}–${Math.round(estimate.seconds.max)} s`}
+          {!estimate.credits &&
+            request.workflowKind === "video.ltx" &&
+            request.inputs.camera &&
+            ` · GPU time, about ${Math.round(estimate.seconds.min / 60)}–${Math.round(estimate.seconds.max / 60)} min`}
         </p>
       </form>
       {(!snapshot || connection === "unavailable") && (
@@ -228,6 +244,7 @@ function studioRequest(
   prompt: string,
   mentions: ReturnType<typeof useMentions>,
   medium: Medium,
+  camera: CameraMove | null,
 ): GenerationRequest {
   const payload = mentionPayload(mentions);
   if (medium === "video")
@@ -235,7 +252,10 @@ function studioRequest(
       workflowKind: "video.ltx",
       inputs: {
         prompt: prompt.trim(),
-        durationSeconds: 6,
+        // A camera move runs on a Cloud GPU billed by time; four seconds
+        // show the move and keep the run short.
+        durationSeconds: camera ? 4 : 6,
+        ...(camera ? { camera } : {}),
         resolution: "1280x720",
         fps: 25,
         generateAudio: true,
@@ -255,4 +275,52 @@ function studioRequest(
         inputs: { ...base, references: payload.references.slice(0, 10) },
       }
     : { workflowKind: "image.flux", inputs: base };
+}
+
+/**
+ * Real camera control: each move is an LTX-2 camera LoRA, not prompt
+ * wording. "Free" leaves the camera to the model and keeps LTX 2.5 on Router.
+ */
+function CameraMoves({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: CameraMove | null;
+  onChange: (move: CameraMove | null) => void;
+  disabled: boolean;
+}) {
+  const options: (CameraMove | null)[] = [
+    null,
+    ...(Object.keys(CAMERA_MOVES) as CameraMove[]),
+  ];
+  return (
+    <fieldset className="mt-4" disabled={disabled}>
+      <legend className="text-sm font-medium">Camera</legend>
+      <div
+        role="radiogroup"
+        aria-label="Camera move"
+        className="mt-2 flex flex-wrap gap-1.5"
+      >
+        {options.map((move) => (
+          <button
+            key={move ?? "free"}
+            type="button"
+            role="radio"
+            aria-checked={value === move}
+            title={move ? CAMERA_MOVES[move].description : undefined}
+            onClick={() => onChange(move)}
+            className="inline-flex h-8 items-center rounded-full border border-border px-3 text-xs text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 aria-checked:border-tungsten/70 aria-checked:bg-surface aria-checked:text-foreground"
+          >
+            {move ? CAMERA_MOVES[move].label : "Free"}
+          </button>
+        ))}
+      </div>
+      <p className="mt-2 text-xs leading-5 text-muted-foreground">
+        {value
+          ? `${CAMERA_MOVES[value].description} A camera-control LoRA makes the move, so describe the scene, not the camera.`
+          : "The model chooses the camera. Pick a move to control it."}
+      </p>
+    </fieldset>
+  );
 }

@@ -159,6 +159,220 @@ async function uploadAsset(
   };
 }
 
+const MEDIA_TYPES: Record<string, string> = {
+  mp4: "video/mp4",
+  webm: "video/webm",
+  mov: "video/quicktime",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+};
+
+interface SavedFile {
+  filename: string;
+  subfolder?: string;
+  type?: string;
+}
+
+/** `{node}|{subfolder}|{filename}`: stable, and enough to fetch the file again. */
+function compatAssetId(node: string, file: SavedFile) {
+  return [node, file.subfolder ?? "", file.filename].join("|");
+}
+
+function compatState(status: unknown): JobState {
+  switch (status) {
+    case "pending":
+    case "queued":
+      return "queued";
+    case "in_progress":
+    case "running":
+      return "running";
+    case "completed":
+    case "success":
+      return "succeeded";
+    case "cancelled":
+      return "cancelled";
+    case "failed":
+    case "error":
+      return "failed";
+    default:
+      return "needs_attention";
+  }
+}
+
+/**
+ * The same Cloud graphs through ComfyUI's own routes (`/api/upload/image`,
+ * `/api/prompt`, `/api/jobs`, `/api/view`), which the media steps use too.
+ * Used only behind the development relay: a container's proxy-injected Cloud
+ * credential is refused by the `/api/v2` routes the SDK calls (foundation.md),
+ * so this is what lets a local stack run Cloud graphs end to end.
+ */
+function createCompatClient(baseUrl: string, order: readonly string[]) {
+  async function read(id: string, signal?: AbortSignal) {
+    const response = await fetch(
+      `${baseUrl}/api/jobs/${encodeURIComponent(id)}`,
+      { signal: signal ?? AbortSignal.timeout(15_000) },
+    );
+    if (!response.ok)
+      throw new Error(`Reading the Cloud job failed: ${response.status}`);
+    return (await response.json()) as {
+      status?: string;
+      outputs?: Record<
+        string,
+        Record<string, SavedFile[] | unknown> | undefined
+      >;
+      execution_status?: { messages?: unknown[] };
+    };
+  }
+  function files(job: Awaited<ReturnType<typeof read>>) {
+    const listed: { id: string; mediaType: string }[] = [];
+    const nodes = Object.keys(job.outputs ?? {}).filter(
+      (node) => !order.length || order.includes(node),
+    );
+    nodes.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    for (const node of nodes)
+      for (const value of Object.values(job.outputs?.[node] ?? {}))
+        if (Array.isArray(value))
+          for (const file of value as SavedFile[])
+            if (
+              file &&
+              typeof file.filename === "string" &&
+              file.type !== "temp"
+            )
+              listed.push({
+                id: compatAssetId(node, file),
+                mediaType:
+                  MEDIA_TYPES[
+                    file.filename.split(".").pop()?.toLowerCase() ?? ""
+                  ] ?? "application/octet-stream",
+              });
+    return listed;
+  }
+  function failure(job: Awaited<ReturnType<typeof read>>) {
+    for (const entry of job.execution_status?.messages ?? [])
+      if (Array.isArray(entry) && entry[0] === "execution_error") {
+        const detail = entry[1] as Record<string, unknown> | undefined;
+        return `${String(detail?.node_type ?? "A node")}: ${String(detail?.exception_message ?? "failed").slice(0, 300)}`;
+      }
+    return "Comfy could not execute this workflow. Check model availability and your Cloud credits.";
+  }
+  async function getStatus(id: string): Promise<ComfyJobStatus> {
+    const job = await read(id);
+    const state = compatState(job.status);
+    return {
+      providerJobId: id,
+      state,
+      progress: state === "succeeded" ? 1 : null,
+      outputs:
+        state === "succeeded"
+          ? files(job).map((f) => ({
+              providerAssetId: f.id,
+              mediaType: f.mediaType,
+            }))
+          : [],
+      error: state === "failed" ? failure(job) : null,
+    };
+  }
+  return {
+    async submit(
+      graph: Record<string, unknown>,
+      idempotencyKey: string,
+      signal: AbortSignal,
+    ): Promise<ComfyJobStatus> {
+      if (!idempotencyKey.trim())
+        throw new Error("A persisted submission key is required");
+      const prompt = structuredClone(
+        isCloudRequest(graph) ? graph.input.graph : graph,
+      ) as Record<string, { inputs: Record<string, unknown> }>;
+      if (isCloudRequest(graph))
+        for (const media of graph.input.media) {
+          const form = new FormData();
+          form.append("type", "input");
+          form.append("overwrite", "true");
+          form.append(
+            "image",
+            new Blob([await download(media.url, signal)], {
+              type: media.contentType,
+            }),
+            `${crypto.randomUUID()}-${media.filename}`,
+          );
+          const response = await fetch(`${baseUrl}/api/upload/image`, {
+            method: "POST",
+            body: form,
+            signal,
+          });
+          const uploaded = (await response.json().catch(() => null)) as {
+            name?: string;
+            subfolder?: string;
+          } | null;
+          if (!response.ok || !uploaded?.name)
+            throw new ComfyError(
+              `Comfy Cloud upload failed: ${response.status}`,
+              { code: "asset_upload_failed", httpStatus: response.status },
+            );
+          const node = prompt[media.node];
+          if (!node) throw new Error(`The graph has no ${media.node} loader`);
+          node.inputs[media.field] = uploaded.subfolder
+            ? `${uploaded.subfolder}/${uploaded.name}`
+            : uploaded.name;
+        }
+      const response = await fetch(`${baseUrl}/api/prompt`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+        signal,
+      });
+      const submitted = (await response.json().catch(() => null)) as {
+        prompt_id?: string;
+      } | null;
+      if (!response.ok || !submitted?.prompt_id)
+        throw new ComfyError(
+          `Comfy Cloud rejected the graph: ${response.status} ${JSON.stringify(submitted).slice(0, 300)}`,
+          { code: "prompt_rejected", httpStatus: response.status },
+        );
+      return {
+        providerJobId: submitted.prompt_id,
+        state: "queued",
+        progress: null,
+        outputs: [],
+        error: null,
+      };
+    },
+    getStatus,
+    async cancel(id: string, signal: AbortSignal): Promise<ComfyJobStatus> {
+      await fetch(`${baseUrl}/api/queue`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ delete: [id] }),
+        signal,
+      }).catch(() => undefined);
+      return getStatus(id);
+    },
+    async getOutputUrl(id: string, assetId: string): Promise<string | null> {
+      const [node, subfolder = "", filename] = assetId.split("|");
+      if (!node || !filename) return null;
+      const job = await read(id);
+      if (!files(job).some((f) => f.id === assetId)) return null;
+      const query = new URLSearchParams({
+        filename,
+        subfolder,
+        type: "output",
+      });
+      // /api/view redirects to a signed storage link that carries no credential.
+      const view = await fetch(`${baseUrl}/api/view?${query}`, {
+        redirect: "manual",
+        signal: AbortSignal.timeout(15_000),
+      });
+      const location = view.headers.get("location");
+      await view.body?.cancel();
+      if (!location) return null;
+      const url = new URL(location, baseUrl);
+      return url.protocol === "https:" ? url.toString() : null;
+    },
+  };
+}
+
 /** Server-only adapter. Every call is bounded; the DO owns durable scheduling. */
 export function createComfyClient(options: {
   apiKey: string;
@@ -171,8 +385,10 @@ export function createComfyClient(options: {
   baseUrl?: string | undefined;
 }) {
   const order = options.outputNodes ?? [];
-  const baseUrl = loopbackRelay(options.baseUrl) ?? COMFY_CLOUD_BASE_URL;
+  const relay = loopbackRelay(options.baseUrl);
+  const baseUrl = relay ?? COMFY_CLOUD_BASE_URL;
   if (!options.apiKey.trim()) throw new Error("Comfy credentials are required");
+  if (relay) return createCompatClient(relay, order);
   // The SDK stores fetch as an instance method; Workers requires the global receiver.
   const client = new Comfy({
     apiKey: options.apiKey,
