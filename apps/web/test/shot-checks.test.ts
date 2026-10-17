@@ -1,6 +1,7 @@
 // Recast guardrails: the pre-flight verdicts and post-run checks from detections.
 import { expect, test } from "bun:test";
 import {
+  checkPeople,
   checkResult,
   facingFromKeypoints,
   preflight,
@@ -210,4 +211,14 @@ test("does not count the target as a bystander on frames where tracking lost the
   const checks = checkResult(scan(frames), scan(recast), mark, [CHARACTER]);
   expect(checks.bystanders).toEqual([]);
   expect(checks.wrongPerson).toBe(false);
+});
+
+test("an object swap or restyle checks everyone in the shot as a bystander", () => {
+  const kept = checkPeople(source, resultWith(SOURCE_TARGET, BYSTANDER));
+  expect(kept.likenessVerdict).toBe("unmeasured");
+  expect(kept.bystanders).toHaveLength(2);
+  expect(kept.bystanders.every((b) => !b.changed)).toBe(true);
+
+  const drifted = checkPeople(source, resultWith(OTHER, BYSTANDER));
+  expect(drifted.bystanders.filter((b) => b.changed)).toHaveLength(1);
 });

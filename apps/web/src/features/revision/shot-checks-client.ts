@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import {
+  checkPeople,
   checkResult,
   sampleTimes,
   type ResultChecks,
@@ -191,8 +192,9 @@ export function requestResultChecks(o: {
   revisionId: string;
   sourceUrl: string;
   resultUrl: string;
-  mark: { x: number; y: number; timeMs: number };
-  referenceUrls: readonly string[];
+  /** The recast person and their Character's faces; omitted, everyone is a bystander. */
+  mark?: { x: number; y: number; timeMs: number };
+  referenceUrls?: readonly string[];
   save: (checks: ResultChecks) => Promise<unknown>;
 }) {
   const current = results.get(o.revisionId);
@@ -201,7 +203,7 @@ export function requestResultChecks(o: {
   (async () => {
     const [source, character] = await Promise.all([
       scanClip(o.sourceUrl),
-      referenceEmbeddings(o.referenceUrls),
+      o.mark ? referenceEmbeddings(o.referenceUrls ?? []) : [],
     ]);
     // Providers retime clips; compare the same proportional moments.
     const result = await scanClip(o.resultUrl, (durationMs) =>
@@ -209,7 +211,9 @@ export function requestResultChecks(o: {
         Math.round((f.timeMs / source.durationMs) * durationMs),
       ),
     );
-    const checks = checkResult(source, result, o.mark, character);
+    const checks = o.mark
+      ? checkResult(source, result, o.mark, character)
+      : checkPeople(source, result);
     setResult(o.revisionId, { status: "ready", checks });
     await o.save(checks).catch(() => undefined);
   })().catch((error: unknown) =>

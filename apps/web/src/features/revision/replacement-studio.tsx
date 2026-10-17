@@ -446,7 +446,7 @@ export function ReplacementStudio({
         preserve: kept.filter(
           (a) => OFFERED[kind].includes(a) || a === "wardrobe",
         ),
-        allowIntegration,
+        allowIntegration: KLING_KINDS.includes(kind) && allowIntegration,
         ...(kind === "character" && wardrobe === "describe"
           ? { notes: `Wardrobe: ${wardrobeNote.trim()}` }
           : {}),
@@ -608,7 +608,7 @@ export function ReplacementStudio({
           "preservation" in request.inputs && request.inputs.preservation
             ? [...request.inputs.preservation.preserve]
             : [],
-        allowIntegration,
+        allowIntegration: KLING_KINDS.includes(kind) && allowIntegration,
         estimate: {
           cost: estimate.cost,
           time: estimate.time,
@@ -1068,8 +1068,9 @@ export function ReplacementStudio({
           )}
           {kind === "camera" && (
             <p className="mt-2 text-xs leading-5 text-muted-foreground">
-              Small moves hold up best. The model has not seen angles from
-              behind the subject, so there is no reverse shot.
+              Small moves hold up best, and the angle is a direction rather than
+              an exact position: an early model makes it. It has not seen angles
+              from behind the subject, so there is no reverse shot.
             </p>
           )}
           {sourceCheck.notes.map((note) => (
