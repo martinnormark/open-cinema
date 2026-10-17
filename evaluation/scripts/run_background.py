@@ -139,11 +139,13 @@ def result_video(run_dir):
 
 
 def matte_for(clip):
-    d = os.path.join(ART, "runs", f"{clip}-switchx-ref")
-    if os.path.isdir(d):
-        for f in os.listdir(d):
-            if "alpha" in f and f.endswith((".mp4", ".mov", ".webm")):
-                return os.path.join(d, f)
+    """The SwitchX subject matte for a clip, from the Router run or else the ComfyUI graph run."""
+    for run in (f"{clip}-switchx-ref", f"{clip}-comfyui-switchx"):
+        d = os.path.join(ART, "runs", run)
+        if os.path.isdir(d):
+            for f in sorted(os.listdir(d)):
+                if "alpha" in f and f.endswith((".mp4", ".mov", ".webm")):
+                    return os.path.join(d, f)
     return None
 
 

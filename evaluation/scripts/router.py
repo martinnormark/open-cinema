@@ -96,10 +96,16 @@ def run(model, body, out_dir, poll_s=5, deadline_s=3600):
         raise RuntimeError(f"submit failed {status}: {json.dumps(res)[:800]}")
     rid = res.get("request_id") or res.get("id")
     log["request_id"] = rid
+    _write(out_dir, log)  # persist the request id before polling, so a crash can resume or cancel it
     t0 = time.time()
     last = None
     while time.time() - t0 < deadline_s:
-        s, st = _call("GET", f"/v2/models/{model}/requests/{rid}/status")
+        try:
+            s, st = _call("GET", f"/v2/models/{model}/requests/{rid}/status")
+        except OSError as e:  # transient network failure: keep polling
+            print(f"[{model}] poll error {e}", flush=True)
+            time.sleep(poll_s)
+            continue
         state = (st or {}).get("status") if isinstance(st, dict) else None
         if state != last:
             print(f"[{model}] {int(time.time()-t0)}s {state}", flush=True)
