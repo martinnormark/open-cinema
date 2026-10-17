@@ -444,27 +444,11 @@
       "img_compression": 33
     }
   },
-  "pose": {
-    "class_type": "DWPreprocessor",
-    "inputs": {
-      "image": [
-        "source_small",
-        0
-      ],
-      "detect_hand": "enable",
-      "detect_body": "enable",
-      "detect_face": "enable",
-      "resolution": 512,
-      "bbox_detector": "yolox_l.torchscript.pt",
-      "pose_estimator": "dw-ll_ucoco_384_bs5.torchscript.pt",
-      "scale_stick_for_xinsr_cn": "disable"
-    }
-  },
-  "pose_fit": {
+  "edges_fit": {
     "class_type": "ImageScale",
     "inputs": {
       "image": [
-        "pose",
+        "source_small",
         0
       ],
       "upscale_method": "bilinear",
@@ -477,6 +461,28 @@
         1
       ],
       "crop": "disabled"
+    }
+  },
+  "edges_blur": {
+    "class_type": "ImageBlur",
+    "inputs": {
+      "image": [
+        "edges_fit",
+        0
+      ],
+      "blur_radius": 2,
+      "sigma": 1
+    }
+  },
+  "edges": {
+    "class_type": "Canny",
+    "inputs": {
+      "image": [
+        "edges_blur",
+        0
+      ],
+      "low_threshold": 0.4,
+      "high_threshold": 0.8
     }
   },
   "unet": {
@@ -591,7 +597,7 @@
       "bypass": false
     }
   },
-  "pose_guide": {
+  "motion_guide": {
     "class_type": "LTXAddVideoICLoRAGuide",
     "inputs": {
       "positive": [
@@ -611,7 +617,7 @@
         0
       ],
       "image": [
-        "pose_fit",
+        "edges",
         0
       ],
       "frame_idx": 0,
@@ -659,11 +665,11 @@
     "class_type": "LTXAddVideoICLoRAGuide",
     "inputs": {
       "positive": [
-        "pose_guide",
+        "motion_guide",
         0
       ],
       "negative": [
-        "pose_guide",
+        "motion_guide",
         1
       ],
       "vae": [
@@ -671,7 +677,7 @@
         0
       ],
       "latent": [
-        "pose_guide",
+        "motion_guide",
         2
       ],
       "image": [

@@ -20,8 +20,8 @@ import {
  *    the Character from their references, in the same place and pose.
  * 2. LTX 2.5 carries that keyframe through the take. Lightricks' Union Control
  *    IC-LoRA (trained on 2.3; Lightricks' own 2.5 example loads it on the 2.5
- *    transformer) reads the source's DWPose skeleton, so the performance and
- *    timing are the take's. With `sheet`, Lightricks' Ingredients IC-LoRA also
+ *    transformer) reads the source's Canny edges (ComfyUI core nodes, no
+ *    detector weights), so the performance and timing are the take's. With `sheet`, Lightricks' Ingredients IC-LoRA also
  *    reads the Character's reference sheet, to hold the face and outfit after
  *    the first frame.
  * 3. SAM 3 follows the marked person in the take and the Character in the
@@ -81,7 +81,7 @@ export interface LtxRecastGraphOptions {
   /** Also condition on the Character's reference sheet (Ingredients IC-LoRA). */
   sheet: boolean;
   target: TargetBox;
-  /** How strongly the clip follows the source's pose, 0.3–1. */
+  /** How strongly the clip follows the source's edges (its motion), 0.3–1. */
   poseStrength: number;
   seed: number;
 }
@@ -163,29 +163,31 @@ export function ltxRecastGraph(o: LtxRecastGraphOptions): Graph {
       class_type: "LTXVPreprocess",
       inputs: { image: ["keyframe_fit", 0], img_compression: 33 },
     },
-    // Body, hands and face landmarks of everyone in frame. Bystanders' poses
-    // are harmless: the composite puts their own pixels back.
-    pose: {
-      class_type: "DWPreprocessor",
-      inputs: {
-        image: source.small,
-        detect_hand: "enable",
-        detect_body: "enable",
-        detect_face: "enable",
-        resolution: 512,
-        bbox_detector: "yolox_l.torchscript.pt",
-        pose_estimator: "dw-ll_ucoco_384_bs5.torchscript.pt",
-        scale_stick_for_xinsr_cn: "disable",
-      },
-    },
-    pose_fit: {
+    // Edges of the take, traced with ComfyUI's own blur and Canny nodes: no
+    // detector weights. A light blur first keeps grain and fabric texture out
+    // of the edge map. The marked person's own outline comes through too, so
+    // the Character keeps the performer's silhouette; the composite puts
+    // everything outside the mask back from the take.
+    edges_fit: {
       class_type: "ImageScale",
       inputs: {
-        image: ["pose", 0],
+        image: source.small,
         upscale_method: "bilinear",
         width: source.genWidth,
         height: source.genHeight,
         crop: "disabled",
+      },
+    },
+    edges_blur: {
+      class_type: "ImageBlur",
+      inputs: { image: ["edges_fit", 0], blur_radius: 2, sigma: 1 },
+    },
+    edges: {
+      class_type: "Canny",
+      inputs: {
+        image: ["edges_blur", 0],
+        low_threshold: 0.4,
+        high_threshold: 0.8,
       },
     },
 
@@ -256,14 +258,14 @@ export function ltxRecastGraph(o: LtxRecastGraphOptions): Graph {
       },
     },
     // The ref0.5 adapter reads its guide at half size; the loader reports the factor.
-    pose_guide: {
+    motion_guide: {
       class_type: "LTXAddVideoICLoRAGuide",
       inputs: {
         positive: ["conditioning", 0],
         negative: ["conditioning", 1],
         vae,
         latent: ["first_frame", 0],
-        image: ["pose_fit", 0],
+        image: ["edges", 0],
         frame_idx: 0,
         strength: o.poseStrength,
         latent_downscale_factor: ["union_control", 1],
@@ -276,7 +278,7 @@ export function ltxRecastGraph(o: LtxRecastGraphOptions): Graph {
   };
 
   let model: Link = ["union_control", 0];
-  let guided = "pose_guide";
+  let guided = "motion_guide";
   if (o.sheet) {
     Object.assign(graph, {
       ingredients: {
@@ -298,14 +300,14 @@ export function ltxRecastGraph(o: LtxRecastGraphOptions): Graph {
         },
       },
       // -1 keeps the still sheet outside the clip's frame range, attended to
-      // but never shown, so it does not compete with the pose guide at 0.
+      // but never shown, so it does not compete with the edge guide at 0.
       sheet_guide: {
         class_type: "LTXAddVideoICLoRAGuide",
         inputs: {
-          positive: ["pose_guide", 0],
-          negative: ["pose_guide", 1],
+          positive: ["motion_guide", 0],
+          negative: ["motion_guide", 1],
           vae,
-          latent: ["pose_guide", 2],
+          latent: ["motion_guide", 2],
           image: ["sheet_scaled", 0],
           frame_idx: -1,
           strength: 1,

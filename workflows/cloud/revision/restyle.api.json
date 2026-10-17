@@ -434,15 +434,39 @@
       "crop": "center"
     }
   },
-  "depth": {
-    "class_type": "DepthAnythingV2Preprocessor",
+  "depth_model": {
+    "class_type": "LoadMoGeModel",
     "inputs": {
+      "model_name": "moge_2_vitl_normal_fp16.safetensors"
+    }
+  },
+  "depth_geometry": {
+    "class_type": "MoGeInference",
+    "inputs": {
+      "moge_model": [
+        "depth_model",
+        0
+      ],
       "image": [
         "source_small",
         0
       ],
-      "ckpt_name": "depth_anything_v2_vitl.pth",
-      "resolution": 512
+      "resolution_level": 6,
+      "fov_x_degrees": 0,
+      "batch_size": 4,
+      "force_projection": true,
+      "apply_mask": true,
+      "refine_steps": 0
+    }
+  },
+  "depth": {
+    "class_type": "MoGeRender",
+    "inputs": {
+      "moge_geometry": [
+        "depth_geometry",
+        0
+      ],
+      "output": "depth"
     }
   },
   "depth_fit": {

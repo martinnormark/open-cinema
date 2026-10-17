@@ -39,6 +39,16 @@ it("uses only Lightricks adapters, and Ingredients only with a sheet", () => {
   expect(graph(true).sheet_guide?.inputs.frame_idx).toBe(-1);
 });
 
+it("guides motion with ComfyUI's core edge nodes, loading no detector weights", () => {
+  const g = graph(false);
+  expect(g.edges?.class_type).toBe("Canny");
+  expect(g.edges?.inputs.image).toEqual(["edges_blur", 0]);
+  expect(g.motion_guide?.inputs.image).toEqual(["edges", 0]);
+  expect(
+    Object.values(g).filter((n) => n.class_type === "DWPreprocessor"),
+  ).toHaveLength(0);
+});
+
 it("generates only inside the marked person and keeps the take's audio", () => {
   const g = graph(false);
   expect(g.target_x?.inputs.expression).toBe("max(1, round(a * 0.15))");

@@ -104,6 +104,12 @@ it("swaps an object with the Thing's sheet and keeps the take outside SAM 3's ma
   expect(prompts).toContain("the table lamp");
   expect(prompts).toContain("Lantern");
   expect(ofType(request, "SAM3_VideoTrack")).toHaveLength(2);
+  // The union IC-LoRA's depth guide comes from MoGe-2 (MIT), the model Re-stage loads.
+  expect(ofType(request, "LoadMoGeModel")[0]?.inputs.model_name).toBe(
+    "moge_2_vitl_normal_fp16.safetensors",
+  );
+  expect(ofType(request, "MoGeRender")[0]?.inputs.output).toBe("depth");
+  expect(ofType(request, "DepthAnythingV2Preprocessor")).toHaveLength(0);
   const composite = ofType(request, "ImageCompositeMasked")[0]!;
   expect(composite.inputs.destination).toEqual(["source_clip", 0]);
 });

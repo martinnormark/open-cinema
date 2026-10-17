@@ -298,12 +298,12 @@
       "save_keyframe"
     ],
     "models": [
-      "depth_anything_v2_vitl.pth",
       "flux-2-klein-9b.safetensors",
       "flux2-vae.safetensors",
       "gemma_3_12B_it_fp4_mixed.safetensors",
       "ltx-2.3-22b-distilled-fp8.safetensors",
       "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors",
+      "moge_2_vitl_normal_fp16.safetensors",
       "qwen_3_8b_fp8mixed.safetensors",
       "sam3.1_multiplex_fp16.safetensors"
     ]
@@ -334,12 +334,12 @@
       "save_keyframe"
     ],
     "models": [
-      "depth_anything_v2_vitl.pth",
       "flux-2-klein-9b.safetensors",
       "flux2-vae.safetensors",
       "gemma_3_12B_it_fp4_mixed.safetensors",
       "ltx-2.3-22b-distilled-fp8.safetensors",
       "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors",
+      "moge_2_vitl_normal_fp16.safetensors",
       "qwen_3_8b_fp8mixed.safetensors"
     ]
   },
@@ -581,7 +581,6 @@
       "save_keyframe"
     ],
     "models": [
-      "dw-ll_ucoco_384_bs5.torchscript.pt",
       "flux-2-klein-9b.safetensors",
       "flux2-vae.safetensors",
       "gemma4-12b-with-proj-ltx-2.5-bf16.safetensors",
@@ -591,8 +590,7 @@
       "ltx-2.5-audio-vae-bf16.safetensors",
       "ltx-2.5-video-vae-bf16.safetensors",
       "qwen_3_8b_fp8mixed.safetensors",
-      "sam3.1_multiplex_fp16.safetensors",
-      "yolox_l.torchscript.pt"
+      "sam3.1_multiplex_fp16.safetensors"
     ]
   }
 ]

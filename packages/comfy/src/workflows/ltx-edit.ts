@@ -8,6 +8,7 @@ import {
   type GraphLimits,
   type Link,
 } from "./ltx-graph";
+import { LTX_RESTAGE_MODELS } from "./ltx-restage";
 
 /**
  * Object Swap and Restyle as one open-weights graph on Comfy Cloud, FLUX then
@@ -17,8 +18,9 @@ import {
  *    (a Thing's sheet for a swap; a Location or style reference for a
  *    restyle). This keyframe is the look the creator approves.
  * 2. LTX 2.3 carries the keyframe through the take with Lightricks' union
- *    IC-LoRA reading the source's depth, so the motion, framing and camera are
- *    the take's own (adapted from Comfy-Org's video_ltx2_3_ic_lora template).
+ *    IC-LoRA reading the source's MoGe-2 depth, so the motion, framing and
+ *    camera are the take's own (adapted from Comfy-Org's video_ltx2_3_ic_lora
+ *    template).
  * 3. A swap then puts the source back everywhere except the object: SAM 3
  *    finds the original object in the take and the new one in the result, and
  *    only the union of those masks comes from the generation. People, the
@@ -245,13 +247,28 @@ export function ltxEditGraph(o: LtxEditGraphOptions): Graph {
         crop: "center",
       },
     },
-    depth: {
-      class_type: "DepthAnythingV2Preprocessor",
+    // MoGe-2 (MIT) per frame; MoGeRender's "depth" is normalised disparity,
+    // near white and far (or sky) black, the convention the union IC-LoRA reads.
+    depth_model: {
+      class_type: "LoadMoGeModel",
+      inputs: { model_name: LTX_RESTAGE_MODELS.geometry },
+    },
+    depth_geometry: {
+      class_type: "MoGeInference",
       inputs: {
+        moge_model: ["depth_model", 0],
         image: source.small,
-        ckpt_name: "depth_anything_v2_vitl.pth",
-        resolution: 512,
+        resolution_level: 6,
+        fov_x_degrees: 0,
+        batch_size: 4,
+        force_projection: true,
+        apply_mask: true,
+        refine_steps: 0,
       },
+    },
+    depth: {
+      class_type: "MoGeRender",
+      inputs: { moge_geometry: ["depth_geometry", 0], output: "depth" },
     },
     depth_fit: {
       class_type: "ImageScale",
