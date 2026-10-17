@@ -178,7 +178,6 @@ Read [ARCHITECTURE.md](ARCHITECTURE.md) before extending the app, and [AGENTS.md
 ## Known limitations
 
 - Everyone allowed into a deployment shares its Comfy key and credits; there are no per-creator spending limits yet.
-- The Orb29 activity shader carries a non-commercial restriction from its author (see [LICENSE](LICENSE)). Replace it or obtain permission before commercial use.
 - Sustained 60 fps has been profiled in headless Chrome only, not yet on representative physical devices.
 
 ## License

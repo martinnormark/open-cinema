@@ -1,6 +1,6 @@
 # Generation MVP
 
-Implemented on 2026-10-17. Studio can submit an image prompt, choose from five sample prompts, cancel work, and show generated images. Activity and the floating shadercn Orb29 share one WebSocket subscription across routes.
+Implemented on 2026-10-17. Studio can submit an image prompt, choose from five sample prompts, cancel work, and show generated images. Activity and the floating Orb share one WebSocket subscription across routes.
 
 ## Run locally
 
@@ -43,7 +43,7 @@ The external subscription store reconnects with backoff and refreshes snapshots 
 
 Generated assets are copied into private R2 storage before a job becomes Ready. Each output records its stable R2 key, size, ETag, and media type in the coordinator and D1. The UI shows Saving during the copy. Downloads authorize ownership and stream R2 bytes directly; Comfy expiry has no effect after a successful copy. Storage failures retry without repeating generation and eventually request attention. Existing provider-only jobs are copied when their coordinator next opens; already-expired sources may be unrecoverable. See [asset architecture](../ARCHITECTURE.md#asset-storage-delivery-and-retention) for bounds and recovery semantics.
 
-Orb29 is lazy-loaded, capped at 1.5 device pixel ratio, paused for reduced motion and hidden documents, and has an accessible static fallback when WebGPU is unavailable. Its shader is attributed to [XorDev](https://x.com/XorDev) and carries a **non-commercial-use restriction** in the upstream source. Preserve that notice; obtain suitable permission or replace the shader before commercial use. The shared shadercn renderer is MIT-licensed according to the upstream source notice.
+The Orb (`StudioOrb`) is lazy-loaded, capped at 1.5 device pixel ratio, paused for reduced motion and hidden documents, and has an accessible static fallback when WebGPU is unavailable. Its shader is original to this repository (MIT); it replaced XorDev's non-commercial Orb29. The shared shadercn renderer is MIT-licensed according to the upstream source notice.
 
 ## Verification
 

@@ -37,7 +37,7 @@ flowchart LR
 | Monorepo | Bun workspaces | Dependency installation, workspace linking, and task execution |
 | Web framework | TanStack Start with React and TanStack Router | Routing, rendering, server components, server functions, and HTTP endpoints |
 | Styling | Tailwind CSS and shadcn/ui | Design tokens, layout, and application-owned UI components |
-| Job indicator | shadercn `Orb29` | Floating indicator with `idle` and `thinking` states |
+| Job indicator | Original `StudioOrb` shader on the MIT shadercn renderer | Floating indicator with `idle` and `thinking` states |
 | Build and deployment | Vite, Cloudflare Vite plugin, Wrangler | Workers-compatible builds, local runtime, bindings, and deployment |
 | Application hosting | Cloudflare Workers | Web application and Durable Object deployment entry points |
 | Relational persistence | Cloudflare D1 | Users, workflows, generation history, and output metadata |
@@ -245,7 +245,7 @@ Hibernation applies to accepted browser sockets. Active upstream I/O may keep th
 
 ## Floating Orb
 
-Mount one floating `GenerationOrb` in the authenticated application shell so it survives route changes. Wrap [shadercn Orb 29](https://www.shadercn.run/docs/components/orbs/orb-29) and derive its state from the shared job subscription:
+Mount one floating `GenerationOrb` in the authenticated application shell so it survives route changes. Wrap `StudioOrb` (`apps/web/src/components/orbs/studio-orb`), an original shader on the MIT shadercn renderer, and derive its state from the shared job subscription:
 
 ```ts
 const thinkingStates = new Set(['queued', 'submitting', 'running', 'persisting', 'cancelling']);

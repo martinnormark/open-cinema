@@ -25,7 +25,6 @@ Third-party components with their own terms
 
 - apps/web/src/components/ui: adapted from shadcn/ui, MIT (see the LICENSE file
   in that directory).
-- apps/web/src/components/orbs/orb-29: the Orb29 shader is by XorDev and carries
-  a NON-COMMERCIAL use restriction in its upstream source. It is not covered by
-  the MIT grant above. Obtain permission or replace the shader before any
-  commercial use. The shared shadercn renderer is MIT.
+- apps/web/src/components/orbs/renderer.ts and canvas.tsx: the shared shadercn
+  orb renderer, MIT. The Studio Orb shader that runs on it is original to this
+  repository and covered by the MIT grant above.

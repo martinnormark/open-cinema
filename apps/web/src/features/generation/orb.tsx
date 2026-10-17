@@ -2,7 +2,7 @@ import { lazy, Suspense, useSyncExternalStore } from "react";
 import { Link } from "@tanstack/react-router";
 import { getOrbState } from "@open-cinema/contracts";
 import { useGeneration } from "./store";
-const Orb29 = lazy(() => import("@/components/orbs/orb-29"));
+const StudioOrb = lazy(() => import("@/components/orbs/studio-orb"));
 const reduced = () =>
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const subscribeMotion = (callback: () => void) => {
@@ -39,7 +39,7 @@ export function GenerationOrb() {
           />
         }
       >
-        <Orb29
+        <StudioOrb
           size={56}
           state={activity}
           paused={paused || !snapshot}

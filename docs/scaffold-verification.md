@@ -32,4 +32,4 @@ Desktop sidebar layout changes are immediate, and the mobile drawer uses transfo
 
 ## Integration limits
 
-The Comfy SDK loads and constructs in `workerd`, but real submission, event consumption, cancellation, and asset retrieval against a selected hosting target remain unverified. Authentication fails closed, and no generation endpoint accepts jobs. The durable scheduler, projection synchronization, browser subscription store, and Orb29 integration remain follow-up work, as listed in the root README.
+The Comfy SDK loads and constructs in `workerd`, but real submission, event consumption, cancellation, and asset retrieval against a selected hosting target remain unverified. Authentication fails closed, and no generation endpoint accepts jobs. The durable scheduler, projection synchronization, browser subscription store, and Orb integration remain follow-up work, as listed in the root README.
