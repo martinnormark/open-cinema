@@ -69,6 +69,29 @@
   }
 }
 
+/* The person found under the mark: outline fades in after the check (opacity only). */
+.target-person {
+  animation: target-person var(--duration-fast) var(--ease-smooth-out);
+}
+@keyframes target-person {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Shot check result swaps in place of "Checking…" (text swap). */
+.shot-check {
+  animation: revision-reveal var(--duration-fast) var(--ease-smooth-out);
+}
+.shot-check-spin {
+  animation: shot-check-spin 0.9s linear infinite;
+}
+@keyframes shot-check-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* A result replaces the generating placeholder (skeleton reveal). */
 .result-reveal {
   animation: result-reveal var(--duration-slow) ease-in-out;
@@ -113,6 +136,9 @@
 @media (prefers-reduced-motion: reduce) {
   .revision-reveal,
   .target-marker,
+  .target-person,
+  .shot-check,
+  .shot-check-spin,
   .result-reveal,
   .generating-sweep::before {
     animation: none;

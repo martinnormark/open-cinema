@@ -48,6 +48,8 @@ export const resultVariantSchema = z.enum(["locked", "unlocked"]);
 export type ResultVariant = z.infer<typeof resultVariantSchema>;
 /** Outputs of a job's later stages are stored as `{stage}:{asset}`. */
 export const LOCK_STAGE = "lock";
+/** A recast's edit retimed onto the source's frame grid with its audio. */
+export const CONFORM_STAGE = "conform";
 export function outputVariant(
   output: Pick<JobOutput, "providerAssetId">,
 ): ResultVariant | null {
@@ -57,14 +59,19 @@ export function outputVariant(
 }
 /**
  * The outputs a creator sees: the variants when a job made them (locked first),
- * otherwise every output. Intermediates such as a matte or the unconformed edit
+ * else a conformed output, otherwise every output. Intermediates such as a matte or the unconformed edit
  * stay stored with the job but are not results.
  */
 export function resultOutputs<T extends Pick<JobOutput, "providerAssetId">>(
   outputs: readonly T[],
 ): T[] {
   const variants = outputs.filter((o) => outputVariant(o));
-  if (!variants.length) return [...outputs];
+  if (!variants.length) {
+    const conformed = outputs.filter((o) =>
+      o.providerAssetId.startsWith(`${CONFORM_STAGE}:`),
+    );
+    return conformed.length ? conformed : [...outputs];
+  }
   const order = resultVariantSchema.options;
   return variants.sort(
     (a, b) =>

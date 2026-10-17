@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 import {
   characterReplaceInputsSchema,
+  resultOutputs,
   type ResolvedMention,
 } from "@open-cinema/contracts";
 import { getWorkflowDefinition, type BuildContext } from "@open-cinema/comfy";
@@ -102,7 +103,7 @@ it("recasts on Kling 3.0 Omni with the source by URL and the Character's body vi
   expect(prompt).toContain("Keep every other person");
 });
 
-it("keeps the source clothing and sound when the creator preserves them", async () => {
+it("keeps the source clothing and sound with face views only when the creator preserves them", async () => {
   const definition = getWorkflowDefinition("video.character-replace")!;
   const request = await definition.build(
     characterReplaceInputsSchema.parse({
@@ -118,6 +119,42 @@ it("keeps the source clothing and sound when the creator preserves them", async 
   expect(request.input).toMatchObject({
     video_list: [{ keep_original_sound: "yes" }],
   });
+  // Body views carry the reference outfit, which Kling follows over the prompt.
+  expect((request.input as Record<string, unknown>).image_list).toEqual([
+    { image_url: "b64-mara-face" },
+  ]);
+});
+
+it("conforms the 24 fps edit onto the source's frame grid and offers only that", async () => {
+  const definition = getWorkflowDefinition("video.character-replace")!;
+  const stages =
+    typeof definition.stages === "function"
+      ? definition.stages(characterReplaceInputsSchema.parse(base))
+      : (definition.stages ?? []);
+  const [conform] = stages;
+  if (conform?.kind !== "media") throw new Error("expected a media stage");
+  const edit = { type: "job-output", jobId: "j", outputId: "j:v1" } as const;
+  const tasks = conform.tasks(characterReplaceInputsSchema.parse(base), {
+    ...context(),
+    saved: ["v1"],
+    output: (id: string) => (id === "v1" ? edit : null),
+  });
+  expect(tasks).toEqual([
+    {
+      output: "video",
+      operation: "conform",
+      parts: [
+        { name: "source", ref: { type: "media-asset", assetId: "take" } },
+        { name: "edit", ref: edit },
+      ],
+    },
+  ]);
+  expect(
+    resultOutputs([
+      { providerAssetId: "v1" },
+      { providerAssetId: "conform:video" },
+    ]),
+  ).toEqual([{ providerAssetId: "conform:video" }]);
 });
 
 it("refuses a recast with no way to identify the person", async () => {

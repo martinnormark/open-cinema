@@ -3,12 +3,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
-    "build": "vite build",
+    "dev": "bun run models && vite --host 127.0.0.1",
+    "build": "bun run models && vite build",
     "preview": "vite preview --host 127.0.0.1",
     "typecheck": "tsc -p tsconfig.json",
     "test": "bun test test",
-    "types:generate": "wrangler types --env-interface WebEnv --include-runtime false"
+    "types:generate": "wrangler types --env-interface WebEnv --include-runtime false",
+    "models": "bun scripts/human-models.ts"
   },
   "dependencies": {
     "@fontsource-variable/inter": "5.2.8",
@@ -18,6 +19,7 @@
     "@open-cinema/database": "workspace:*",
     "@tanstack/react-router": "1.170.45",
     "@tanstack/react-start": "1.169.3",
+    "@vladmandic/human": "3.3.6",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "cmdk": "1.1.1",

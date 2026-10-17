@@ -8,7 +8,11 @@ import {
   ImageOff,
   Lock,
   Library,
+  LoaderCircle,
   Mountain,
+  ScanFace,
+  TriangleAlert,
+  Ban,
   UserRound,
 } from "lucide-react";
 import {
@@ -42,6 +46,8 @@ import {
 import { submitRevision } from "@/server/revisions";
 import { useCostPreferences } from "@/features/settings/preferences";
 import { estimateReplacement } from "./estimate";
+import { preflight, type Preflight } from "./shot-checks";
+import { requestScan, useShotScan, type ScanState } from "./shot-checks-client";
 import {
   formatEstimate,
   formatTimecode,
@@ -151,6 +157,19 @@ export function ReplacementStudio({
     ? [...LOCKED.background, "lighting"]
     : LOCKED[kind];
 
+  // Recast pre-flight: where the marked person is, which way they face and how
+  // large their face gets (docs/phase0-recast.md, supported envelope).
+  const scanState = useShotScan(
+    kind === "character" && source ? source.url : null,
+  );
+  const shotCheck = useMemo(
+    () =>
+      kind === "character" && target && scanState.status === "ready"
+        ? preflight(scanState.scan, target)
+        : null,
+    [kind, target, scanState],
+  );
+
   const { unit } = useCostPreferences();
   const estimate = formatEstimate(
     estimateReplacement(kind, clipSeconds, pipeline),
@@ -184,6 +203,12 @@ export function ReplacementStudio({
     problems.push("Describe the wardrobe, or choose another option.");
   if (kind === "character" && clipSeconds !== null && clipSeconds < 4)
     problems.push("Recasting needs a clip of at least 4 seconds.");
+  if (kind === "character" && target && scanState.status === "scanning")
+    problems.push("Checking the shot…");
+  if (shotCheck?.verdict === "refuse")
+    problems.push(
+      "Recasting needs a shot where this person’s face is seen at some point.",
+    );
 
   function chooseKind(next: ReplacementKind) {
     if (next === kind) return;
@@ -360,6 +385,8 @@ export function ReplacementStudio({
           time: estimate.time,
           basis: estimate.basis,
         },
+        targetPoint: kind === "character" ? target : null,
+        preflight: shotCheck,
       };
       const result = await submitRevision({
         data: {
@@ -404,6 +431,7 @@ export function ReplacementStudio({
             setTarget(next);
             setPendingKey(null);
           }}
+          personBox={shotCheck?.box ?? null}
           onDuration={setDuration}
         />
         <ClipStrip
@@ -515,6 +543,13 @@ export function ReplacementStudio({
               aria-label="Describe the person to recast"
               className="mt-2 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
             />
+            {target && (
+              <ShotCheck
+                scan={scanState}
+                check={shotCheck}
+                onRetry={() => source && requestScan(source.url)}
+              />
+            )}
           </fieldset>
         )}
 
@@ -523,31 +558,53 @@ export function ReplacementStudio({
             <legend className="text-sm font-medium">Wardrobe</legend>
             <div className="mt-2 flex flex-col gap-1">
               {(Object.keys(wardrobeIntents) as WardrobeIntent[]).map(
-                (option) => (
-                  <label
-                    key={option}
-                    className="flex cursor-pointer gap-3 rounded-lg px-2 py-2 hover:bg-surface has-focus-visible:ring-2 has-focus-visible:ring-ring"
-                  >
-                    <input
-                      type="radio"
-                      name="wardrobe"
-                      checked={wardrobe === option}
-                      onChange={() => {
-                        setWardrobe(option);
-                        setPendingKey(null);
-                      }}
-                      className="mt-1 accent-(--tungsten)"
-                    />
-                    <span>
-                      <span className="block text-sm">
-                        {wardrobeIntents[option].label}
+                (option) => {
+                  const unavailable = wardrobeIntents[option].unavailable;
+                  return (
+                    <label
+                      key={option}
+                      className={cn(
+                        "flex gap-3 rounded-lg px-2 py-2 has-focus-visible:ring-2 has-focus-visible:ring-ring",
+                        unavailable
+                          ? "cursor-not-allowed"
+                          : "cursor-pointer hover:bg-surface",
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="wardrobe"
+                        checked={wardrobe === option}
+                        disabled={!!unavailable}
+                        aria-describedby={
+                          unavailable ? `wardrobe-${option}-limit` : undefined
+                        }
+                        onChange={() => {
+                          setWardrobe(option);
+                          setPendingKey(null);
+                        }}
+                        className="mt-1 accent-(--tungsten)"
+                      />
+                      <span>
+                        <span
+                          className={cn(
+                            "block text-sm",
+                            unavailable && "text-muted-foreground",
+                          )}
+                        >
+                          {wardrobeIntents[option].label}
+                        </span>
+                        <span
+                          id={
+                            unavailable ? `wardrobe-${option}-limit` : undefined
+                          }
+                          className="block text-xs leading-5 text-muted-foreground"
+                        >
+                          {unavailable ?? wardrobeIntents[option].detail}
+                        </span>
                       </span>
-                      <span className="block text-xs leading-5 text-muted-foreground">
-                        {wardrobeIntents[option].detail}
-                      </span>
-                    </span>
-                  </label>
-                ),
+                    </label>
+                  );
+                },
               )}
             </div>
             {wardrobe === "describe" && (
@@ -727,12 +784,15 @@ function SourceStage({
   target,
   onTarget,
   onDuration,
+  personBox,
 }: {
   source: MediaItem | null;
   markTarget: boolean;
   target: Target | null;
   onTarget: (target: Target) => void;
   onDuration: (seconds: number) => void;
+  /** The person found under the mark, outlined so the creator can confirm it. */
+  personBox: Preflight["box"];
 }) {
   const video = useRef<HTMLVideoElement | null>(null);
   const [frameRatio, setFrameRatio] = useState(16 / 9);
@@ -768,6 +828,7 @@ function SourceStage({
     const y = (event.clientY - rect.top - (rect.height - height) / 2) / height;
     if (x < 0 || x > 1 || y < 0 || y > 1) return;
     v.pause();
+    requestScan(source!.url);
     onTarget({ x, y, timeMs: Math.round(v.currentTime * 1000) });
   }
 
@@ -780,6 +841,8 @@ function SourceStage({
         )}
         style={{ containerType: "size" }}
         onPointerUp={mark}
+        // Start analysing as the pointer arrives, so the check is ready by the click.
+        onPointerEnter={markTarget ? () => requestScan(source.url) : undefined}
       >
         <video
           key={source.id}
@@ -797,7 +860,7 @@ function SourceStage({
           onClick={markTarget ? (event) => event.preventDefault() : undefined}
         />
         {markTarget && target && (
-          <TargetMarker target={target} ratio={frameRatio} />
+          <TargetMarker target={target} ratio={frameRatio} box={personBox} />
         )}
       </div>
       {markTarget && <ScrubBar video={video} />}
@@ -821,7 +884,15 @@ function SourceStage({
 }
 
 /** Positioned in the letterboxed frame box, so percentages match frame space. */
-function TargetMarker({ target, ratio }: { target: Target; ratio: number }) {
+function TargetMarker({
+  target,
+  ratio,
+  box,
+}: {
+  target: Target;
+  ratio: number;
+  box: Preflight["box"];
+}) {
   return (
     <div
       className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
@@ -830,6 +901,18 @@ function TargetMarker({ target, ratio }: { target: Target; ratio: number }) {
         height: `min(100cqh, ${100 / ratio}cqw)`,
       }}
     >
+      {box && (
+        <span
+          key={`box-${box.x}-${box.y}`}
+          className="target-person absolute rounded-md border border-dashed border-tungsten/70"
+          style={{
+            left: `${box.x * 100}%`,
+            top: `${box.y * 100}%`,
+            width: `${box.w * 100}%`,
+            height: `${box.h * 100}%`,
+          }}
+        />
+      )}
       <span
         key={`${target.x}-${target.y}`}
         className="target-marker absolute size-9 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-tungsten bg-tungsten/20 shadow-[0_0_0_4px_rgb(0_0_0/0.35)]"
@@ -858,6 +941,112 @@ function ScrubBar({ video }: { video: { current: HTMLVideoElement | null } }) {
         v.currentTime = (Number(event.target.value) / 1000) * v.duration;
       }}
     />
+  );
+}
+
+const shotReasons: Record<Preflight["reasons"][number], string> = {
+  "back-view":
+    "They are only seen from behind. The model turns a recast person to face the camera, which reverses their body against the action.",
+  "small-face":
+    "Their face stays small in the frame. Body, wardrobe and motion carry over, but the face may not read as the Character.",
+  "partly-away":
+    "They face away for much of the shot. Likeness is weakest in those frames.",
+};
+
+/** The composer's pre-flight: refuse back-view-only targets, warn on small faces. */
+function ShotCheck({
+  scan,
+  check,
+  onRetry,
+}: {
+  scan: ScanState;
+  check: Preflight | null;
+  onRetry: () => void;
+}) {
+  let tone: "muted" | "ok" | "warn" | "refuse" = "muted";
+  let Icon = ScanFace;
+  let title: string;
+  let body: string[] = [];
+  if (scan.status === "scanning" || scan.status === "idle") {
+    Icon = LoaderCircle;
+    title = "Checking the shot…";
+  } else if (scan.status === "failed" || !check) {
+    title = "Could not check this shot";
+    body = [
+      "You can still recast it. Check that their face is visible and not too small.",
+    ];
+  } else if (check.verdict === "unmatched") {
+    tone = "warn";
+    Icon = TriangleAlert;
+    title = "No person found at the mark";
+    body = [
+      "Click on their body on a frame where they are clearly visible, or describe them above.",
+    ];
+  } else if (check.verdict === "refuse") {
+    tone = "refuse";
+    Icon = Ban;
+    title = "This shot cannot be recast yet";
+    body = [
+      shotReasons["back-view"],
+      "Choose a take where their face is seen at some point.",
+    ];
+  } else if (check.verdict === "warn") {
+    tone = "warn";
+    Icon = TriangleAlert;
+    title = "Recast with care";
+    body = check.reasons.map((reason) => shotReasons[reason]);
+  } else {
+    tone = "ok";
+    title = "Face clearly visible";
+    body = [
+      `Seen facing the camera in ${check.faceFrames} of ${check.tracked} sampled frames.`,
+    ];
+  }
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className={cn(
+        "shot-check mt-3 flex gap-2.5 rounded-lg px-3 py-2.5 text-xs leading-5",
+        tone === "refuse"
+          ? "bg-destructive/10 text-foreground"
+          : tone === "warn"
+            ? "bg-warning/10 text-foreground"
+            : "bg-surface text-muted-foreground",
+      )}
+    >
+      <Icon
+        aria-hidden="true"
+        className={cn(
+          "mt-0.5 size-3.5 shrink-0",
+          Icon === LoaderCircle && "shot-check-spin",
+          tone === "refuse"
+            ? "text-destructive"
+            : tone === "warn"
+              ? "text-warning"
+              : tone === "ok"
+                ? "text-success"
+                : "text-subtle-foreground",
+        )}
+      />
+      <div className="min-w-0">
+        <p className="font-medium text-foreground">{title}</p>
+        {body.map((line) => (
+          <p key={line} className="text-muted-foreground">
+            {line}
+          </p>
+        ))}
+        {scan.status === "failed" && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="mt-1 text-foreground underline underline-offset-2"
+          >
+            Check again
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 

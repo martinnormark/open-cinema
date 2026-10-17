@@ -1,11 +1,12 @@
-import type {
-  CharacterReplaceInputs,
-  ReferenceView,
-  ResolvedMention,
-  TargetSelection,
+import {
+  CONFORM_STAGE,
+  type CharacterReplaceInputs,
+  type ReferenceView,
+  type ResolvedMention,
+  type TargetSelection,
 } from "@open-cinema/contracts";
 import { KLING_EDIT_LIMITS } from "./background-replace";
-import type { BuildContext, ProviderRequest } from "./types";
+import type { BuildContext, MediaStage, ProviderRequest } from "./types";
 
 /**
  * `video.character-replace` runs on Kling V3 Omni's video edit (`refer_type:
@@ -32,9 +33,21 @@ function viewRank(view: ReferenceView | null) {
   return rank < 0 ? VIEW_PRIORITY.length : rank;
 }
 
-/** Orders a Character's approved references for an identity-and-body recast. */
-export function characterReferences(mention: ResolvedMention) {
-  return [...mention.references]
+/** Views that show the face without the Character's outfit. */
+const FACE_VIEWS: readonly ReferenceView[] = ["face-closeup", "expression"];
+
+/**
+ * Orders a Character's approved references for an identity-and-body recast.
+ * When the source wardrobe is kept, only face views go: full-body and
+ * three-quarter views carry the reference outfit, which Kling followed over
+ * the prompt in Phase 0 (G4, U5). That variant is not yet measured, so the
+ * composer does not offer keeping the wardrobe.
+ */
+export function characterReferences(
+  mention: ResolvedMention,
+  { faceOnly = false }: { faceOnly?: boolean } = {},
+) {
+  const ordered = [...mention.references]
     .filter(
       (r) =>
         r.roles.length === 0 ||
@@ -43,6 +56,13 @@ export function characterReferences(mention: ResolvedMention) {
         ),
     )
     .sort((a, b) => viewRank(a.view) - viewRank(b.view));
+  if (!faceOnly) return ordered;
+  const faces = ordered.filter(
+    (r) =>
+      (r.view && FACE_VIEWS.includes(r.view)) ||
+      (r.roles.includes("identity") && !r.roles.includes("wardrobe")),
+  );
+  return faces.length ? faces : ordered;
 }
 
 /**
@@ -121,9 +141,12 @@ export async function characterReplaceRequest(
   // Kling fetches the edited video itself; it accepts no inline video.
   const videoUrl = await source.fetchableUrl();
 
+  const keepSourceWardrobe = inputs.preservation.preserve.includes("wardrobe");
   const refs = [
     ...inputs.references,
-    ...characterReferences(mention).map((r) => r.asset),
+    ...characterReferences(mention, { faceOnly: keepSourceWardrobe }).map(
+      (r) => r.asset,
+    ),
   ].slice(0, KLING_EDIT_LIMITS.maxReferenceImages);
   if (!refs.length)
     throw new Error("Approve at least one reference image for this Character");
@@ -140,7 +163,7 @@ export async function characterReplaceRequest(
       prompt: characterReplacePrompt({
         target: describeTarget(inputs.target),
         character: mention,
-        keepSourceWardrobe: inputs.preservation.preserve.includes("wardrobe"),
+        keepSourceWardrobe,
         imageTags: images.map((_, i) => `<<<image_${i + 1}>>>`),
         direction: inputs.prompt,
       }),
@@ -158,3 +181,31 @@ export async function characterReplaceRequest(
     },
   };
 }
+
+/**
+ * Kling returns 24 fps at the source length within a frame, so 25 and 29.97
+ * fps takes drift against their own audio and frame-exact review. The media
+ * container retimes the edit onto the source's frame grid with the source
+ * audio (docs/background-job.md); `conform:video` is then the result.
+ */
+export const characterConformStage: MediaStage<"video.character-replace"> = {
+  kind: "media",
+  id: CONFORM_STAGE,
+  label: "Matching the source frame rate",
+  deadlineMs: 20 * 60_000,
+  tasks(inputs, context) {
+    const editId = context.saved.find((id) => !id.includes(":"));
+    const edit = editId ? context.output(editId) : null;
+    if (!edit) throw new Error("The recast edit is missing");
+    return [
+      {
+        output: "video",
+        operation: "conform",
+        parts: [
+          { name: "source", ref: inputs.source },
+          { name: "edit", ref: edit },
+        ],
+      },
+    ];
+  },
+};
