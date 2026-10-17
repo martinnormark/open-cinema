@@ -109,6 +109,13 @@ export const worldRecipeSchema = z.object({
   version: z.number().int().positive().default(1),
   history: z.array(z.unknown()).max(50).default([]),
   cover: mediaPath.nullable().default(null),
+  /** A built-in recipe it was adapted from (`builtin:<slug>`), which every studio ships. */
+  parentId: z
+    .string()
+    .regex(/^builtin:[a-z0-9-]{1,60}$/)
+    .nullable()
+    .catch(null)
+    .default(null),
 });
 export type WorldRecipe = z.infer<typeof worldRecipeSchema>;
 

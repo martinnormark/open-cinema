@@ -149,6 +149,7 @@ export async function importWorld(
       name: recipe.name,
       summary: recipe.summary,
       spec,
+      ...(recipe.parentId ? { parentId: recipe.parentId } : {}),
       ...(cover ? { cover } : {}),
     });
     recipes++;

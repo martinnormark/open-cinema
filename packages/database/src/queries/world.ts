@@ -167,6 +167,8 @@ export async function collectWorld(
       version: recipe.version,
       history: recipe.history,
       cover: recipe.cover ? await include(recipe.cover) : null,
+      // Personal recipes' ids mean nothing elsewhere; built-ins ship everywhere.
+      parentId: recipe.parentId?.startsWith("builtin:") ? recipe.parentId : null,
     });
 
   const worldSequences = [];
