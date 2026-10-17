@@ -88,7 +88,9 @@ export function PromptStudio({
     setChosen(id);
     setCurrentProject(id);
   }
-  const [camera, setCamera] = useState<CameraMove | null>(null);
+  const [camera, setCamera] = useState<CameraMove | null>(
+    draft?.camera ?? null,
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [uncertain, setUncertain] = useState<WorkflowCommandInput | null>(null);

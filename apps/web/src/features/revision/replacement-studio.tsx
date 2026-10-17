@@ -1046,6 +1046,18 @@ export function ReplacementStudio({
                 )
                 .join(", ")}
             </dd>
+            <dt className="text-muted-foreground">Project look</dt>
+            <dd>
+              {kind === "background"
+                ? projectId
+                  ? "Palette, light and texture follow the project"
+                  : "None: no project chosen"
+                : kind === "restyle"
+                  ? "Not applied: the style you choose sets the look"
+                  : kind === "character"
+                    ? "Not applied: a recast changes the person, not the look"
+                    : "Not applied: the result keeps the source’s look"}
+            </dd>
             {shouldShowEstimate(preferences, "video") && (
               <>
                 <dt className="text-muted-foreground">Cost</dt>

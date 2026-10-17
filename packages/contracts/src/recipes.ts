@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { cameraMoveSchema } from "./camera";
 import { capabilityIdSchema, type CapabilityId } from "./capabilities";
 import { effectiveLook, lookSchema, shotDirectionSchema } from "./direction";
 import {
@@ -38,6 +39,8 @@ export const recipeSpecSchema = z.object({
   shot: shotDirectionSchema.default({}),
   aspectRatio: imageAspectRatioSchema.default("16:9"),
   durationSeconds: z.literal([4, 5, 6, 8, 10]).default(6),
+  /** A video recipe's camera move (an LTX-2 camera LoRA run), if it has one. */
+  camera: cameraMoveSchema.nullable().catch(null).default(null),
   capabilities: z.array(capabilityIdSchema).max(6).default([]),
   /** What to expect and where it struggles, in the creator's words. */
   notes: z.string().trim().max(1000).default(""),
@@ -215,6 +218,8 @@ export function recipeFromGeneration(
   )
     capabilities.push("character-sheets");
   if (Object.values(look).some(Boolean)) capabilities.push("project-look");
+  const camera = video ? (request.inputs.camera ?? null) : null;
+  if (camera) capabilities.push("ltx-camera");
   return recipeSpecSchema.parse({
     medium: video ? "video" : "image",
     template: template.slice(0, 1500),
@@ -229,6 +234,7 @@ export function recipeFromGeneration(
       video && [4, 5, 6, 8, 10].includes(request.inputs.durationSeconds)
         ? request.inputs.durationSeconds
         : 6,
+    camera,
     capabilities,
   });
 }

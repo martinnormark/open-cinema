@@ -560,7 +560,7 @@ function UseRecipe({ view }: { view: RecipeView }) {
     spec.medium,
     spec.aspectRatio,
     direction,
-    null,
+    spec.medium === "video" ? spec.camera : null,
     spec.durationSeconds,
   );
   const estimate = estimateGeneration(request);
@@ -732,6 +732,7 @@ function UseRecipe({ view }: { view: RecipeView }) {
                 shot: direction.shot,
                 aspectRatio: spec.aspectRatio,
                 durationSeconds: spec.durationSeconds,
+                ...(spec.medium === "video" ? { camera: spec.camera } : {}),
                 recipe: { id: view.id, version: view.version, name: view.name },
               });
               // "No project" must not leave the shot filed under, and lit by,

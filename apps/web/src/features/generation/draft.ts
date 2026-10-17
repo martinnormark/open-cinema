@@ -1,4 +1,5 @@
 import type {
+  CameraMove,
   ImageAspectRatio,
   Look,
   ShotDirection,
@@ -12,6 +13,7 @@ export interface StudioDraft {
   shot: ShotDirection;
   aspectRatio?: ImageAspectRatio;
   durationSeconds?: number;
+  camera?: CameraMove | null;
   recipe?: { id: string; version: number; name: string };
 }
 

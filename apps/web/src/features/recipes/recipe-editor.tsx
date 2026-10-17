@@ -104,6 +104,8 @@ export function RecipeEditor({
     shot,
     aspectRatio,
     durationSeconds,
+    // Kept as made; the editor has no camera control yet.
+    camera: start.camera,
     capabilities,
     notes,
   };
