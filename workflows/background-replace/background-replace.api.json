@@ -1,0 +1,45 @@
+{
+  "1": {
+    "class_type": "LoadVideo",
+    "_meta": { "title": "Source take" },
+    "inputs": { "file": "source.mp4" }
+  },
+  "2": {
+    "class_type": "LoadImage",
+    "_meta": { "title": "Location reference 1 (establishing)" },
+    "inputs": { "image": "location-1.jpg" }
+  },
+  "3": {
+    "class_type": "LoadImage",
+    "_meta": { "title": "Location reference 2" },
+    "inputs": { "image": "location-2.jpg" }
+  },
+  "4": {
+    "class_type": "ImageBatch",
+    "_meta": { "title": "Location references" },
+    "inputs": { "image1": ["2", 0], "image2": ["3", 0] }
+  },
+  "5": {
+    "class_type": "KlingOmniProEditVideoNode",
+    "_meta": { "title": "Replace background" },
+    "inputs": {
+      "model_name": "kling-v3-omni",
+      "prompt": "Replace only the background of <<<video_1>>> with Harbor (dusk): a small working fishing harbor with a weathered wooden pier, moored fishing boats, stacked lobster crates and warm sodium lamps under a deep blue evening sky. Use the place shown in <<<image_1>>> and <<<image_2>>> as the new setting. Keep every person and every object they hold or touch exactly as in the source: same faces, hair, clothing, poses, gestures, expressions and timing. Keep the camera movement, framing and lens identical. Adjust light and shadows on the people only as needed to sit naturally in the new setting.",
+      "video": ["1", 0],
+      "keep_original_sound": false,
+      "reference_images": ["4", 0],
+      "resolution": "720p",
+      "seed": 1207
+    }
+  },
+  "6": {
+    "class_type": "SaveVideo",
+    "_meta": { "title": "Result" },
+    "inputs": {
+      "video": ["5", 0],
+      "filename_prefix": "open-cinema/background-replace",
+      "format": "auto",
+      "format.codec": "auto"
+    }
+  }
+}

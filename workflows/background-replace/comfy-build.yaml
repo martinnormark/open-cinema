@@ -1,0 +1,15 @@
+schema: comfy-build/1
+id: null
+name: open-cinema-background-replace
+description: "Open Cinema video background replacement: Kling 3.0 Omni video edit with Location references, Beeble SwitchX matte-preserving edit, and a core-node foreground-lock composite. Partner nodes only; no custom nodes or local weights."
+syncedRevision: null
+definition:
+  schema: distribution-definition/0
+  baseComfyVersion: v0.41.2
+  models: []
+  customNodes: []
+  modelPolicy: { mode: allowlist, list: [] }
+  partnerNodePolicy:
+    mode: allowlist
+    list: [KlingOmniProEditVideoNode, BeebleSwitchXVideoEdit]
+  customNodePolicy: { mode: allowlist, list: [] }

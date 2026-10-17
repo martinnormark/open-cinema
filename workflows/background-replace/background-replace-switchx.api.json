@@ -1,0 +1,44 @@
+{
+  "1": {
+    "class_type": "LoadVideo",
+    "_meta": { "title": "Source take" },
+    "inputs": { "file": "source.mp4" }
+  },
+  "2": {
+    "class_type": "LoadImage",
+    "_meta": { "title": "Location reference (establishing)" },
+    "inputs": { "image": "location-1.jpg" }
+  },
+  "3": {
+    "class_type": "BeebleSwitchXVideoEdit",
+    "_meta": { "title": "Replace background, keep matted subject" },
+    "inputs": {
+      "video": ["1", 0],
+      "prompt": "The same people, unchanged, in Harbor (dusk): a small working fishing harbor with a weathered wooden pier, moored fishing boats, stacked lobster crates and warm sodium lamps under a deep blue evening sky.",
+      "reference_image": ["2", 0],
+      "alpha_mode": "auto",
+      "max_resolution": "720p",
+      "seed": 1207
+    }
+  },
+  "4": {
+    "class_type": "SaveVideo",
+    "_meta": { "title": "Result" },
+    "inputs": {
+      "video": ["3", 0],
+      "filename_prefix": "open-cinema/background-replace-switchx",
+      "format": "auto",
+      "format.codec": "auto"
+    }
+  },
+  "5": {
+    "class_type": "SaveVideo",
+    "_meta": { "title": "Subject matte" },
+    "inputs": {
+      "video": ["3", 1],
+      "filename_prefix": "open-cinema/background-replace-switchx-matte",
+      "format": "auto",
+      "format.codec": "auto"
+    }
+  }
+}
