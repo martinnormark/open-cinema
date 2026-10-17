@@ -15,6 +15,10 @@ export type ReferenceStatus = z.infer<typeof referenceStatusSchema>;
 /** The view a reference shows, per GOALS.md section 3. */
 export const referenceViewSchema = z.enum([
   // Characters
+  /** Three panels: headless front and back full body, large 3/4 portrait. */
+  "sheet",
+  /** The 3/4 close portrait with a smile, so teeth are never invented. */
+  "smile",
   "front",
   "profile",
   "rear",
@@ -35,11 +39,13 @@ export type ReferenceView = z.infer<typeof referenceViewSchema>;
 
 export const REFERENCE_VIEWS_BY_TYPE = {
   character: [
+    "sheet",
+    "face-closeup",
+    "smile",
     "front",
     "profile",
     "rear",
     "three-quarter",
-    "face-closeup",
     "expression",
     "full-body",
   ],
@@ -49,7 +55,7 @@ export const REFERENCE_VIEWS_BY_TYPE = {
 
 /** Views a reference sheet should cover before it reads as complete. */
 export const RECOMMENDED_VIEWS_BY_TYPE = {
-  character: ["front", "profile", "three-quarter", "rear", "face-closeup"],
+  character: ["face-closeup", "smile", "sheet"],
   location: ["establishing", "alternate-angle"],
   thing: ["front", "side", "three-quarter", "detail"],
 } as const satisfies Record<ElementType, readonly ReferenceView[]>;
@@ -195,18 +201,29 @@ export type CreateElementStateInput = z.infer<
   typeof createElementStateInputSchema
 >;
 
-/** Approved references for a mention: the base sheet plus the selected state's. */
+/**
+ * Approved references for a mention: the selected state's, then the base
+ * sheet's. A state is its own asset, so where it has approved a view (its
+ * own sheet, its own close portrait) the base reference for that view is left
+ * out: wet Cal does not also bring dry Cal's jacket.
+ */
 export function approvedReferences(
   element: Pick<Element, "references">,
   stateId?: string,
 ): ElementReference[] {
-  return element.references
-    .filter(
-      (ref) =>
-        ref.status === "approved" &&
-        (ref.stateId === null || ref.stateId === stateId),
-    )
-    .sort((a, b) => a.sortOrder - b.sortOrder);
+  const approved = element.references.filter(
+    (ref) => ref.status === "approved",
+  );
+  const own = stateId ? approved.filter((ref) => ref.stateId === stateId) : [];
+  const overridden = new Set(
+    own.flatMap((ref) => (ref.view ? [ref.view] : [])),
+  );
+  const base = approved.filter(
+    (ref) => ref.stateId === null && !(ref.view && overridden.has(ref.view)),
+  );
+  const bySortOrder = (a: ElementReference, b: ElementReference) =>
+    a.sortOrder - b.sortOrder;
+  return [...own.sort(bySortOrder), ...base.sort(bySortOrder)];
 }
 
 export function missingViews(

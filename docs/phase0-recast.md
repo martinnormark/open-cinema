@@ -123,7 +123,7 @@ Router results carry no `X-Comfy-Credits-Used` header on the queued API, so cost
 
 ## Packaging status
 
-- **Request builder:** `packages/comfy/src/workflows/character-replace.ts`, registered as `video.character-replace` in the workflow registry with display model "Kling 3.0 Omni" and a 60 minute deadline. It takes the Character's approved references (identity, appearance and wardrobe roles; pose-only references are left out), orders them full body, front, face, three-quarter, rear, profile, sends at most four, stages the take as a fetchable URL, and keeps source audio when the creator preserves it.
+- **Request builder:** `packages/comfy/src/workflows/character-replace.ts`, registered as `video.character-replace` in the workflow registry with display model "Kling 3.0 Omni" and a 60 minute deadline. It takes the Character's approved references (identity, appearance and wardrobe roles; pose-only references are left out), orders them close portrait, character sheet, smile, then full body, front, three-quarter, rear, profile (changed on 2026-10-17 for [character sheets](character-sheets.md); the measured runs above sent full body first), sends at most four, says which image is the face and which is the headless sheet, stages the take as a fetchable URL, and keeps source audio when the creator preserves it.
 - **ComfyUI graph:** [`workflows/character-replace/`](../workflows/character-replace/README.md), `LoadVideo` → `KlingOmniProEditVideoNode` with three padded references → `SaveVideo`, plus `comfy-build.yaml` (ComfyUI v0.41.2, partner node only). `comfy build validate` passes; the graph has not been executed and no release has been cut.
 - **Estimate:** `packages/comfy/src/estimates.ts` reports about 35 credits per second of source video.
 

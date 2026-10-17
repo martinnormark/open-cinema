@@ -132,9 +132,13 @@ export function RevisionView({
       ? approvedReferences(character, state?.id).filter(
           (r) =>
             r.view === null ||
-            ["face-closeup", "front", "three-quarter", "full-body"].includes(
-              r.view,
-            ),
+            [
+              "face-closeup",
+              "smile",
+              "front",
+              "three-quarter",
+              "full-body",
+            ].includes(r.view),
         )
       : [];
     if (!faces.length) return;

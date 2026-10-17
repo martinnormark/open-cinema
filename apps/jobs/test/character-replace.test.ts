@@ -72,7 +72,7 @@ const base = {
   },
 };
 
-it("recasts on Kling 3.0 Omni with the source by URL and the Character's body views first", async () => {
+it("recasts on Kling 3.0 Omni with the source by URL and the Character's face first", async () => {
   const definition = getWorkflowDefinition("video.character-replace")!;
   const request = await definition.build(
     characterReplaceInputsSchema.parse(base),
@@ -90,8 +90,8 @@ it("recasts on Kling 3.0 Omni with the source by URL and the Character's body vi
     ],
     // Pose-only references are not identity evidence and are left out.
     image_list: [
-      { image_url: "b64-mara-full" },
       { image_url: "b64-mara-face" },
+      { image_url: "b64-mara-full" },
       { image_url: "b64-mara-back" },
     ],
   });
@@ -101,6 +101,48 @@ it("recasts on Kling 3.0 Omni with the source by URL and the Character's body vi
   );
   expect(prompt).toContain("reference outfit");
   expect(prompt).toContain("Keep every other person");
+  // Without a headless sheet there is nothing to explain.
+  expect(prompt).not.toContain("character sheet");
+});
+
+it("sends the close portrait as the face and the headless sheet as the outfit", async () => {
+  const sheeted: ResolvedMention = {
+    ...mara,
+    references: [
+      {
+        asset: { type: "media-asset", assetId: "mara-sheet" },
+        view: "sheet",
+        roles: [],
+      },
+      {
+        asset: { type: "media-asset", assetId: "mara-smile" },
+        view: "smile",
+        roles: [],
+      },
+      {
+        asset: { type: "media-asset", assetId: "mara-portrait" },
+        view: "face-closeup",
+        roles: [],
+      },
+    ],
+  };
+  const definition = getWorkflowDefinition("video.character-replace")!;
+  const request = await definition.build(
+    characterReplaceInputsSchema.parse(base),
+    { ...context(), mentions: [sheeted] },
+  );
+  expect((request.input as Record<string, unknown>).image_list).toEqual([
+    { image_url: "b64-mara-portrait" },
+    { image_url: "b64-mara-sheet" },
+    { image_url: "b64-mara-smile" },
+  ]);
+  const prompt = String((request.input as Record<string, unknown>).prompt);
+  expect(prompt).toContain(
+    "Take the face only from the close portrait in <<<image_1>>>, <<<image_3>>>. <<<image_2>>> is a character sheet",
+  );
+  expect(prompt).toContain(
+    "heads are left out of the full-body panels on purpose",
+  );
 });
 
 it("keeps the source clothing and sound with face views only when the creator preserves them", async () => {
