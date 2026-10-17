@@ -61,7 +61,7 @@ web server fn ──submit(WorkflowCommand | PromptCommand)──▶ GenerationC
 4. Add the estimate to `packages/comfy/src/estimates.ts`. Router queue responses report no cost, so estimates come from published pricing.
 5. Test against HTTP fixtures in `apps/jobs/test`. `dispatch.test.ts` shows how to drive submission with mentions and inline references.
 
-The coordinator itself needs no change. An unregistered kind is rejected at submit with "That kind of generation is not available yet." At the time of writing, `image.flux`, `image.flux-reference` and `video.ltx` are registered. The two replacement kinds have contracts and revision persistence, but they still need definitions.
+The coordinator itself needs no change. An unregistered kind is rejected at submit with "That kind of generation is not available yet." At the time of writing, every kind in `workflowKindSchema` is registered. `video.object-swap`, `video.restyle`, `video.restage` and `video.ltx` with a camera move run as Comfy Cloud graphs; see [revision-modes.md](revision-modes.md).
 
 ## Where server code goes
 
