@@ -5,6 +5,11 @@ import {
 } from "./cloud-workflow";
 import type { ComfyJobStatus } from "./cloud-workflow";
 export type { ComfyJobStatus } from "./cloud-workflow";
+export * from "./workflows/router-request";
+export * from "./workflows/flux-image";
+export * from "./workflows/flux-reference";
+export * from "./workflows/ltx-video";
+export * from "./estimates";
 
 export const ROUTER_MODEL = "bfl/flux-3-image";
 /** Verified against Router's published model schema. No seed field is accepted. */
@@ -49,18 +54,20 @@ export function submissionFailure(error: unknown, provider = "router") {
       : "Waiting to recover the Router receipt using the original request key.",
   };
 }
+/** BFL models return `result.sample`; LTX returns `result.video_url`. */
 function sample(data: unknown): string | null {
   if (!data || typeof data !== "object" || !("result" in data)) return null;
   const result = data.result;
-  if (
-    !result ||
-    typeof result !== "object" ||
-    !("sample" in result) ||
-    typeof result.sample !== "string"
-  )
-    return null;
+  if (!result || typeof result !== "object") return null;
+  const value =
+    "sample" in result && typeof result.sample === "string"
+      ? result.sample
+      : "video_url" in result && typeof result.video_url === "string"
+        ? result.video_url
+        : null;
+  if (!value) return null;
   try {
-    const url = new URL(result.sample);
+    const url = new URL(value);
     return url.protocol === "https:" && !url.username && !url.password
       ? url.href
       : null;
@@ -76,7 +83,11 @@ function mediaType(url: string) {
       ? "image/jpeg"
       : path.endsWith(".webp")
         ? "image/webp"
-        : "image/*";
+        : path.endsWith(".mp4")
+          ? "video/mp4"
+          : path.endsWith(".webm")
+            ? "video/webm"
+            : "image/*";
 }
 /** SDK calls stay bounded; durable alarms own retries and polling. */
 export function createComfyClient(options: {
@@ -125,7 +136,7 @@ export function createComfyClient(options: {
         return {
           ...result,
           state: "failed",
-          error: "Comfy completed the request without a usable image.",
+          error: "Comfy completed the request without a usable output.",
         };
       }
       return {

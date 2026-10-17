@@ -33,6 +33,7 @@
       "dependencies": {
         "@fontsource-variable/inter": "5.2.8",
         "@open-cinema/assets": "workspace:*",
+        "@open-cinema/comfy": "workspace:*",
         "@open-cinema/contracts": "workspace:*",
         "@open-cinema/database": "workspace:*",
         "@tanstack/react-router": "1.170.45",
