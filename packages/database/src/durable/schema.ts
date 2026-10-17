@@ -39,6 +39,11 @@ export const executionSchema = z.object({
    */
   workflow: workflowGraphSchema,
   submissionKey: z.string(),
+  /**
+   * 0 is the definition's own request; n > 0 runs the definition's `stages[n-1]`
+   * (a further Router request or media container work) once earlier outputs are saved.
+   */
+  stage: z.number().int().nonnegative().default(0),
   nextAttemptAt: z.number(),
   deadline: z.number(),
   attempts: z.number().int(),

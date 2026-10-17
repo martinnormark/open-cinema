@@ -330,6 +330,9 @@ export function CompareViewer({
               onLoadedMetadata={() => {
                 setDurations(durationsNow());
                 align();
+                // A swapped result (another variant) rejoins playback in place.
+                if (source.current && !source.current.paused)
+                  void result.current?.play().catch(() => undefined);
               }}
             />
           </div>
@@ -472,7 +475,7 @@ export function CompareViewer({
   );
 }
 
-function Segmented<T extends string>({
+export function Segmented<T extends string>({
   label,
   value,
   onChange,

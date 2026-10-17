@@ -115,6 +115,11 @@ export type Revision = z.infer<typeof revisionSchema>;
 export const setRevisionStatusInputSchema = z.object({
   id: z.string().min(1),
   status: z.enum(["kept", "rejected"]),
+  /**
+   * Keeps a different result variant of the same job (for example the relit
+   * edit instead of the foreground lock). Must be one of that job's outputs.
+   */
+  resultOutputId: z.string().min(1).optional(),
 });
 export type SetRevisionStatusInput = z.infer<
   typeof setRevisionStatusInputSchema

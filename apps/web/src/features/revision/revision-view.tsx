@@ -10,6 +10,9 @@ import {
 } from "lucide-react";
 import {
   assetRefKey,
+  outputVariant,
+  resultOutputs,
+  type AssetRef,
   type Job,
   type Project,
   type Revision,
@@ -22,7 +25,7 @@ import { useGeneration } from "@/features/generation/store";
 import { useLibrary } from "@/features/library";
 import { cancelGeneration, reconcileGeneration } from "@/server/functions";
 import { decideRevision, type RevisionEntry } from "@/server/revisions";
-import { CompareViewer } from "./compare-viewer";
+import { CompareViewer, Segmented } from "./compare-viewer";
 import {
   assetUrl,
   phaseLabels,
@@ -34,6 +37,7 @@ import {
   type ReplacementKind,
   type RevisionDecisions,
   type RevisionPhase,
+  variantLabels,
 } from "./model";
 import "./revision.css";
 
@@ -71,8 +75,30 @@ export function RevisionView({
   const { snapshot } = useGeneration();
   const jobs = snapshot?.jobs ?? [];
   const job = jobs.find((j) => j.id === revision.jobId);
-  const result = revisionResult(revision, job);
+  const stored = revisionResult(revision, job);
+  // Variants of the same job (the lock and the relit edit) can be swapped in place.
+  const variants = job
+    ? resultOutputs(job.outputs).filter((o) => o.r2Key && outputVariant(o))
+    : [];
+  const [chosen, setChosen] = useState<string | null>(null);
+  const chosenOutput = variants.find((o) => o.id === chosen);
+  const result: AssetRef | null =
+    chosenOutput && job
+      ? { type: "job-output", jobId: job.id, outputId: chosenOutput.id }
+      : stored;
+  const resultVariant =
+    result?.type === "job-output"
+      ? variants.find((o) => o.id === result.outputId)
+      : undefined;
   const phase = revisionPhase(revision.status, job, !!result);
+  // Viewing a different version than the stored one makes Keep a real choice again.
+  const viewingStored =
+    !result ||
+    !stored ||
+    result.type !== "job-output" ||
+    stored.type !== "job-output" ||
+    result.outputId === stored.outputId;
+  const kept = revision.status === "kept" && viewingStored;
   const kind = kindOf(revision);
   const items = useLibrary((s) => s.items);
   const [deciding, setDeciding] = useState<"kept" | "rejected" | null>(null);
@@ -82,7 +108,15 @@ export function RevisionView({
     setDeciding(status);
     setError("");
     try {
-      const saved = await decideRevision({ data: { id: revision.id, status } });
+      const switched =
+        status === "kept" && !viewingStored && result?.type === "job-output";
+      const saved = await decideRevision({
+        data: {
+          id: revision.id,
+          status,
+          ...(switched ? { resultOutputId: result.outputId } : {}),
+        },
+      });
       if (!saved)
         setError(
           "This result is still being saved. Try again once it shows as ready.",
@@ -160,9 +194,33 @@ export function RevisionView({
           {result ? (
             <div className="result-reveal">
               <CompareViewer
-                key={assetUrl(result)}
+                key={revision.id}
                 sourceUrl={assetUrl(revision.source)}
                 resultUrl={assetUrl(result)}
+                footer={
+                  variants.length > 1 && resultVariant ? (
+                    <div className="mt-4 flex flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:items-center sm:gap-4">
+                      <Segmented
+                        label="Version"
+                        value={resultVariant.id}
+                        onChange={setChosen}
+                        options={variants.map((o) => ({
+                          value: o.id,
+                          label: variantLabels[outputVariant(o)!].label,
+                        }))}
+                      />
+                      <p
+                        className="max-w-prose text-xs leading-5 text-muted-foreground"
+                        aria-live="polite"
+                      >
+                        {
+                          variantLabels[outputVariant(resultVariant)!]
+                            .description
+                        }
+                      </p>
+                    </div>
+                  ) : undefined
+                }
               />
             </div>
           ) : (
@@ -178,13 +236,17 @@ export function RevisionView({
           {result && (
             <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-border pt-5">
               <Button
-                variant={revision.status === "kept" ? "default" : "secondary"}
-                aria-pressed={revision.status === "kept"}
+                variant={kept ? "default" : "secondary"}
+                aria-pressed={kept}
                 disabled={!!deciding}
                 onClick={() => void decide("kept")}
               >
                 <Check aria-hidden="true" />
-                {revision.status === "kept" ? "Kept" : "Keep"}
+                {kept
+                  ? "Kept"
+                  : revision.status === "kept"
+                    ? "Keep this version"
+                    : "Keep"}
               </Button>
               <Button
                 variant={revision.status === "rejected" ? "default" : "ghost"}
@@ -219,7 +281,7 @@ export function RevisionView({
                 </Button>
               )}
               <p className="w-full text-xs leading-5 text-muted-foreground sm:ml-auto sm:w-auto">
-                {revision.status === "kept"
+                {kept
                   ? "Kept alongside the original. Nothing was overwritten."
                   : revision.status === "rejected"
                     ? "Rejected. It stays in history in case you change your mind."
@@ -291,9 +353,11 @@ function PendingStage({
               : phase === "saving"
                 ? "Saving the result to your library…"
                 : phase === "generating"
-                  ? kind === "background"
-                    ? "Replacing the background…"
-                    : "Recasting the character…"
+                  ? job?.stage
+                    ? `${job.stage}…`
+                    : kind === "background"
+                      ? "Replacing the background…"
+                      : "Recasting the character…"
                   : "Waiting for a free slot…"}
           </p>
           {!failed && (

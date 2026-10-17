@@ -6,14 +6,22 @@ import {
   fluxReferenceWorkflow,
   ltxVideoWorkflow,
 } from "./definitions";
-import type { WorkflowDefinition } from "./types";
+import type { WorkflowDefinition, WorkflowStage } from "./types";
 
 export type {
   BuildContext,
+  CloudMediaInput,
+  CloudWorkflowRequest,
+  MediaOperation,
+  MediaStage,
+  MediaTask,
   ProviderOutput,
   ProviderRequest,
   ResolvedAsset,
+  RouterStage,
+  StageContext,
   WorkflowDefinition,
+  WorkflowStage,
 } from "./types";
 export {
   expandMentions,
@@ -39,8 +47,14 @@ export {
   describeTarget,
 } from "./character-replace";
 export {
+  BACKGROUND_MATTE_MODEL,
   BACKGROUND_REPLACE_MODELS,
   DEFAULT_BACKGROUND_PIPELINE,
+  MATTE_STAGE,
+  backgroundLockStage,
+  backgroundMatteOutputs,
+  backgroundMatteRequest,
+  backgroundMatteStage,
   backgroundEditPrompt,
   backgroundReplaceOutputs,
   klingBackgroundRequest,
@@ -66,6 +80,27 @@ export function getWorkflowDefinition<K extends WorkflowKind>(
   kind: K,
 ): WorkflowDefinition<K> | null {
   return (registry[kind] as WorkflowDefinition<K> | undefined) ?? null;
+}
+
+/** Stage 0 is the definition's own request; stage n is `stages[n - 1]`. */
+/** The stages that follow the first request for these inputs. */
+export function workflowStages(
+  kind: WorkflowKind,
+  inputs: unknown,
+): readonly WorkflowStage[] {
+  const stages = (registry[kind] as WorkflowDefinition | undefined)?.stages;
+  return (
+    (typeof stages === "function" ? stages(inputs as never) : stages) ?? []
+  );
+}
+
+export function workflowStage(
+  kind: WorkflowKind,
+  stage: number,
+  inputs: unknown,
+): WorkflowStage | null {
+  if (stage <= 0) return null;
+  return workflowStages(kind, inputs)[stage - 1] ?? null;
 }
 
 export function availableWorkflowKinds(): WorkflowKind[] {

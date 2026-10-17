@@ -2,11 +2,13 @@ import { z } from "zod";
 import { formatCost, type CostUnit } from "@/features/settings/preferences";
 import {
   preservedAspectSchema,
+  resultOutputs,
   type AssetRef,
   type GenerationEstimate,
   type GenerationRequest,
   type Job,
   type PreservedAspect,
+  type ResultVariant,
   type Revision,
   type RevisionStatus,
 } from "@open-cinema/contracts";
@@ -39,6 +41,23 @@ export const replacementKinds = {
     changes: string;
   }
 >;
+
+/** How each result variant reads to a creator choosing between them. */
+export const variantLabels: Record<
+  ResultVariant,
+  { label: string; description: string }
+> = {
+  locked: {
+    label: "As shot",
+    description:
+      "Your performers exactly as filmed, placed in the new setting. They keep the light of the original take.",
+  },
+  unlocked: {
+    label: "Relit",
+    description:
+      "The model relights the performers to sit in the new setting. Faces, hands and props can drift slightly.",
+  },
+};
 
 export const preservedLabels: Record<PreservedAspect, string> = {
   performance: "Performance",
@@ -126,7 +145,7 @@ export function revisionResult(
   job: Job | undefined,
 ): AssetRef | null {
   if (revision.result) return revision.result;
-  const output = job?.outputs.find(
+  const output = resultOutputs(job?.outputs ?? []).find(
     (o) => o.r2Key && o.mediaType.startsWith("video/"),
   );
   return output && job?.state === "succeeded"
@@ -161,6 +180,9 @@ export function revisionPhase(
       return "attention";
     case "persisting":
       return "saving";
+    case "queued":
+      // A later stage waits for its turn after earlier results were saved.
+      return job.outputs.some((o) => o.r2Key) ? "generating" : "queued";
     case "running":
     case "submitting":
     case "cancelling":

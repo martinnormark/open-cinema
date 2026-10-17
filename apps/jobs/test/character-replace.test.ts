@@ -94,7 +94,7 @@ it("recasts on Kling 3.0 Omni with the source by URL and the Character's body vi
       { image_url: "b64-mara-back" },
     ],
   });
-  const prompt = String(request.input.prompt);
+  const prompt = String((request.input as Record<string, unknown>).prompt);
   expect(prompt).toContain(
     "In <<<video_1>>>, replace the woman with long red hair (on the right of the frame) with the person shown in <<<image_1>>>, <<<image_2>>>, <<<image_3>>>: Mara, a woman",
   );
@@ -112,7 +112,7 @@ it("keeps the source clothing and sound when the creator preserves them", async 
     }),
     context(),
   );
-  const prompt = String(request.input.prompt);
+  const prompt = String((request.input as Record<string, unknown>).prompt);
   expect(prompt).toContain("replace the person on the left of the frame");
   expect(prompt).toContain("Keep the original clothing");
   expect(request.input).toMatchObject({

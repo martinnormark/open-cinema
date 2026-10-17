@@ -1,6 +1,8 @@
-import type { AssetRef } from "@open-cinema/contracts";
+import type { AssetRef, WorkflowInputs } from "@open-cinema/contracts";
 import { fluxImageInput, FLUX_IMAGE_MODEL } from "./flux-image";
 import {
+  backgroundLockStage,
+  backgroundMatteStage,
   backgroundReplaceOutputs,
   DEFAULT_BACKGROUND_PIPELINE,
   BACKGROUND_REPLACE_MODELS,
@@ -10,6 +12,14 @@ import {
   switchxBackgroundRequest,
 } from "./background-replace";
 import { MAX_REFERENCE_IMAGES } from "./flux-reference";
+import {
+  LTX_ALPHA_MEDIA_INPUTS,
+  LTX_ALPHA_MODEL_ID,
+  LTX_ALPHA_OUTPUT_NODES,
+  ltxAlphaBackgroundGraph,
+  mediaFilename,
+  seedFrom,
+} from "./ltx-alpha-background";
 import { ltxVideoModel, ltxVideoRequest } from "./ltx-video";
 import {
   expandMentions,
@@ -21,7 +31,12 @@ import {
   CHARACTER_REPLACE_MODEL,
   characterReplaceRequest,
 } from "./character-replace";
-import type { BuildContext, ProviderOutput, WorkflowDefinition } from "./types";
+import type {
+  BuildContext,
+  CloudWorkflowRequest,
+  ProviderOutput,
+  WorkflowDefinition,
+} from "./types";
 
 /** Reads one URL field of a Router result as a single output. */
 function singleOutput(field: string, id: string, fallback: string) {
@@ -135,16 +150,74 @@ export const ltxVideoWorkflow: WorkflowDefinition<"video.ltx"> = {
   outputs: ltxVideoOutputs,
 };
 
+/**
+ * LTX 2.5 Alpha Gen on Comfy Cloud: matte the take, composite it over the
+ * explicit background (image or clip) or the Location's best reference.
+ */
+async function ltxAlphaBackgroundRequest(
+  inputs: WorkflowInputs<"video.background-replace">,
+  context: BuildContext,
+): Promise<CloudWorkflowRequest> {
+  const location = context.mentions.find(
+    (m) => m.elementId === inputs.location?.elementId,
+  );
+  const plateRef = inputs.background ?? locationReferences(location)[0];
+  if (!plateRef)
+    throw new Error("Choose a background image or clip, or a Location");
+  const [source, plate] = await Promise.all([
+    context.asset(inputs.source),
+    context.asset(plateRef),
+  ]);
+  const background = plate.mediaType.startsWith("video/") ? "video" : "image";
+  const slot =
+    background === "video"
+      ? LTX_ALPHA_MEDIA_INPUTS.backgroundVideo
+      : LTX_ALPHA_MEDIA_INPUTS.backgroundImage;
+  return {
+    model: LTX_ALPHA_MODEL_ID,
+    input: {
+      graph: ltxAlphaBackgroundGraph({
+        background,
+        seed: seedFrom(JSON.stringify(inputs.source)),
+      }),
+      media: [
+        {
+          ...LTX_ALPHA_MEDIA_INPUTS.source,
+          url: await source.fetchableUrl(),
+          filename: mediaFilename("source", source.mediaType),
+          contentType: source.mediaType,
+        },
+        {
+          ...slot,
+          url: await plate.fetchableUrl(),
+          filename: mediaFilename("background", plate.mediaType),
+          contentType: plate.mediaType,
+        },
+      ],
+    },
+  };
+}
+
 export const backgroundReplaceWorkflow: WorkflowDefinition<"video.background-replace"> =
   {
     kind: "video.background-replace",
-    displayModel:
-      DEFAULT_BACKGROUND_PIPELINE === "kling"
-        ? "Kling 3.0 Omni"
-        : "Beeble SwitchX",
+    displayModel: (inputs) =>
+      inputs.pipeline === "ltx-alpha"
+        ? "LTX 2.5 Alpha Gen"
+        : DEFAULT_BACKGROUND_PIPELINE === "kling"
+          ? "Kling 3.0 Omni"
+          : "Beeble SwitchX",
     deadlineMs: 60 * 60_000,
-    model: () => BACKGROUND_REPLACE_MODELS[DEFAULT_BACKGROUND_PIPELINE],
+    model: (inputs) =>
+      inputs.pipeline === "ltx-alpha"
+        ? LTX_ALPHA_MODEL_ID
+        : BACKGROUND_REPLACE_MODELS[DEFAULT_BACKGROUND_PIPELINE],
+    provider: (inputs) =>
+      inputs.pipeline === "ltx-alpha" ? "cloud-workflow" : "router",
+    cloudOutputNodes: LTX_ALPHA_OUTPUT_NODES,
     async build(inputs, context) {
+      if (inputs.pipeline === "ltx-alpha")
+        return ltxAlphaBackgroundRequest(inputs, context);
       // Kling and SwitchX fetch the source clip by URL only.
       const source = await context.asset(inputs.source);
       const videoUrl = await source.fetchableUrl();
@@ -179,6 +252,17 @@ export const backgroundReplaceWorkflow: WorkflowDefinition<"video.background-rep
       return klingBackgroundRequest(inputs, location, media);
     },
     outputs: backgroundReplaceOutputs,
+    // SwitchX keeps its matted subject itself; Kling's edit gets the lock.
+    // The alpha composite already keeps the take's own pixels.
+    ...(DEFAULT_BACKGROUND_PIPELINE === "kling"
+      ? {
+          label: "Replacing the background",
+          stages: (inputs) =>
+            inputs.pipeline === "ltx-alpha"
+              ? []
+              : [backgroundMatteStage, backgroundLockStage],
+        }
+      : {}),
   };
 
 export const characterReplaceWorkflow: WorkflowDefinition<"video.character-replace"> =

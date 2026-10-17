@@ -87,7 +87,7 @@ it("edits the source on Kling 3.0 Omni with the Location's establishing view fir
     ],
     mode: "std",
   });
-  const prompt = String(request.input.prompt);
+  const prompt = String((request.input as Record<string, unknown>).prompt);
   expect(prompt).toContain("background of <<<video_1>>>");
   expect(prompt).toContain("Harbor (dusk)");
   expect(prompt).toContain("<<<image_1>>> and <<<image_2>>>");

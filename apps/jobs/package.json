@@ -4,16 +4,17 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev --port 8788 --persist-to ../../.wrangler/state",
-    "build": "wrangler deploy --dry-run --outdir dist",
+    "build": "wrangler deploy --dry-run --outdir dist --containers-rollout none",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "types:generate": "wrangler types --env-interface JobsEnv --include-runtime false"
   },
   "dependencies": {
-    "@open-cinema/contracts": "workspace:*",
-    "@open-cinema/database": "workspace:*",
+    "@cloudflare/containers": "0.3.7",
+    "@open-cinema/assets": "workspace:*",
     "@open-cinema/comfy": "workspace:*",
-    "@open-cinema/assets": "workspace:*"
+    "@open-cinema/contracts": "workspace:*",
+    "@open-cinema/database": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "1.4.4",

@@ -65,6 +65,9 @@ export const ltxVideoInputsSchema = z.object({
 });
 export type LtxVideoInputs = z.infer<typeof ltxVideoInputsSchema>;
 
+export const backgroundPipelineSchema = z.enum(["kling", "ltx-alpha"]);
+export type BackgroundPipelineChoice = z.infer<typeof backgroundPipelineSchema>;
+
 export const backgroundReplaceInputsSchema = z.object({
   source: assetRefSchema,
   /** A Location (and optional state) to supply the new setting. */
@@ -74,6 +77,13 @@ export const backgroundReplaceInputsSchema = z.object({
   prompt: prompt.optional(),
   target: targetSelectionSchema.default({ type: "background" }),
   preservation: preservationIntentSchema,
+  /**
+   * `kling` regenerates the setting around the take (Kling 3.0 Omni edit, with
+   * relight and parallax). `ltx-alpha` keeps the take's pixels: LTX 2.5 Alpha
+   * Gen mattes the subject on Comfy Cloud and composites it over the
+   * background image or clip, or the Location's best reference.
+   */
+  pipeline: backgroundPipelineSchema.default("kling"),
 });
 export type BackgroundReplaceInputs = z.infer<
   typeof backgroundReplaceInputsSchema
@@ -237,7 +247,11 @@ export const WORKFLOW_DESCRIPTORS = {
     kind: "video.background-replace",
     label: "Replace background",
     output: "video",
-    models: ["kling/kling-v3-omni", "beeble/switchx"],
+    models: [
+      "kling/kling-v3-omni",
+      "beeble/switchx",
+      "comfy-cloud/ltx-2.5-alpha-gen",
+    ],
   },
   "video.character-replace": {
     kind: "video.character-replace",

@@ -2,6 +2,7 @@ import { readObjectBase64, signMediaPath } from "@open-cinema/assets";
 import {
   assetRefKey,
   type AssetRef,
+  type JobOutput,
   type OwnerScope,
 } from "@open-cinema/contracts";
 import {
@@ -23,6 +24,27 @@ interface MediaLinkEnv {
 /** The request referenced media the owner cannot use (deleted, foreign, or unsaved). */
 export class AssetUnavailableError extends Error {}
 
+/** Where a ref's bytes are: this job's checkpoint first, then D1. */
+export async function storedAsset(
+  db: ReturnType<typeof createDatabase>,
+  scope: OwnerScope,
+  ref: AssetRef,
+  ownOutputs: readonly JobOutput[] = [],
+) {
+  if (ref.type === "job-output") {
+    const own = ownOutputs.find(
+      (o) => o.jobId === ref.jobId && o.id === ref.outputId && o.r2Key,
+    );
+    if (own)
+      return {
+        r2Key: own.r2Key!,
+        mediaType: own.mediaType,
+        sizeBytes: own.sizeBytes,
+      };
+  }
+  return resolveAssetRef(db, scope, ref);
+}
+
 /**
  * Resolves refs at submission time. Links expire at a fixed time derived from the
  * job so a rebuilt request after a lost receipt is byte-identical.
@@ -31,11 +53,13 @@ export function createAssetResolver(
   env: JobsEnv & MediaLinkEnv,
   scope: OwnerScope,
   linkExpiresAt: number,
+  /** This job's saved outputs, read from the checkpoint before D1 has them. */
+  ownOutputs: readonly JobOutput[] = [],
 ) {
   const db = createDatabase(env.DB);
   const cache = new Map<string, Promise<ResolvedAsset>>();
   async function resolve(ref: AssetRef): Promise<ResolvedAsset> {
-    const stored = await resolveAssetRef(db, scope, ref);
+    const stored = await storedAsset(db, scope, ref, ownOutputs);
     if (!stored) throw new AssetUnavailableError(assetRefKey(ref));
     let publicUrl: string | null = null;
     const origin = env.MEDIA_PUBLIC_ORIGIN?.replace(/\/+$/, "");
