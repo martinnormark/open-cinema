@@ -501,16 +501,20 @@ export function Segmented<T extends string>({
     <div
       role="radiogroup"
       aria-label={label}
-      className="inline-flex rounded-lg bg-secondary p-0.5"
+      className="segmented relative inline-flex rounded-lg bg-secondary p-0.5"
+      ref={followResize}
     >
+      <span className="segmented-pill" aria-hidden="true" />
       {options.map((option) => (
         <button
           key={option.value}
           type="button"
           role="radio"
           aria-checked={value === option.value}
+          // The checked option moves the pill; callback refs rerun each render.
+          ref={value === option.value ? placePill : undefined}
           onClick={() => onChange(option.value)}
-          className="inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-medium text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring aria-checked:bg-background aria-checked:text-foreground aria-checked:shadow-[0_1px_2px_rgb(0_0_0/0.3)] [&_svg]:size-3.5"
+          className="relative z-[1] inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-medium text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring aria-checked:text-foreground [&_svg]:size-3.5"
         >
           {option.icon}
           {option.label}
@@ -518,4 +522,34 @@ export function Segmented<T extends string>({
       ))}
     </div>
   );
+}
+
+/**
+ * Sliding selection (transitions.dev tabs sliding): the pill takes the
+ * checked option's box. The first placement snaps; later ones glide.
+ */
+function placePill(option: HTMLButtonElement | null) {
+  const pill =
+    option?.parentElement?.querySelector<HTMLElement>(".segmented-pill");
+  if (!option || !pill) return;
+  const first = !pill.dataset.placed;
+  if (first) pill.style.transition = "none";
+  pill.style.width = `${option.offsetWidth}px`;
+  pill.style.transform = `translateX(${option.offsetLeft}px)`;
+  if (first) {
+    void pill.offsetWidth;
+    pill.style.transition = "";
+    pill.dataset.placed = "true";
+  }
+}
+/** Labels can change width when the font loads or the layout reflows. */
+function followResize(group: HTMLDivElement | null) {
+  if (!group || typeof ResizeObserver === "undefined") return;
+  const observer = new ResizeObserver(() => {
+    const pill = group.querySelector<HTMLElement>(".segmented-pill");
+    if (pill) delete pill.dataset.placed;
+    placePill(group.querySelector('[aria-checked="true"]'));
+  });
+  observer.observe(group);
+  return () => observer.disconnect();
 }

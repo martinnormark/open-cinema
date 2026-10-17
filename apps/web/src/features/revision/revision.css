@@ -103,6 +103,28 @@
   }
 }
 
+/* Compare modes: one pill slides to the chosen option (tabs sliding). Until
+   it is placed after hydration, the checked option carries the fill. */
+.segmented:not(:has(.segmented-pill[data-placed])) [aria-checked="true"] {
+  border-radius: 0.375rem;
+  background: var(--background);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+}
+.segmented-pill {
+  position: absolute;
+  top: 0.125rem;
+  left: 0;
+  height: 2rem;
+  width: 0;
+  border-radius: 0.375rem;
+  background: var(--background);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+  pointer-events: none;
+  transition:
+    transform var(--duration-fast) var(--ease-smooth-out),
+    width var(--duration-fast) var(--ease-smooth-out);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .revision-reveal,
   .target-marker,
