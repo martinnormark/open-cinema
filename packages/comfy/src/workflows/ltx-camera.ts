@@ -1,18 +1,10 @@
+import { CAMERA_MOVES, type CameraMove } from "@open-cinema/contracts";
 import {
-  CAMERA_MOVES,
-  RESTAGE_ANGLES,
-  type CameraMove,
-  type RestageAngle,
-} from "@open-cinema/contracts";
-import {
-  LTX23_MODELS,
   LTX2_MODELS,
   ltxFrameCount,
   ltxSamplerNodes,
   saveVideoNodes,
-  sourceClipNodes,
   type Graph,
-  type GraphLimits,
 } from "./ltx-graph";
 
 /**
@@ -23,18 +15,14 @@ import {
  * the prompt only describes the scene. With a first frame it animates that
  * image (image-to-video), otherwise it is text-to-video.
  *
- * Re-staging: LTX 2.3 with Cseti's CrossView-Prompt IC-LoRA re-renders an
- * existing take from a new camera angle, guided by the take itself, so the
- * performance and timing are the take's.
+ * Re-staging a take from a new angle is off: the only model that did it was a
+ * community IC-LoRA, and the app uses no LoRA made by someone else
+ * (docs/third-party-ip.md).
  */
 export const LTX_CAMERA_MODEL_ID = "comfy-cloud/ltx-2-camera-lora";
-export const LTX_RESTAGE_MODEL_ID = "comfy-cloud/ltx-2.3-crossview";
 
 export const LTX_CAMERA_MEDIA_INPUTS = {
   firstFrame: { node: "first_frame", field: "image" },
-} as const;
-export const LTX_RESTAGE_MEDIA_INPUTS = {
-  source: { node: "source", field: "file" },
 } as const;
 export const LTX_CAMERA_OUTPUT_NODES = ["save_result"] as const;
 
@@ -105,66 +93,5 @@ export function ltxCameraGraph(o: LtxCameraGraphOptions): Graph {
     ...graph,
     ...ltx.nodes,
     ...saveVideoNodes("save_result", ltx.frames, o.fps, ltx.audio, "camera"),
-  };
-}
-
-export const LTX_RESTAGE_LIMITS: GraphLimits = {
-  /** CrossView trained on 81-frame clips; longer takes keep their first 97. */
-  maxFrames: 97,
-  maxSide: 768,
-};
-
-export interface LtxRestageGraphOptions {
-  angle: RestageAngle;
-  /** What is in the shot, so LTX keeps it; the angle words come first. */
-  description: string;
-  seed: number;
-}
-
-/** The CrossView caption: its trigger, then the angle in its own vocabulary. */
-export function crossViewPrompt(angle: RestageAngle, description: string) {
-  const a = RESTAGE_ANGLES[angle];
-  const scene = description.trim().replace(/[.\s]+$/, "");
-  return `crossview. new camera angle: ${a.azimuth}, ${a.elevation}, ${a.distance}.${scene ? ` ${scene}.` : ""}`;
-}
-
-export function ltxRestageGraph(o: LtxRestageGraphOptions): Graph {
-  const source = sourceClipNodes(LTX_RESTAGE_LIMITS);
-  const ltx = ltxSamplerNodes({
-    id: "ltx",
-    checkpoint: LTX23_MODELS.checkpoint,
-    textEncoder: LTX23_MODELS.textEncoder,
-    // The card asks for 1.2–1.5 on distilled, few-step models.
-    loras: [{ name: LTX23_MODELS.crossView, strength: 1.3 }],
-    prompt: crossViewPrompt(o.angle, o.description),
-    width: source.genWidth,
-    height: source.genHeight,
-    length: source.length,
-    fps: source.fps,
-    seed: o.seed,
-    guide: { image: source.small, strength: 1 },
-  });
-  return {
-    ...source.nodes,
-    ...ltx.nodes,
-    // Back at the take's size, so the comparison lines up frame for frame.
-    restaged: {
-      class_type: "ImageScale",
-      inputs: {
-        image: ltx.frames,
-        upscale_method: "lanczos",
-        width: source.width,
-        height: source.height,
-        crop: "disabled",
-      },
-    },
-    // A new angle is a new picture; the take's sound still fits it.
-    ...saveVideoNodes(
-      "save_result",
-      ["restaged", 0],
-      source.fps,
-      source.audio,
-      "restage",
-    ),
   };
 }
