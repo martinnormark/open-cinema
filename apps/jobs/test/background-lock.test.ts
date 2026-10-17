@@ -333,3 +333,120 @@ it("stops for the creator when Comfy Cloud keeps failing the lock, then resumes 
     "lock:unlocked",
   ]);
 }, 30_000);
+
+/** A stored take whose Router edit and matte complete, ready for the lock step. */
+async function lockedTake() {
+  const ownerId = crypto.randomUUID();
+  const stub = env.GENERATION_COORDINATORS.getByName(ownerId);
+  const db = createDatabase(env.DB);
+  const sourceId = crypto.randomUUID();
+  const r2Key = `uploads/${ownerId}/${sourceId}`;
+  await env.GENERATED_ASSETS.put(r2Key, take);
+  await createPendingMediaAsset(
+    db,
+    { ownerId },
+    {
+      id: sourceId,
+      r2Key,
+      filename: "take.mp4",
+      mediaType: "video/mp4",
+      sizeBytes: take.length,
+    },
+  );
+  await markMediaAssetReady(db, { ownerId }, sourceId, {
+    sizeBytes: take.length,
+    etag: "e",
+  });
+  network.use(
+    http.post("https://api.comfy.org/customers/storage", () =>
+      HttpResponse.json({
+        upload_url: "https://storage.googleapis.com/upload/take.mp4",
+        download_url: "https://storage.googleapis.com/signed/take.mp4",
+      }),
+    ),
+    http.put(
+      "https://storage.googleapis.com/upload/take.mp4",
+      () => new HttpResponse(null, { status: 200 }),
+    ),
+  );
+  const editUrl = "https://v15-kling-fdl.klingai.com/edit.mp4";
+  const matteUrl = "https://temp.bria.ai/abc/matte.webm";
+  provider("kling/kling-v3-omni", "kling-1", {
+    data: { task_result: { videos: [{ id: "v1", url: editUrl }] } },
+  });
+  provider("bria/video-edit-remove-background", "bria-1", {
+    result: { video_url: matteUrl },
+  });
+  asset(editUrl, edit, "video/mp4");
+  asset(matteUrl, matte, "video/webm");
+  const submit = () =>
+    stub.submit(
+      { ownerId },
+      {
+        idempotencyKey: crypto.randomUUID(),
+        request: {
+          workflowKind: "video.background-replace",
+          inputs: {
+            source: { type: "media-asset", assetId: sourceId },
+            prompt: "a fishing harbor at dusk",
+            preservation: { preserve: ["foreground"], allowIntegration: true },
+          },
+        },
+      },
+    );
+  return { ownerId, stub, submit };
+}
+
+it("lets the creator dismiss a lock Comfy Cloud refuses, keeping the saved parts and reopening the queue", async () => {
+  const { ownerId, stub, submit } = await lockedTake();
+  network.use(...cloudMedia(rendered).handlers);
+  network.use(
+    http.post(
+      "https://cloud.comfy.org/api/upload/image",
+      () => new HttpResponse("unsupported clip", { status: 400 }),
+    ),
+  );
+  const accepted = await submit();
+  if (!accepted.ok) throw new Error(accepted.error);
+  for (let i = 0; i < 14; i++) {
+    await due(stub);
+    if ((await checkpoint(stub))!.jobs[0]!.state === "needs_attention") break;
+  }
+  const stuck = (await checkpoint(stub))!.jobs[0]!;
+  expect(stuck.state).toBe("needs_attention");
+  expect(stuck.providerJobId).toBeTruthy();
+  expect(await submit()).toMatchObject({ ok: false });
+
+  const dismissed = await stub.cancel({ ownerId }, stuck.id);
+  expect(dismissed.ok).toBe(true);
+  const job = (await checkpoint(stub))!.jobs[0]!;
+  expect(job).toMatchObject({
+    state: "cancelled",
+    error: expect.stringContaining("Comfy may still have run it"),
+  });
+  expect(job.outputs.filter((o) => o.r2Key)).toHaveLength(2);
+  expect(await submit()).toMatchObject({ ok: true });
+}, 30_000);
+
+it("keeps polling the same Cloud media job through a transient status error", async () => {
+  const { stub, submit } = await lockedTake();
+  const cloud = cloudMedia(rendered);
+  let unavailable = 1;
+  network.use(...cloud.handlers);
+  network.use(
+    http.get("https://cloud.comfy.org/api/jobs/:id", () =>
+      unavailable-- > 0
+        ? new HttpResponse("upstream", { status: 503 })
+        : undefined,
+    ),
+  );
+  const accepted = await submit();
+  if (!accepted.ok) throw new Error(accepted.error);
+  for (let i = 0; i < 12; i++) {
+    await due(stub);
+    if ((await checkpoint(stub))!.jobs[0]!.state === "succeeded") break;
+  }
+  expect((await checkpoint(stub))!.jobs[0]!.state).toBe("succeeded");
+  // One prompt per step: the poll error did not post (and bill) the lock again.
+  expect(cloud.runs.map((r) => r.operation)).toEqual(["lock", "conform"]);
+}, 30_000);

@@ -79,20 +79,22 @@ export async function replaceCoordinatorWake(
       await transaction.get("coordinator"),
     );
     let next = socketExpiry ?? Infinity;
-    const active = record.jobs.find(
+    const active = record.jobs.filter(
       (j) =>
         ["submitting", "running", "persisting", "cancelling"].includes(
           j.state,
         ) ||
         (j.state === "queued" && j.providerJobId),
     );
-    if (active)
-      next = Math.min(next, record.executions[active.id]!.nextAttemptAt);
-    else if (
-      !record.jobs.some((j) => j.state === "needs_attention") &&
-      record.jobs.some((j) => j.state === "queued")
+    // Every active job polls on its own schedule; wake for the earliest.
+    for (const job of active)
+      next = Math.min(next, record.executions[job.id]!.nextAttemptAt);
+    if (
+      !active.length &&
+      !record.jobs.some((j) => j.state === "needs_attention")
     )
-      next = Math.min(next, Date.now() + 100);
+      for (const job of record.jobs.filter((j) => j.state === "queued"))
+        next = Math.min(next, record.executions[job.id]!.nextAttemptAt);
     if (Object.values(record.executions).some((e) => e.pendingProjection))
       next = Math.min(next, Date.now() + 5000);
     if (Number.isFinite(next))

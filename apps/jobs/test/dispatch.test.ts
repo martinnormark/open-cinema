@@ -369,8 +369,36 @@ it("reports whether Comfy credentials are configured without revealing them", as
   expect(status).toEqual({ comfyConfigured: true });
 });
 
-it("runs LTX 2.5 Alpha Gen on Comfy Cloud with uploaded media and lists the composite first", async () => {
-  const { scope, stub } = fixture();
+const cloudOutput = (node_id: string, id: string) => ({
+  node_id,
+  name: `${node_id}.mp4`,
+  type: "video",
+  content_type: "video/mp4",
+  size_bytes: 10,
+  id,
+  hash: null,
+  url: `https://cloud-media.test/${id}`,
+  url_expires_at: new Date(Date.now() + 60_000).toISOString(),
+});
+const cloudJob = (status: string, outputs: unknown[] = []) => ({
+  id: "cloud-job-1",
+  status,
+  created_at: new Date().toISOString(),
+  started_at: null,
+  completed_at: null,
+  expires_at: new Date(Date.now() + 86_400_000).toISOString(),
+  queue_position: null,
+  progress: null,
+  outputs,
+  error: null,
+  urls: {},
+});
+/**
+ * A stored take and background plate staged through Comfy storage (local
+ * development has no public media origin), and a Comfy Cloud that takes asset
+ * uploads and queues `cloud-job-1`.
+ */
+async function ltxAlpha(scope: { ownerId: string }) {
   const db = createDatabase(env.DB);
   async function stored(name: string, mediaType: string) {
     const bytes = new TextEncoder().encode(`${name} bytes`);
@@ -394,9 +422,6 @@ it("runs LTX 2.5 Alpha Gen on Comfy Cloud with uploaded media and lists the comp
   }
   const take = await stored("take.mp4", "video/mp4");
   const plate = await stored("harbor.png", "image/png");
-
-  // Local development has no public media origin, so the resolver stages the
-  // bytes in Comfy storage and the Cloud client reads them back from there.
   const staged = new Map<string, Uint8Array>();
   network.use(
     http.post(
@@ -427,30 +452,6 @@ it("runs LTX 2.5 Alpha Gen on Comfy Cloud with uploaded media and lists the comp
   );
   const uploads: { path: string; type: string; body: string }[] = [];
   const jobs: unknown[] = [];
-  const output = (node_id: string, id: string) => ({
-    node_id,
-    name: `${node_id}.mp4`,
-    type: "video",
-    content_type: "video/mp4",
-    size_bytes: 10,
-    id,
-    hash: null,
-    url: `https://cloud-media.test/${id}`,
-    url_expires_at: new Date(Date.now() + 60_000).toISOString(),
-  });
-  const cloudJob = (status: string, outputs: unknown[] = []) => ({
-    id: "cloud-job-1",
-    status,
-    created_at: new Date().toISOString(),
-    started_at: null,
-    completed_at: null,
-    expires_at: new Date(Date.now() + 86_400_000).toISOString(),
-    queue_position: null,
-    progress: null,
-    outputs,
-    error: null,
-    urls: {},
-  });
   network.use(
     http.head(
       "https://cloud.comfy.org/api/v2/assets/by-hash/:hash",
@@ -482,21 +483,27 @@ it("runs LTX 2.5 Alpha Gen on Comfy Cloud with uploaded media and lists the comp
       return HttpResponse.json(cloudJob("queued"), { status: 201 });
     }),
   );
-
-  const job = accepted(
-    await stub.submit(scope, {
-      idempotencyKey: crypto.randomUUID(),
-      request: {
-        workflowKind: "video.background-replace",
-        inputs: {
-          source: { type: "media-asset", assetId: take },
-          background: { type: "media-asset", assetId: plate },
-          preservation: { preserve: ["foreground", "performance"] },
-          pipeline: "ltx-alpha",
+  const command = () => ({
+    idempotencyKey: crypto.randomUUID(),
+    request: {
+      workflowKind: "video.background-replace" as const,
+      inputs: {
+        source: { type: "media-asset" as const, assetId: take },
+        background: { type: "media-asset" as const, assetId: plate },
+        preservation: {
+          preserve: ["foreground" as const, "performance" as const],
         },
+        pipeline: "ltx-alpha" as const,
       },
-    }),
-  );
+    },
+  });
+  return { uploads, jobs, command };
+}
+
+it("runs LTX 2.5 Alpha Gen on Comfy Cloud with uploaded media and lists the composite first", async () => {
+  const { scope, stub } = fixture();
+  const { uploads, jobs, command } = await ltxAlpha(scope);
+  const job = accepted(await stub.submit(scope, command()));
   expect(job.model).toBe("LTX 2.5 Alpha Gen");
   await due(stub);
 
@@ -530,9 +537,9 @@ it("runs LTX 2.5 Alpha Gen on Comfy Cloud with uploaded media and lists the comp
     http.get("https://cloud.comfy.org/api/v2/jobs/cloud-job-1", () =>
       HttpResponse.json(
         cloudJob("succeeded", [
-          output("source", "loader-preview"),
-          output("save_matte", "matte"),
-          output("save_composite", "composite"),
+          cloudOutput("source", "loader-preview"),
+          cloudOutput("save_matte", "matte"),
+          cloudOutput("save_composite", "composite"),
         ]),
       ),
     ),
@@ -545,6 +552,73 @@ it("runs LTX 2.5 Alpha Gen on Comfy Cloud with uploaded media and lists the comp
     "composite",
     "matte",
   ]);
+});
+
+it("retries a Cloud submission whose media upload fails before the prompt is posted", async () => {
+  const { scope, stub } = fixture();
+  const { uploads, jobs, command } = await ltxAlpha(scope);
+  let unavailable = 1;
+  network.use(
+    http.post("https://cloud.comfy.org/api/v2/assets", () =>
+      unavailable-- > 0
+        ? HttpResponse.json({ message: "starting" }, { status: 503 })
+        : undefined,
+    ),
+  );
+  accepted(await stub.submit(scope, command()));
+  await due(stub);
+  // Nothing reached Cloud's job queue, so the job simply waits to try again.
+  expect(jobs).toHaveLength(0);
+  expect((await stub.getSnapshot(scope))?.jobs[0]?.state).toBe("queued");
+  await due(stub);
+  expect(jobs).toHaveLength(1);
+  expect(uploads).toHaveLength(2);
+  expect((await stub.getSnapshot(scope))?.jobs[0]).toMatchObject({
+    state: "queued",
+    providerJobId: "cloud-job-1",
+  });
+});
+
+it("returns a Cloud job to the queue when its request cannot be built", async () => {
+  const { scope, stub } = fixture();
+  const { jobs, command } = await ltxAlpha(scope);
+  let unavailable = 1;
+  network.use(
+    http.post("https://api.comfy.org/customers/storage", () =>
+      unavailable-- > 0
+        ? HttpResponse.json({ error: "busy" }, { status: 503 })
+        : undefined,
+    ),
+  );
+  accepted(await stub.submit(scope, command()));
+  await due(stub);
+  expect((await stub.getSnapshot(scope))?.jobs[0]?.state).toBe("queued");
+  await due(stub);
+  expect(jobs).toHaveLength(1);
+  expect((await stub.getSnapshot(scope))?.jobs[0]?.providerJobId).toBe(
+    "cloud-job-1",
+  );
+});
+
+it("fails a Cloud job that succeeds without saving an output instead of retrying storage", async () => {
+  const { scope, stub } = fixture();
+  const { command } = await ltxAlpha(scope);
+  accepted(await stub.submit(scope, command()));
+  await due(stub);
+  // Only the loader's preview, which is not one of the graph's saved results.
+  network.use(
+    http.get("https://cloud.comfy.org/api/v2/jobs/cloud-job-1", () =>
+      HttpResponse.json(
+        cloudJob("succeeded", [cloudOutput("source", "loader-preview")]),
+      ),
+    ),
+  );
+  await due(stub);
+  expect((await stub.getSnapshot(scope))?.jobs[0]).toMatchObject({
+    state: "failed",
+    outputs: [],
+    error: expect.stringContaining("without a usable output"),
+  });
 });
 
 it("combines one state per kind in a mention and writes the shot's direction into the prompt", async () => {

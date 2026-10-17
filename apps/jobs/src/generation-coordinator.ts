@@ -102,6 +102,8 @@ const stagePrefix = (execution: Execution) => {
   const stage = stageOf(execution);
   return stage ? `${stage.id}:` : "";
 };
+/** Downloading and uploading a Cloud request's media, before its prompt is posted. */
+const MEDIA_PREP_MS = 5 * 60_000;
 /** Media steps retry on their own; past this many failures the creator decides. */
 const MEDIA_ATTEMPTS = 5;
 /**
@@ -338,16 +340,29 @@ export class GenerationCoordinator
   }
 
   async cancel(scope: OwnerScope, jobId: string): Promise<CommandResult> {
+    type Stop = { providerJobId: string; execution: Execution };
+    let stop: Stop | null = null;
     const record = await mutateCoordinator(
       this.ctx.storage,
       ownerScopeSchema.parse(scope),
       (record) => {
+        stop = null;
         const job = record.jobs.find((j) => j.id === jobId);
-        // With no receipt there is nothing to check again, so the creator can
-        // dismiss it; otherwise it would pause admission for good.
-        if (job?.state === "needs_attention" && !job.providerJobId) {
-          record.executions[jobId]!.cancelRequested = true;
+        // The creator can always dismiss a job that needs attention; otherwise a
+        // permanent failure would pause admission for good. Saved outputs stay.
+        if (job?.state === "needs_attention") {
+          const execution = record.executions[jobId]!;
+          // Only a generation still at the provider is worth cancelling there.
+          if (
+            job.providerJobId &&
+            !execution.assetsPending &&
+            stageOf(execution)?.kind !== "media"
+          )
+            stop = { providerJobId: job.providerJobId, execution };
+          execution.cancelRequested = true;
           job.state = "cancelled";
+          job.stage = null;
+          job.progress = null;
           job.error =
             "Dismissed. Comfy may still have run it, so check your Comfy usage.";
           touch(record, job);
@@ -367,6 +382,17 @@ export class GenerationCoordinator
     if (!record || !record.jobs.some((j) => j.id === jobId))
       return failure("Job not found");
     this.broadcast(record);
+    const dismissed = stop as Stop | null;
+    // Best effort: the job is already dismissed whatever the provider answers.
+    if (dismissed)
+      try {
+        await this.client(dismissed.execution).cancel(
+          dismissed.providerJobId,
+          AbortSignal.timeout(10_000),
+        );
+      } catch {
+        console.warn(JSON.stringify({ event: "dismiss_cancel_failed", jobId }));
+      }
     return { ok: true, snapshot: snapshot(record) };
   }
 
@@ -799,7 +825,11 @@ export class GenerationCoordinator
     ].filter((j) => record!.executions[j.id]!.nextAttemptAt <= now);
     for (const job of due) {
       const execution = record.executions[job.id]!;
-      if (now > execution.deadline) {
+      // A job still waiting its turn has not started its window (see the claim).
+      if (
+        now > execution.deadline &&
+        (job.state !== "queued" || job.providerJobId)
+      ) {
         await this.change(record.ownerId, job.id, (j) => {
           j.state = "needs_attention";
           j.error = execution.assetsPending
@@ -829,7 +859,10 @@ export class GenerationCoordinator
           (r) => {
             const current = r.jobs.find((j) => j.id === job.id)!;
             if (current.state === "queued" && !current.providerJobId) {
+              const e = r.executions[job.id]!;
               current.state = "submitting";
+              // Monitoring starts on submission, not while waiting behind others.
+              e.deadline = Date.now() + deadlineFor(e);
               touch(r, current);
             }
           },
@@ -846,12 +879,21 @@ export class GenerationCoordinator
         this.broadcast(claimed);
         let providerRequest: Record<string, unknown> | null = null;
         try {
+          // The claim may have started the deadline, which media links follow.
           providerRequest = await this.providerRequest(
             record.ownerId,
             job,
-            execution,
+            claimed.executions[job.id]!,
           );
+          // Cloud media is uploaded before, not inside, the bounded prompt post.
+          const client = this.client(execution);
+          if ("prepare" in client)
+            providerRequest = await client.prepare(
+              providerRequest,
+              AbortSignal.timeout(MEDIA_PREP_MS),
+            );
         } catch (error) {
+          providerRequest = null;
           // Nothing reached the provider, so failing or retrying here is safe.
           const unavailable = error instanceof AssetUnavailableError;
           await this.change(record.ownerId, job.id, (j, r) => {
@@ -865,7 +907,10 @@ export class GenerationCoordinator
               j.error = unavailable
                 ? "Some media in this request is no longer available. Choose it again."
                 : "This generation's media could not be prepared. Try again.";
-            }
+            } else if (job.state === "queued")
+              // Claimed from the queue this time, so no earlier call can have a
+              // receipt to recover: wait in the queue again.
+              j.state = e.cancelRequested ? "cancelled" : "queued";
           });
         }
         if (providerRequest)

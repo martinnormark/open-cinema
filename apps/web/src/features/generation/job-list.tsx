@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { isActiveJob, type Job } from "@open-cinema/contracts";
 import { cancelGeneration, reconcileGeneration } from "@/server/functions";
@@ -28,6 +28,7 @@ export function JobList({ jobs }: { jobs: readonly Job[] }) {
 function JobRow({ job }: { job: Job }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const dismissNote = useId();
   async function action(kind: "cancel" | "reconcile") {
     setPending(true);
     setError("");
@@ -137,36 +138,44 @@ function JobRow({ job }: { job: Job }) {
           </Button>
         )}
       {job.state === "needs_attention" && (
-        <div className="mt-3 flex gap-4">
-          {!job.providerJobId && (
+        <>
+          <div className="mt-3 flex gap-4">
+            {job.providerJobId && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={pending}
+                onClick={() => void action("reconcile")}
+              >
+                Check again
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
               disabled={pending}
+              aria-describedby={dismissNote}
               onClick={() => void action("cancel")}
             >
               Dismiss
             </Button>
-          )}
-          {job.providerJobId && (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={pending}
-              onClick={() => void action("reconcile")}
+            <a
+              href="https://cloud.comfy.org"
+              target="_blank"
+              rel="noreferrer"
+              className="text-sm underline underline-offset-4"
             >
-              Check again
-            </Button>
-          )}
-          <a
-            href="https://cloud.comfy.org"
-            target="_blank"
-            rel="noreferrer"
-            className="text-sm underline underline-offset-4"
+              Open Comfy Cloud
+            </a>
+          </div>
+          <p
+            id={dismissNote}
+            className="mt-2 max-w-2xl text-xs text-muted-foreground"
           >
-            Open Comfy Cloud
-          </a>
-        </div>
+            Dismissing stops tracking this job and keeps anything already saved.
+            Comfy may still have run it, so check your Comfy usage.
+          </p>
+        </>
       )}
     </article>
   );

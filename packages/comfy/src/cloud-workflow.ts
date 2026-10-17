@@ -42,12 +42,19 @@ function savedOutputs(job: ProviderJob, order: readonly string[]) {
     .filter((o) => order.includes(o.nodeId))
     .sort((a, b) => order.indexOf(a.nodeId) - order.indexOf(b.nodeId));
 }
+const NO_OUTPUT = "Comfy completed the request without a usable output.";
+/** A run that saved nothing has nothing to store; like Router, that is a failure. */
+function withOutputs(result: ComfyJobStatus): ComfyJobStatus {
+  return result.state === "succeeded" && !result.outputs.length
+    ? { ...result, state: "failed", progress: null, error: NO_OUTPUT }
+    : result;
+}
 function status(
   job: ProviderJob,
   order: readonly string[] = [],
 ): ComfyJobStatus {
   const value = job.progress?.value;
-  return {
+  return withOutputs({
     providerJobId: job.id,
     state: mapProviderState(job.status),
     progress:
@@ -64,7 +71,7 @@ function status(
         : job.status === "expired"
           ? "This Comfy job has expired."
           : null,
-  };
+  });
 }
 /** Submission failures without a definitive rejection must never be retried blindly. */
 export function submissionFailure(error: unknown): {
@@ -157,6 +164,29 @@ async function uploadAsset(
     __type: "core/ASSET",
     info: { id, file_path: media.filename },
   };
+}
+
+/**
+ * Uploads each media input with `upload` and fills its loader, returning a
+ * request with no media left to send. Coordinators run this before `submit`
+ * under its own time limit: until the prompt is posted, nothing is queued at
+ * Cloud, so a failure here is safe to retry.
+ */
+async function prepareMedia(
+  request: Record<string, unknown>,
+  upload: (media: CloudMediaInput) => Promise<unknown>,
+): Promise<Record<string, unknown>> {
+  if (!isCloudRequest(request) || !request.input.media.length) return request;
+  const graph = structuredClone(request.input.graph) as Record<
+    string,
+    { inputs?: Record<string, unknown> } | undefined
+  >;
+  for (const media of request.input.media) {
+    const node = graph[media.node];
+    if (!node) throw new Error(`The graph has no ${media.node} loader`);
+    (node.inputs ??= {})[media.field] = await upload(media);
+  }
+  return { ...request, input: { graph, media: [] } };
 }
 
 const MEDIA_TYPES: Record<string, string> = {
@@ -260,7 +290,7 @@ function createCompatClient(baseUrl: string, order: readonly string[]) {
   async function getStatus(id: string): Promise<ComfyJobStatus> {
     const job = await read(id);
     const state = compatState(job.status);
-    return {
+    return withOutputs({
       providerJobId: id,
       state,
       progress: state === "succeeded" ? 1 : null,
@@ -272,51 +302,50 @@ function createCompatClient(baseUrl: string, order: readonly string[]) {
             }))
           : [],
       error: state === "failed" ? failure(job) : null,
-    };
+    });
+  }
+  function prepare(request: Record<string, unknown>, signal: AbortSignal) {
+    return prepareMedia(request, async (media) => {
+      const form = new FormData();
+      form.append("type", "input");
+      form.append("overwrite", "true");
+      form.append(
+        "image",
+        new Blob([await download(media.url, signal)], {
+          type: media.contentType,
+        }),
+        `${crypto.randomUUID()}-${media.filename}`,
+      );
+      const response = await fetch(`${baseUrl}/api/upload/image`, {
+        method: "POST",
+        body: form,
+        signal,
+      });
+      const uploaded = (await response.json().catch(() => null)) as {
+        name?: string;
+        subfolder?: string;
+      } | null;
+      if (!response.ok || !uploaded?.name)
+        throw new ComfyError(`Comfy Cloud upload failed: ${response.status}`, {
+          code: "asset_upload_failed",
+          httpStatus: response.status,
+        });
+      return uploaded.subfolder
+        ? `${uploaded.subfolder}/${uploaded.name}`
+        : uploaded.name;
+    });
   }
   return {
+    prepare,
     async submit(
-      graph: Record<string, unknown>,
+      request: Record<string, unknown>,
       idempotencyKey: string,
       signal: AbortSignal,
     ): Promise<ComfyJobStatus> {
       if (!idempotencyKey.trim())
         throw new Error("A persisted submission key is required");
-      const prompt = structuredClone(
-        isCloudRequest(graph) ? graph.input.graph : graph,
-      ) as Record<string, { inputs: Record<string, unknown> }>;
-      if (isCloudRequest(graph))
-        for (const media of graph.input.media) {
-          const form = new FormData();
-          form.append("type", "input");
-          form.append("overwrite", "true");
-          form.append(
-            "image",
-            new Blob([await download(media.url, signal)], {
-              type: media.contentType,
-            }),
-            `${crypto.randomUUID()}-${media.filename}`,
-          );
-          const response = await fetch(`${baseUrl}/api/upload/image`, {
-            method: "POST",
-            body: form,
-            signal,
-          });
-          const uploaded = (await response.json().catch(() => null)) as {
-            name?: string;
-            subfolder?: string;
-          } | null;
-          if (!response.ok || !uploaded?.name)
-            throw new ComfyError(
-              `Comfy Cloud upload failed: ${response.status}`,
-              { code: "asset_upload_failed", httpStatus: response.status },
-            );
-          const node = prompt[media.node];
-          if (!node) throw new Error(`The graph has no ${media.node} loader`);
-          node.inputs[media.field] = uploaded.subfolder
-            ? `${uploaded.subfolder}/${uploaded.name}`
-            : uploaded.name;
-        }
+      const graph = await prepare(request, signal);
+      const prompt = isCloudRequest(graph) ? graph.input.graph : graph;
       const response = await fetch(`${baseUrl}/api/prompt`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -396,30 +425,29 @@ export function createComfyClient(options: {
     clientInfo: "open-cinema",
     fetch: (input, init) => globalThis.fetch(input, init),
   });
+  const prepare = (request: Record<string, unknown>, signal: AbortSignal) =>
+    prepareMedia(request, async (media) =>
+      uploadAsset(
+        baseUrl,
+        options.apiKey,
+        media,
+        await download(media.url, signal),
+        signal,
+      ),
+    );
   return {
+    prepare,
     async submit(
-      graph: Record<string, unknown>,
+      request: Record<string, unknown>,
       idempotencyKey: string,
       signal: AbortSignal,
     ): Promise<ComfyJobStatus> {
       if (!idempotencyKey.trim())
         throw new Error("A persisted submission key is required");
-      const workflow = isCloudRequest(graph)
-        ? client.workflows.fromJson(structuredClone(graph.input.graph))
-        : client.workflows.fromJson(graph);
-      if (isCloudRequest(graph))
-        for (const media of graph.input.media)
-          workflow.setInput(
-            media.node,
-            media.field,
-            await uploadAsset(
-              baseUrl,
-              options.apiKey,
-              media,
-              await download(media.url, signal),
-              signal,
-            ),
-          );
+      const graph = await prepare(request, signal);
+      const workflow = client.workflows.fromJson(
+        isCloudRequest(graph) ? graph.input.graph : graph,
+      );
       return status(
         await client.submit(workflow, { idempotencyKey, signal }),
         order,

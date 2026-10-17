@@ -16,6 +16,7 @@ import {
   COORDINATOR_SCHEMA_VERSION,
   readCoordinator,
   mutateCoordinator,
+  replaceCoordinatorWake,
 } from "@open-cinema/database/durable";
 import {
   jobEventSchema,
@@ -571,4 +572,53 @@ it("archives existing v3 completed outputs on coordinator activation", async () 
   expect((await stub.getSnapshot(scope))?.jobs[0]?.state).toBe("persisting");
   expect(await runDurableObjectAlarm(stub)).toBe(true);
   expect((await stub.getSnapshot(scope))?.jobs[0]?.state).toBe("succeeded");
+});
+
+it("starts the monitoring window when a queued job is submitted, not while it waits its turn", async () => {
+  const { scope, stub } = fixture();
+  let submissions = 0;
+  network.use(
+    http.post(base, () => {
+      submissions++;
+      return receipt();
+    }),
+  );
+  accepted(await stub.submit(scope, command()));
+  // As if it waited behind a long Router job past the window set at acceptance.
+  await runInDurableObject(stub, (_, state) =>
+    mutateCoordinator(state.storage, scope, (record) => {
+      for (const entry of Object.values(record.executions))
+        entry.deadline = Date.now() - 1;
+    }),
+  );
+  await due(stub, scope);
+  expect(submissions).toBe(1);
+  watch("IN_PROGRESS");
+  await due(stub, scope);
+  expect((await stub.getSnapshot(scope))?.jobs[0]).toMatchObject({
+    state: "running",
+    providerJobId: providerId,
+  });
+});
+
+it("wakes for the earliest due job when several are active", async () => {
+  const { scope, stub } = fixture();
+  accepted(await stub.submit(scope, command()));
+  accepted(await stub.submit(scope, command()));
+  const soon = Date.now() + 10_000;
+  const alarm = await runInDurableObject(stub, async (_, state) => {
+    await mutateCoordinator(state.storage, scope, (record) => {
+      record.jobs.forEach((job, i) => {
+        job.state = "running";
+        job.providerJobId = `provider-${i}`;
+        Object.assign(record.executions[job.id]!, {
+          nextAttemptAt: i === 0 ? Date.now() + 60_000 : soon,
+          pendingProjection: false,
+        });
+      });
+    });
+    await replaceCoordinatorWake(state.storage, null);
+    return state.storage.getAlarm();
+  });
+  expect(alarm).toBe(soon);
 });

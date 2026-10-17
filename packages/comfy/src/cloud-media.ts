@@ -93,6 +93,38 @@ function executionError(job: unknown): string | null {
   return null;
 }
 
+/** Waits `ms`, or rejects when `signal` aborts; leaves no listener behind. */
+function sleep(ms: number, signal: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    if (signal.aborted) return reject(signal.reason);
+    const abort = () => {
+      clearTimeout(timer);
+      reject(signal.reason);
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", abort);
+      resolve();
+    }, ms);
+    signal.addEventListener("abort", abort, { once: true });
+  });
+}
+
+/** A status read that may succeed if repeated: the network or Cloud's own 5xx/429. */
+async function readJob(url: string, headers: HeadersInit, signal: AbortSignal) {
+  let response: Response;
+  try {
+    response = await fetch(url, { headers, signal });
+  } catch (error) {
+    if (signal.aborted) throw error;
+    return null;
+  }
+  if (response.status >= 500 || response.status === 429) {
+    await response.body?.cancel();
+    return null;
+  }
+  return { job: await json(response, "Reading the media job") };
+}
+
 /**
  * Runs one media step (see workflows/media-graphs.ts) on Comfy Cloud and
  * streams its MP4 back. It uses Cloud's ComfyUI-compatible routes (upload,
@@ -164,32 +196,23 @@ export async function runCloudMedia(options: {
   if (typeof promptId !== "string")
     throw new Error("Comfy Cloud returned no job id");
 
+  // The prompt is queued (and billed) now: a transient read error retries the
+  // same job until `signal` ends, never posting the graph again.
   let job: unknown;
   for (;;) {
-    job = await json(
-      await fetch(`${base}/api/jobs/${encodeURIComponent(promptId)}`, {
-        headers,
-        signal,
-      }),
-      "Reading the media job",
+    const read = await readJob(
+      `${base}/api/jobs/${encodeURIComponent(promptId)}`,
+      headers,
+      signal,
     );
+    job = read?.job;
     const status = field(job, "status");
     if (status === "completed") break;
     if (status === "failed" || status === "cancelled" || status === "error")
       throw new CloudMediaRejectedError(
         executionError(job) ?? `The media job ${String(status)}`,
       );
-    await new Promise((resolve, reject) => {
-      const timer = setTimeout(resolve, options.pollMs ?? 2000);
-      signal.addEventListener(
-        "abort",
-        () => {
-          clearTimeout(timer);
-          reject(signal.reason);
-        },
-        { once: true },
-      );
-    });
+    await sleep(options.pollMs ?? 2000, signal);
   }
 
   const saved = field(job, "outputs", MEDIA_GRAPH_OUTPUT, "images");
