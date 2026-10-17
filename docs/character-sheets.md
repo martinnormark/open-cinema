@@ -40,4 +40,10 @@ It runs in a Web Worker on an `OffscreenCanvas` when a sheet job finishes, so th
 
 ## Cost
 
-At Router prices on 2026-10-17, a close portrait (1k, 3:4) is about 6 credits and a sheet (1.5k, 21:9) about 9 to 12. A full set for one look is about 20 credits; Cal with three looks, plus the two retries described above, used about 70.
+At Router prices on 2026-10-17, a close portrait (1k, 3:4) is about 6 credits and a sheet (1.5k, 21:9) about 9 to 12. A full set for one look is about 20 credits. Building Cal with three looks, including the prompt experiments and retries described above, used roughly 130 credits (about $0.60).
+
+## Known limits
+
+- FLUX 3 keeps a guided close portrait very near its reference. Injured Cal came out clearly changed; wet Cal only lightly wet, even with a vivid description, while his wet sheet (whose layout differs from the reference) came out soaked. Describe a state head to toe and concretely.
+- FLUX 3 refuses some injury wording under its content policy ("beaten up", "dried blood"); "a plaster across the eyebrow, a faint bruise, dark stains on the T-shirt" passed.
+- The headless pass assumes the front view fills the first third of the image and stands on a plain backdrop; it leaves anything else untouched rather than guess.
