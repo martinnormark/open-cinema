@@ -204,7 +204,13 @@ export function ReplacementStudio({
           : "Move this shot to a new setting, keeping the performers and action.";
       return `Move this shot to ${mention}, keeping the performers and action.${how ? ` ${how[0]!.toUpperCase()}${how.slice(1)}.` : ""}`;
     }
-    const who = targetNote.trim() || "the marked person";
+    // "The woman on the right" reads as a phrase mid-sentence; names keep their case.
+    const who =
+      targetNote
+        .trim()
+        .replace(/[.\s]+$/, "")
+        .replace(/^(The|A|An) /, (article) => article.toLowerCase()) ||
+      "the marked person";
     const dress =
       wardrobe === "keep"
         ? "in the original wardrobe"
