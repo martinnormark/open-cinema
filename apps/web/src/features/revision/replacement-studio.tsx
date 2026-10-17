@@ -16,6 +16,7 @@ import {
   approvedReferences,
   assetRefKey,
   type AssetRef,
+  type BackgroundPipelineChoice,
   type GenerationRequestInput,
   type PreservedAspect,
 } from "@open-cinema/contracts";
@@ -134,6 +135,8 @@ export function ReplacementStudio({
   const [error, setError] = useState("");
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [duration, setDuration] = useState<number | null>(null);
+  const [pipeline, setPipeline] = useState<BackgroundPipelineChoice>("kling");
+  const [plate, setPlate] = useState<MediaItem | null>(null);
 
   const elementType = kind === "background" ? "location" : "character";
   const candidates = elements.filter((e) => e.type === elementType);
@@ -142,13 +145,28 @@ export function ReplacementStudio({
   const references = element ? approvedReferences(element, state?.id) : [];
   const preserved = preserve[kind];
   const clipSeconds = source?.durationSeconds ?? duration;
+  const alpha = kind === "background" && pipeline === "ltx-alpha";
+  // A composite never relights the matted people.
+  const locked: readonly PreservedAspect[] = alpha
+    ? [...LOCKED.background, "lighting"]
+    : LOCKED[kind];
 
   const { unit } = useCostPreferences();
-  const estimate = formatEstimate(estimateReplacement(kind, clipSeconds), unit);
+  const estimate = formatEstimate(
+    estimateReplacement(kind, clipSeconds, pipeline),
+    unit,
+  );
 
   const problems: string[] = [];
   if (!source) problems.push("Choose a clip to revise.");
-  if (kind === "background" && !element && direction.trim().length < 3)
+  if (alpha && !plate && !element)
+    problems.push("Choose a Location or a plate to put behind the take.");
+  if (
+    kind === "background" &&
+    !alpha &&
+    !element &&
+    direction.trim().length < 3
+  )
     problems.push("Choose a Location or describe the new setting.");
   if (kind === "background" && element && !references.length)
     problems.push(`${element.name} needs an approved reference first.`);
@@ -182,7 +200,7 @@ export function ReplacementStudio({
     setPendingKey(null);
   }
   function togglePreserved(aspect: PreservedAspect) {
-    if (LOCKED[kind].includes(aspect)) return;
+    if (locked.includes(aspect)) return;
     setPreserve((current) => {
       const next = new Set(current[kind]);
       if (next.has(aspect)) next.delete(aspect);
@@ -196,6 +214,10 @@ export function ReplacementStudio({
     const mention = element
       ? `@${element.handle}${state ? `:${stateHandle(state)}` : ""}`
       : null;
+    if (alpha) {
+      const where = plate ? `“${plate.title}”` : (mention ?? "a new plate");
+      return `Put the performers, exactly as shot, in front of ${where}.`;
+    }
     if (kind === "background") {
       const how = direction.trim().replace(/[.\s]+$/, "");
       if (!mention)
@@ -229,7 +251,7 @@ export function ReplacementStudio({
     try {
       if (!snapshot) await startSession();
       const preservation = {
-        preserve: [...preserved].filter(
+        preserve: [...new Set([...locked, ...preserved])].filter(
           (a) => OFFERED[kind].includes(a) || a === "wardrobe",
         ),
         allowIntegration,
@@ -247,11 +269,13 @@ export function ReplacementStudio({
               inputs: {
                 source: source.ref,
                 ...(mention ? { location: mention } : {}),
-                ...(direction.trim().length >= 3
+                ...(alpha && plate ? { background: plate.ref } : {}),
+                ...(!alpha && direction.trim().length >= 3
                   ? { prompt: direction.trim() }
                   : {}),
                 target: { type: "background" },
                 preservation,
+                pipeline,
               },
             }
           : {
@@ -455,6 +479,23 @@ export function ReplacementStudio({
           }}
         />
 
+        {kind === "background" && (
+          <BackgroundMethod
+            pipeline={pipeline}
+            onPipeline={(next) => {
+              setPipeline(next);
+              setPendingKey(null);
+            }}
+            plate={plate}
+            onPlate={(next) => {
+              setPlate(next);
+              setPendingKey(null);
+            }}
+            locationName={element?.name ?? null}
+            clipSeconds={clipSeconds}
+          />
+        )}
+
         {kind === "character" && (
           <fieldset className="revision-reveal">
             <legend className="text-sm font-medium">Who is recast</legend>
@@ -523,31 +564,33 @@ export function ReplacementStudio({
           </fieldset>
         )}
 
-        <div>
-          <label htmlFor="revision-direction" className="text-sm font-medium">
-            {kind === "background"
-              ? element
-                ? "Direction (optional)"
-                : "Describe the new setting"
-              : "Direction (optional)"}
-          </label>
-          <Textarea
-            id="revision-direction"
-            value={direction}
-            onChange={(event) => {
-              setDirection(event.target.value);
-              setPendingKey(null);
-            }}
-            maxLength={1500}
-            rows={3}
-            className="mt-2 text-sm leading-6"
-            placeholder={
-              kind === "background"
-                ? "Harbor at dusk, sodium lights coming on, light rain"
-                : "Slightly older, the same quiet intensity"
-            }
-          />
-        </div>
+        {!alpha && (
+          <div>
+            <label htmlFor="revision-direction" className="text-sm font-medium">
+              {kind === "background"
+                ? element
+                  ? "Direction (optional)"
+                  : "Describe the new setting"
+                : "Direction (optional)"}
+            </label>
+            <Textarea
+              id="revision-direction"
+              value={direction}
+              onChange={(event) => {
+                setDirection(event.target.value);
+                setPendingKey(null);
+              }}
+              maxLength={1500}
+              rows={3}
+              className="mt-2 text-sm leading-6"
+              placeholder={
+                kind === "background"
+                  ? "Harbor at dusk, sodium lights coming on, light rain"
+                  : "Slightly older, the same quiet intensity"
+              }
+            />
+          </div>
+        )}
 
         <fieldset>
           <legend className="text-sm font-medium">
@@ -555,16 +598,16 @@ export function ReplacementStudio({
           </legend>
           <ul className="mt-2 flex flex-wrap gap-1.5">
             {OFFERED[kind].map((aspect) => {
-              const locked = LOCKED[kind].includes(aspect);
-              const on = preserved.has(aspect) || locked;
+              const fixed = locked.includes(aspect);
+              const on = preserved.has(aspect) || fixed;
               return (
                 <li key={aspect}>
                   <button
                     type="button"
                     aria-pressed={on}
-                    aria-disabled={locked}
+                    aria-disabled={fixed}
                     title={
-                      locked
+                      fixed
                         ? "Always kept for this kind of revision"
                         : undefined
                     }
@@ -574,10 +617,10 @@ export function ReplacementStudio({
                       on
                         ? "border-transparent bg-secondary text-foreground"
                         : "border-dashed border-border text-muted-foreground hover:text-foreground",
-                      locked && "cursor-default",
+                      fixed && "cursor-default",
                     )}
                   >
-                    {locked ? (
+                    {fixed ? (
                       <Lock
                         aria-hidden="true"
                         className="size-3 text-subtle-foreground"
@@ -591,18 +634,20 @@ export function ReplacementStudio({
               );
             })}
           </ul>
-          <label className="mt-3 flex cursor-pointer items-start gap-2.5 text-xs leading-5 text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={allowIntegration}
-              onChange={(event) => setAllowIntegration(event.target.checked)}
-              className="mt-0.5 accent-(--tungsten)"
-            />
-            <span>
-              Allow scoped integration: contact shadows, edge light and colour
-              matching where the change meets the shot.
-            </span>
-          </label>
+          {!alpha && (
+            <label className="mt-3 flex cursor-pointer items-start gap-2.5 text-xs leading-5 text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={allowIntegration}
+                onChange={(event) => setAllowIntegration(event.target.checked)}
+                className="mt-0.5 accent-(--tungsten)"
+              />
+              <span>
+                Allow scoped integration: contact shadows, edge light and colour
+                matching where the change meets the shot.
+              </span>
+            </label>
+          )}
         </fieldset>
 
         <section
@@ -613,13 +658,15 @@ export function ReplacementStudio({
           <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
             <dt className="text-muted-foreground">Changes</dt>
             <dd>
-              {kind === "background"
-                ? "Only the setting behind the people and Things"
-                : "Only the marked person"}
+              {alpha
+                ? "Everything outside the matted people and Things"
+                : kind === "background"
+                  ? "Only the setting behind the people and Things"
+                  : "Only the marked person"}
             </dd>
             <dt className="text-muted-foreground">Keeps</dt>
             <dd>
-              {[...new Set([...LOCKED[kind], ...preserved])]
+              {[...new Set([...locked, ...preserved])]
                 .filter((a) => OFFERED[kind].includes(a))
                 .map((a) =>
                   preservedLabels[a].toLowerCase().replace("things", "Things"),
@@ -897,6 +944,134 @@ function ClipStrip({
         onSelect={onSelect}
       />
     </div>
+  );
+}
+
+/** Only Alpha Gen's reliable range is matted; longer takes are trimmed to it. */
+const ALPHA_MAX_SECONDS = 5;
+
+function BackgroundMethod({
+  pipeline,
+  onPipeline,
+  plate,
+  onPlate,
+  locationName,
+  clipSeconds,
+}: {
+  pipeline: BackgroundPipelineChoice;
+  onPipeline: (pipeline: BackgroundPipelineChoice) => void;
+  plate: MediaItem | null;
+  onPlate: (plate: MediaItem | null) => void;
+  locationName: string | null;
+  clipSeconds: number | null;
+}) {
+  const [picking, setPicking] = useState(false);
+  const methods = {
+    kling: {
+      label: "Rebuild the setting",
+      detail:
+        "Kling 3.0 Omni paints a new background with matching light and camera movement. People may shift slightly.",
+    },
+    "ltx-alpha": {
+      label: "Keep the take, swap the plate",
+      detail:
+        "LTX 2.5 Alpha Gen mattes the people and lays them over a still or clip, untouched, in their original light.",
+    },
+  } as const;
+  return (
+    <fieldset className="min-w-0">
+      <legend className="text-sm font-medium">How</legend>
+      <div className="mt-2 flex flex-col gap-1">
+        {(Object.keys(methods) as BackgroundPipelineChoice[]).map((option) => (
+          <label
+            key={option}
+            className="flex cursor-pointer gap-3 rounded-lg px-2 py-2 hover:bg-surface has-focus-visible:ring-2 has-focus-visible:ring-ring"
+          >
+            <input
+              type="radio"
+              name="background-pipeline"
+              checked={pipeline === option}
+              onChange={() => onPipeline(option)}
+              className="mt-1 accent-(--tungsten)"
+            />
+            <span>
+              <span className="block text-sm">{methods[option].label}</span>
+              <span className="block text-xs leading-5 text-muted-foreground">
+                {methods[option].detail}
+              </span>
+            </span>
+          </label>
+        ))}
+      </div>
+      {pipeline === "ltx-alpha" && (
+        <div className="revision-reveal mt-3 flex items-center gap-3 rounded-lg bg-surface p-2">
+          {plate ? (
+            <Thumbnail
+              src={plate.thumbnailUrl}
+              kind={plate.kind}
+              className="aspect-video w-20 shrink-0 rounded-md"
+            />
+          ) : (
+            <span className="grid aspect-video w-20 shrink-0 place-items-center rounded-md border border-dashed border-border">
+              <Mountain
+                aria-hidden="true"
+                className="size-4 text-subtle-foreground"
+              />
+            </span>
+          )}
+          <span className="min-w-0 flex-1 text-xs leading-5">
+            <span className="block truncate text-sm">
+              {plate
+                ? plate.title
+                : locationName
+                  ? `${locationName}, establishing view`
+                  : "No plate yet"}
+            </span>
+            <span className="block text-muted-foreground">
+              {plate
+                ? plate.kind === "video"
+                  ? "Clip plate; loops if shorter than the take."
+                  : "Still plate."
+                : "Pick a Location above, or a still or clip, like an LTX 2.5 plate."}
+            </span>
+          </span>
+          {plate ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => onPlate(null)}
+            >
+              Clear
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setPicking(true)}
+            >
+              <Library aria-hidden="true" /> Choose plate
+            </Button>
+          )}
+          <MediaPicker
+            open={picking}
+            onOpenChange={setPicking}
+            title="Choose a plate"
+            description="A still or a clip to put behind the take. Generated LTX 2.5 videos work well as moving plates."
+            onSelect={onPlate}
+          />
+        </div>
+      )}
+      {pipeline === "ltx-alpha" &&
+        clipSeconds !== null &&
+        clipSeconds > ALPHA_MAX_SECONDS + 0.1 && (
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">
+            Alpha Gen mattes the first {ALPHA_MAX_SECONDS} seconds, so the
+            result is {ALPHA_MAX_SECONDS} seconds long.
+          </p>
+        )}
+    </fieldset>
   );
 }
 

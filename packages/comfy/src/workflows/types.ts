@@ -88,6 +88,27 @@ export interface ProviderRequest {
   input: Record<string, unknown>;
 }
 
+/** A media file a Comfy Cloud graph loads: fetched by the Worker and uploaded as a job asset. */
+export interface CloudMediaInput {
+  /** API-graph node id and the loader's file field. */
+  node: string;
+  field: string;
+  /** Short-lived https URL of the bytes. Never persist it. */
+  url: string;
+  /** Name the uploaded asset gets; the extension tells the loader its format. */
+  filename: string;
+  contentType: string;
+}
+
+/** The Comfy Cloud call: an API-format graph plus the media its loaders read. */
+export interface CloudWorkflowRequest {
+  model: string;
+  input: {
+    graph: Record<string, unknown>;
+    media: CloudMediaInput[];
+  };
+}
+
 /** One downloadable result. `providerAssetId` must be stable across reads. */
 export interface ProviderOutput {
   providerAssetId: string;
@@ -106,19 +127,30 @@ export interface WorkflowDefinition<K extends WorkflowKind = WorkflowKind> {
   displayModel: string | ((inputs: WorkflowInputs<K>) => string);
   /** Monitoring deadline from acceptance to a terminal provider state. */
   deadlineMs: number;
-  /** Router model id for these inputs. Must be deterministic. */
+  /** Router model id (or Cloud pipeline id) for these inputs. Must be deterministic. */
   model(inputs: WorkflowInputs<K>): string;
+  /**
+   * Where these inputs run. Router by default; `cloud-workflow` runs the
+   * request's graph on Comfy Cloud, for open-weights pipelines Router lacks.
+   * Must be deterministic.
+   */
+  provider?(inputs: WorkflowInputs<K>): "router" | "cloud-workflow";
+  /** Cloud only: SaveVideo/SaveImage node ids in the order outputs are listed. */
+  cloudOutputNodes?: readonly string[];
   build(
     inputs: WorkflowInputs<K>,
     context: BuildContext,
-  ): Promise<ProviderRequest>;
+  ): Promise<ProviderRequest | CloudWorkflowRequest>;
   /** Maps the Router result document (`data`) to outputs; [] means unusable. */
   outputs(result: unknown): ProviderOutput[];
   /**
    * Steps that run in order once the first request's outputs are saved. The
-   * job succeeds after the last one; each stage's outputs are kept.
+   * job succeeds after the last one; each stage's outputs are kept. A
+   * function picks them from the inputs and must be deterministic.
    */
-  stages?: readonly WorkflowStage<K>[];
+  stages?:
+    | readonly WorkflowStage<K>[]
+    | ((inputs: WorkflowInputs<K>) => readonly WorkflowStage<K>[]);
   /** Creator-facing label of the first request while later stages follow. */
   label?: string;
 }

@@ -365,3 +365,181 @@ it("reports whether Comfy credentials are configured without revealing them", as
   const status = await fixture().stub.getProviderStatus();
   expect(status).toEqual({ comfyConfigured: true });
 });
+
+it("runs LTX 2.5 Alpha Gen on Comfy Cloud with uploaded media and lists the composite first", async () => {
+  const { scope, stub } = fixture();
+  const db = createDatabase(env.DB);
+  async function stored(name: string, mediaType: string) {
+    const bytes = new TextEncoder().encode(`${name} bytes`);
+    const id = crypto.randomUUID();
+    const r2Key = `uploads/${scope.ownerId}/${id}`;
+    await env.GENERATED_ASSETS.put(r2Key, bytes, {
+      httpMetadata: { contentType: mediaType },
+    });
+    await createPendingMediaAsset(db, scope, {
+      id,
+      r2Key,
+      filename: name,
+      mediaType,
+      sizeBytes: bytes.length,
+    });
+    await markMediaAssetReady(db, scope, id, {
+      sizeBytes: bytes.length,
+      etag: "e",
+    });
+    return id;
+  }
+  const take = await stored("take.mp4", "video/mp4");
+  const plate = await stored("harbor.png", "image/png");
+
+  // Local development has no public media origin, so the resolver stages the
+  // bytes in Comfy storage and the Cloud client reads them back from there.
+  const staged = new Map<string, Uint8Array>();
+  network.use(
+    http.post(
+      "https://api.comfy.org/customers/storage",
+      async ({ request }) => {
+        const { file_name } = (await request.json()) as { file_name: string };
+        return HttpResponse.json({
+          upload_url: `https://storage.test/up/${file_name}`,
+          download_url: `https://storage.test/down/${file_name}`,
+        });
+      },
+    ),
+    http.put("https://storage.test/up/:name", async ({ request, params }) => {
+      staged.set(
+        String(params.name),
+        new Uint8Array(await request.arrayBuffer()),
+      );
+      return new HttpResponse(null, { status: 200 });
+    }),
+    http.get("https://storage.test/down/:name", ({ params }) => {
+      const bytes = staged.get(String(params.name));
+      return bytes
+        ? new HttpResponse(bytes, {
+            headers: { "Content-Length": String(bytes.length) },
+          })
+        : new HttpResponse(null, { status: 404 });
+    }),
+  );
+  const uploads: { path: string; type: string; body: string }[] = [];
+  const jobs: unknown[] = [];
+  const output = (node_id: string, id: string) => ({
+    node_id,
+    name: `${node_id}.mp4`,
+    type: "video",
+    content_type: "video/mp4",
+    size_bytes: 10,
+    id,
+    hash: null,
+    url: `https://cloud-media.test/${id}`,
+    url_expires_at: new Date(Date.now() + 60_000).toISOString(),
+  });
+  const cloudJob = (status: string, outputs: unknown[] = []) => ({
+    id: "cloud-job-1",
+    status,
+    created_at: new Date().toISOString(),
+    started_at: null,
+    completed_at: null,
+    expires_at: new Date(Date.now() + 86_400_000).toISOString(),
+    queue_position: null,
+    progress: null,
+    outputs,
+    error: null,
+    urls: {},
+  });
+  network.use(
+    http.head(
+      "https://cloud.comfy.org/api/v2/assets/by-hash/:hash",
+      () => new HttpResponse(null, { status: 404 }),
+    ),
+    http.post("https://cloud.comfy.org/api/v2/assets", async ({ request }) => {
+      const form = await request.formData();
+      const file = form.get("file") as File;
+      uploads.push({
+        path: String(form.get("file_path")),
+        type: String(form.get("content_type")),
+        body: await file.text(),
+      });
+      return HttpResponse.json(
+        {
+          id: `asset-${uploads.length}`,
+          hash: form.get("expected_hash"),
+          size_bytes: file.size,
+          content_type: String(form.get("content_type")),
+          created_at: new Date().toISOString(),
+          url: "https://cloud-media.test/upload",
+          url_expires_at: new Date(Date.now() + 60_000).toISOString(),
+        },
+        { status: 201 },
+      );
+    }),
+    http.post("https://cloud.comfy.org/api/v2/jobs", async ({ request }) => {
+      jobs.push(await request.json());
+      return HttpResponse.json(cloudJob("queued"), { status: 201 });
+    }),
+  );
+
+  const job = accepted(
+    await stub.submit(scope, {
+      idempotencyKey: crypto.randomUUID(),
+      request: {
+        workflowKind: "video.background-replace",
+        inputs: {
+          source: { type: "media-asset", assetId: take },
+          background: { type: "media-asset", assetId: plate },
+          preservation: { preserve: ["foreground", "performance"] },
+          pipeline: "ltx-alpha",
+        },
+      },
+    }),
+  );
+  expect(job.model).toBe("LTX 2.5 Alpha Gen");
+  await due(stub);
+
+  expect(uploads).toEqual([
+    { path: "source.mp4", type: "video/mp4", body: "take.mp4 bytes" },
+    { path: "background.png", type: "image/png", body: "harbor.png bytes" },
+  ]);
+  const { workflow } = jobs[0] as {
+    workflow: Record<string, { inputs: Record<string, unknown> }>;
+  };
+  expect(workflow.source!.inputs.file).toMatchObject({
+    __type: "core/ASSET",
+    info: { id: "asset-1" },
+  });
+  expect(workflow.background_image!.inputs.image).toMatchObject({
+    __type: "core/ASSET",
+    info: { id: "asset-2" },
+  });
+  const record = await runInDurableObject(stub, (_, state) =>
+    readCoordinator(state.storage),
+  );
+  const execution = record!.executions[job.id]!;
+  expect(execution.provider).toBe("cloud-workflow");
+  // Only the pipeline id is kept; the graph and its media links are rebuilt.
+  expect(execution.workflow).toEqual({
+    model: "comfy-cloud/ltx-2.5-alpha-gen",
+  });
+  expect(record!.jobs[0]!.providerJobId).toBe("cloud-job-1");
+
+  network.use(
+    http.get("https://cloud.comfy.org/api/v2/jobs/cloud-job-1", () =>
+      HttpResponse.json(
+        cloudJob("succeeded", [
+          output("source", "loader-preview"),
+          output("save_matte", "matte"),
+          output("save_composite", "composite"),
+        ]),
+      ),
+    ),
+  );
+  await due(stub);
+  const done = await runInDurableObject(stub, (_, state) =>
+    readCoordinator(state.storage),
+  );
+  expect(done!.jobs[0]!.outputs.map((o) => o.providerAssetId)).toEqual([
+    "composite",
+    "matte",
+  ]);
+});

@@ -37,9 +37,9 @@ import {
   getWorkflowDefinition,
   submissionFailure,
   workflowStage,
+  workflowStages,
   type ComfyJobStatus,
   type MediaStage,
-  type ProviderRequest,
   type StageContext,
   type WorkflowDefinition,
 } from "@open-cinema/comfy";
@@ -72,7 +72,11 @@ export function mediaLinkExpiry(createdAt: string, deadline: number) {
   );
 }
 const stageOf = (execution: Execution) =>
-  workflowStage(execution.workflowKind, execution.stage);
+  workflowStage(
+    execution.workflowKind,
+    execution.stage,
+    execution.command.request.inputs,
+  );
 const deadlineFor = (execution: Execution) =>
   stageOf(execution)?.deadlineMs ??
   getWorkflowDefinition(execution.workflowKind)?.deadlineMs ??
@@ -92,7 +96,11 @@ function advanceStage(job: Job, execution: Execution) {
   execution.assetsPending = false;
   execution.cancelRequested = false;
   execution.attempts = 0;
-  const next = workflowStage(execution.workflowKind, execution.stage + 1);
+  const next = workflowStage(
+    execution.workflowKind,
+    execution.stage + 1,
+    execution.command.request.inputs,
+  );
   if (!next) {
     job.state = "succeeded";
     job.progress = 1;
@@ -269,7 +277,12 @@ export class GenerationCoordinator
           seed: null,
 
           progress: null,
-          stage: definition.stages?.length ? (definition.label ?? null) : null,
+          stage: workflowStages(
+            command.request.workflowKind,
+            command.request.inputs,
+          ).length
+            ? (definition.label ?? null)
+            : null,
           error: null,
           outputs: [],
         };
@@ -278,7 +291,8 @@ export class GenerationCoordinator
         record.executions[job.id] = {
           command,
           requestHash,
-          provider: "router",
+          provider:
+            definition.provider?.(command.request.inputs as never) ?? "router",
           workflowKind: command.request.workflowKind,
           mentions,
           assetsPending: false,
@@ -398,20 +412,28 @@ export class GenerationCoordinator
                 : getWorkflowDefinition(execution.workflowKind)?.outputs;
             })(),
           }
-        : {}),
+        : {
+            outputNodes: getWorkflowDefinition(execution.workflowKind)
+              ?.cloudOutputNodes,
+          }),
     });
   }
 
   /**
-   * v4 Router checkpoints persisted the full request. v5 rebuilds it from the
-   * typed command so media links are created fresh and never stored.
+   * v4 Router checkpoints persisted the full request, and legacy Cloud jobs
+   * their graph. v5 keeps only `{ model }` and rebuilds the request (a Router
+   * input or a Cloud graph with its media) from the typed command, so media
+   * links are created fresh and never stored.
    */
   private async providerRequest(
     ownerId: string,
     job: Job,
     execution: Execution,
   ): Promise<Record<string, unknown>> {
-    if (execution.provider !== "router" || "input" in execution.workflow)
+    if (
+      "input" in execution.workflow ||
+      typeof execution.workflow.model !== "string"
+    )
       return execution.workflow;
     const { request } = execution.command;
     const definition = getWorkflowDefinition(
@@ -420,7 +442,7 @@ export class GenerationCoordinator
     if (!definition) throw new AssetUnavailableError(request.workflowKind);
     const stage = stageOf(execution);
     const context = this.stageContext(ownerId, job, execution);
-    const built: ProviderRequest =
+    const built =
       stage?.kind === "router"
         ? await stage.build(request.inputs as never, context)
         : await definition.build(request.inputs as never, context);

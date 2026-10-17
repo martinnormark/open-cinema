@@ -8,6 +8,7 @@ export type { ComfyJobStatus } from "./cloud-workflow";
 export * from "./workflows/flux-image";
 export * from "./workflows/flux-reference";
 export * from "./workflows/ltx-video";
+export * from "./workflows/ltx-alpha-background";
 export * from "./estimates";
 export { uploadToComfyStorage } from "./storage";
 
@@ -85,6 +86,8 @@ export function createComfyClient(options: {
   baseUrl?: string | undefined;
   /** Maps a Router result document to outputs; defaults to `sample` or `video_url`. */
   outputs?: ((data: unknown) => ProviderOutput[]) | undefined;
+  /** Cloud: SaveVideo/SaveImage node ids listed as outputs, in order. */
+  outputNodes?: readonly string[] | undefined;
 }) {
   if (options.provider === "cloud-workflow") return createCloudClient(options);
   if (!options.apiKey.trim()) throw new Error("Comfy credentials are required");

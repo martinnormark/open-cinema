@@ -10,6 +10,8 @@ import type { WorkflowDefinition, WorkflowStage } from "./types";
 
 export type {
   BuildContext,
+  CloudMediaInput,
+  CloudWorkflowRequest,
   MediaOperation,
   MediaStage,
   MediaTask,
@@ -81,12 +83,24 @@ export function getWorkflowDefinition<K extends WorkflowKind>(
 }
 
 /** Stage 0 is the definition's own request; stage n is `stages[n - 1]`. */
+/** The stages that follow the first request for these inputs. */
+export function workflowStages(
+  kind: WorkflowKind,
+  inputs: unknown,
+): readonly WorkflowStage[] {
+  const stages = (registry[kind] as WorkflowDefinition | undefined)?.stages;
+  return (
+    (typeof stages === "function" ? stages(inputs as never) : stages) ?? []
+  );
+}
+
 export function workflowStage(
   kind: WorkflowKind,
   stage: number,
+  inputs: unknown,
 ): WorkflowStage | null {
   if (stage <= 0) return null;
-  return (registry[kind]?.stages?.[stage - 1] as WorkflowStage) ?? null;
+  return workflowStages(kind, inputs)[stage - 1] ?? null;
 }
 
 export function availableWorkflowKinds(): WorkflowKind[] {
