@@ -1,0 +1,603 @@
+[
+  {
+    "file": "media/lock.api.json",
+    "title": "Lock the performers: source foreground over the edit",
+    "usedBy": "video.background-replace, as-shot variant (lock stage)",
+    "inputs": [
+      {
+        "node": "source",
+        "field": "file",
+        "file": "source.mp4"
+      },
+      {
+        "node": "edit",
+        "field": "video",
+        "file": "edit.mp4"
+      },
+      {
+        "node": "matte",
+        "field": "video",
+        "file": "matte.webm"
+      }
+    ],
+    "outputs": [
+      "save"
+    ],
+    "models": []
+  },
+  {
+    "file": "media/conform.api.json",
+    "title": "Conform an edit to the source's frame grid",
+    "usedBy": "video.background-replace and video.character-replace (conform stage)",
+    "inputs": [
+      {
+        "node": "source",
+        "field": "file",
+        "file": "source.mp4"
+      },
+      {
+        "node": "edit",
+        "field": "video",
+        "file": "edit.mp4"
+      }
+    ],
+    "outputs": [
+      "save"
+    ],
+    "models": []
+  },
+  {
+    "file": "media/square.api.json",
+    "title": "Square a clip's pixels",
+    "usedBy": "uploads whose pixels the browser could not square",
+    "inputs": [
+      {
+        "node": "source",
+        "field": "file",
+        "file": "source.mp4"
+      }
+    ],
+    "outputs": [
+      "save"
+    ],
+    "models": []
+  },
+  {
+    "file": "background/ltx-alpha-gen-image.api.json",
+    "title": "Background replacement with LTX 2.5 Alpha Gen, image plate",
+    "usedBy": "video.background-replace, LTX path (comfy-cloud/ltx-2.5-alpha-gen)",
+    "inputs": [
+      {
+        "node": "source",
+        "field": "file",
+        "file": "source.mp4"
+      },
+      {
+        "node": "background_image",
+        "field": "image",
+        "file": "background.jpg"
+      }
+    ],
+    "outputs": [
+      "save_composite",
+      "save_matte"
+    ],
+    "models": [
+      "gemma4-12b-with-proj-ltx-2.5-bf16.safetensors",
+      "ltx-2.5-22b-distilled-transformer-bf16.safetensors",
+      "ltx-2.5-22b-ic-lora-alpha-gen-0.9.safetensors",
+      "ltx-2.5-audio-vae-bf16.safetensors",
+      "ltx-2.5-video-vae-bf16.safetensors"
+    ]
+  },
+  {
+    "file": "background/ltx-alpha-gen-video.api.json",
+    "title": "Background replacement with LTX 2.5 Alpha Gen, video plate",
+    "usedBy": "video.background-replace, LTX path (comfy-cloud/ltx-2.5-alpha-gen)",
+    "inputs": [
+      {
+        "node": "source",
+        "field": "file",
+        "file": "source.mp4"
+      },
+      {
+        "node": "background_video",
+        "field": "file",
+        "file": "background.mp4"
+      }
+    ],
+    "outputs": [
+      "save_composite",
+      "save_matte"
+    ],
+    "models": [
+      "gemma4-12b-with-proj-ltx-2.5-bf16.safetensors",
+      "ltx-2.5-22b-distilled-transformer-bf16.safetensors",
+      "ltx-2.5-22b-ic-lora-alpha-gen-0.9.safetensors",
+      "ltx-2.5-audio-vae-bf16.safetensors",
+      "ltx-2.5-video-vae-bf16.safetensors"
+    ]
+  },
+  {
+    "file": "camera/static.api.json",
+    "title": "Camera move: Locked off, from a first frame",
+    "usedBy": "video.ltx with a camera move (comfy-cloud/ltx-2-camera-lora)",
+    "inputs": [
+      {
+        "node": "first_frame",
+        "field": "image",
+        "file": "first-frame.png"
+      }
+    ],
+    "outputs": [
+      "save_result"
+    ],
+    "models": [
+      "gemma_3_12B_it_fp4_mixed.safetensors",
+      "ltx-2-19b-distilled-fp8.safetensors",
+      "ltx-2-19b-lora-camera-control-static.safetensors"
+    ]
+  },
+  {
+    "file": "camera/dolly-in.api.json",
+    "title": "Camera move: Push in, from a first frame",
+    "usedBy": "video.ltx with a camera move (comfy-cloud/ltx-2-camera-lora)",
+    "inputs": [
+      {
+        "node": "first_frame",
+        "field": "image",
+        "file": "first-frame.png"
+      }
+    ],
+    "outputs": [
+      "save_result"
+    ],
+    "models": [
+      "gemma_3_12B_it_fp4_mixed.safetensors",
+      "ltx-2-19b-distilled-fp8.safetensors",
+      "ltx-2-19b-lora-camera-control-dolly-in.safetensors"
+    ]
+  },
+  {
+    "file": "camera/dolly-out.api.json",
+    "title": "Camera move: Pull back, from a first frame",
+    "usedBy": "video.ltx with a camera move (comfy-cloud/ltx-2-camera-lora)",
+    "inputs": [
+      {
+        "node": "first_frame",
+        "field": "image",
+        "file": "first-frame.png"
+      }
+    ],
+    "outputs": [
+      "save_result"
+    ],
+    "models": [
+      "gemma_3_12B_it_fp4_mixed.safetensors",
+      "ltx-2-19b-distilled-fp8.safetensors",
+      "ltx-2-19b-lora-camera-control-dolly-out.safetensors"
+    ]
+  },
+  {
+    "file": "camera/truck-left.api.json",
+    "title": "Camera move: Track left, from a first frame",
+    "usedBy": "video.ltx with a camera move (comfy-cloud/ltx-2-camera-lora)",
+    "inputs": [
+      {
+        "node": "first_frame",
+        "field": "image",
+        "file": "first-frame.png"
+      }
+    ],
+    "outputs": [
+      "save_result"
+    ],
+    "models": [
+      "gemma_3_12B_it_fp4_mixed.safetensors",
+      "ltx-2-19b-distilled-fp8.safetensors",
+      "ltx-2-19b-lora-camera-control-dolly-left.safetensors"
+    ]
+  },
+  {
+    "file": "camera/truck-right.api.json",
+    "title": "Camera move: Track right, from a first frame",
+    "usedBy": "video.ltx with a camera move (comfy-cloud/ltx-2-camera-lora)",
+    "inputs": [
+      {
+        "node": "first_frame",
+        "field": "image",
+        "file": "first-frame.png"
+      }
+    ],
+    "outputs": [
+      "save_result"
+    ],
+    "models": [
+      "gemma_3_12B_it_fp4_mixed.safetensors",
+      "ltx-2-19b-distilled-fp8.safetensors",
+      "ltx-2-19b-lora-camera-control-dolly-right.safetensors"
+    ]
+  },
+  {
+    "file": "camera/crane-up.api.json",
+    "title": "Camera move: Crane up, from a first frame",
+    "usedBy": "video.ltx with a camera move (comfy-cloud/ltx-2-camera-lora)",
+    "inputs": [
+      {
+        "node": "first_frame",
+        "field": "image",
+        "file": "first-frame.png"
+      }
+    ],
+    "outputs": [
+      "save_result"
+    ],
+    "models": [
+      "gemma_3_12B_it_fp4_mixed.safetensors",
+      "ltx-2-19b-distilled-fp8.safetensors",
+      "ltx-2-19b-lora-camera-control-jib-up.safetensors"
+    ]
+  },
+  {
+    "file": "camera/crane-down.api.json",
+    "title": "Camera move: Crane down, from a first frame",
+    "usedBy": "video.ltx with a camera move (comfy-cloud/ltx-2-camera-lora)",
+    "inputs": [
+      {
+        "node": "first_frame",
+        "field": "image",
+        "file": "first-frame.png"
+      }
+    ],
+    "outputs": [
+      "save_result"
+    ],
+    "models": [
+      "gemma_3_12B_it_fp4_mixed.safetensors",
+      "ltx-2-19b-distilled-fp8.safetensors",
+      "ltx-2-19b-lora-camera-control-jib-down.safetensors"
+    ]
+  },
+  {
+    "file": "camera/dolly-in-text.api.json",
+    "title": "Camera move: Push in, text to video",
+    "usedBy": "video.ltx with a camera move (comfy-cloud/ltx-2-camera-lora)",
+    "inputs": [],
+    "outputs": [
+      "save_result"
+    ],
+    "models": [
+      "gemma_3_12B_it_fp4_mixed.safetensors",
+      "ltx-2-19b-distilled-fp8.safetensors",
+      "ltx-2-19b-lora-camera-control-dolly-in.safetensors"
+    ]
+  },
+  {
+    "file": "revision/object-swap.api.json",
+    "title": "Object Swap: replace one object with a Thing",
+    "usedBy": "video.object-swap (comfy-cloud/ltx-2.3-object-swap)",
+    "inputs": [
+      {
+        "node": "source",
+        "field": "file",
+        "file": "source.mp4"
+      },
+      {
+        "node": "reference_0",
+        "field": "image",
+        "file": "reference-0.png"
+      },
+      {
+        "node": "reference_1",
+        "field": "image",
+        "file": "reference-1.png"
+      }
+    ],
+    "outputs": [
+      "save_result",
+      "save_keyframe"
+    ],
+    "models": [
+      "depth_anything_v2_vitl.pth",
+      "flux-2-klein-9b.safetensors",
+      "flux2-vae.safetensors",
+      "gemma_3_12B_it_fp4_mixed.safetensors",
+      "ltx-2.3-22b-distilled-fp8.safetensors",
+      "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors",
+      "qwen_3_8b_fp8mixed.safetensors",
+      "sam3.1_multiplex_fp16.safetensors"
+    ]
+  },
+  {
+    "file": "revision/restyle.api.json",
+    "title": "Restyle: the same take in a new look",
+    "usedBy": "video.restyle (comfy-cloud/ltx-2.3-restyle)",
+    "inputs": [
+      {
+        "node": "source",
+        "field": "file",
+        "file": "source.mp4"
+      },
+      {
+        "node": "reference_0",
+        "field": "image",
+        "file": "reference-0.png"
+      },
+      {
+        "node": "reference_1",
+        "field": "image",
+        "file": "reference-1.png"
+      }
+    ],
+    "outputs": [
+      "save_result",
+      "save_keyframe"
+    ],
+    "models": [
+      "depth_anything_v2_vitl.pth",
+      "flux-2-klein-9b.safetensors",
+      "flux2-vae.safetensors",
+      "gemma_3_12B_it_fp4_mixed.safetensors",
+      "ltx-2.3-22b-distilled-fp8.safetensors",
+      "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors",
+      "qwen_3_8b_fp8mixed.safetensors"
+    ]
+  },
+  {
+    "file": "restage/closer.api.json",
+    "title": "Re-stage: Move in",
+    "usedBy": "video.restage (comfy-cloud/ltx-2.3-restage)",
+    "inputs": [
+      {
+        "node": "source",
+        "field": "file",
+        "file": "source.mp4"
+      }
+    ],
+    "outputs": [
+      "save_result",
+      "save_projection"
+    ],
+    "models": [
+      "gemma_3_12B_it_fp4_mixed.safetensors",
+      "ltx-2.3-22b-distilled-fp8.safetensors",
+      "ltx-2.3-22b-ic-lora-in-outpainting-0.9.safetensors",
+      "moge_2_vitl_normal_fp16.safetensors"
+    ]
+  },
+  {
+    "file": "restage/wider.api.json",
+    "title": "Re-stage: Pull out",
+    "usedBy": "video.restage (comfy-cloud/ltx-2.3-restage)",
+    "inputs": [
+      {
+        "node": "source",
+        "field": "file",
+        "file": "source.mp4"
+      }
+    ],
+    "outputs": [
+      "save_result",
+      "save_projection"
+    ],
+    "models": [
+      "gemma_3_12B_it_fp4_mixed.safetensors",
+      "ltx-2.3-22b-distilled-fp8.safetensors",
+      "ltx-2.3-22b-ic-lora-in-outpainting-0.9.safetensors",
+      "moge_2_vitl_normal_fp16.safetensors"
+    ]
+  },
+  {
+    "file": "restage/low-angle.api.json",
+    "title": "Re-stage: Low angle",
+    "usedBy": "video.restage (comfy-cloud/ltx-2.3-restage)",
+    "inputs": [
+      {
+        "node": "source",
+        "field": "file",
+        "file": "source.mp4"
+      }
+    ],
+    "outputs": [
+      "save_result",
+      "save_projection"
+    ],
+    "models": [
+      "gemma_3_12B_it_fp4_mixed.safetensors",
+      "ltx-2.3-22b-distilled-fp8.safetensors",
+      "ltx-2.3-22b-ic-lora-in-outpainting-0.9.safetensors",
+      "moge_2_vitl_normal_fp16.safetensors"
+    ]
+  },
+  {
+    "file": "restage/high-angle.api.json",
+    "title": "Re-stage: High angle",
+    "usedBy": "video.restage (comfy-cloud/ltx-2.3-restage)",
+    "inputs": [
+      {
+        "node": "source",
+        "field": "file",
+        "file": "source.mp4"
+      }
+    ],
+    "outputs": [
+      "save_result",
+      "save_projection"
+    ],
+    "models": [
+      "gemma_3_12B_it_fp4_mixed.safetensors",
+      "ltx-2.3-22b-distilled-fp8.safetensors",
+      "ltx-2.3-22b-ic-lora-in-outpainting-0.9.safetensors",
+      "moge_2_vitl_normal_fp16.safetensors"
+    ]
+  },
+  {
+    "file": "restage/from-left.api.json",
+    "title": "Re-stage: Swing left",
+    "usedBy": "video.restage (comfy-cloud/ltx-2.3-restage)",
+    "inputs": [
+      {
+        "node": "source",
+        "field": "file",
+        "file": "source.mp4"
+      }
+    ],
+    "outputs": [
+      "save_result",
+      "save_projection"
+    ],
+    "models": [
+      "gemma_3_12B_it_fp4_mixed.safetensors",
+      "ltx-2.3-22b-distilled-fp8.safetensors",
+      "ltx-2.3-22b-ic-lora-in-outpainting-0.9.safetensors",
+      "moge_2_vitl_normal_fp16.safetensors"
+    ]
+  },
+  {
+    "file": "restage/from-right.api.json",
+    "title": "Re-stage: Swing right",
+    "usedBy": "video.restage (comfy-cloud/ltx-2.3-restage)",
+    "inputs": [
+      {
+        "node": "source",
+        "field": "file",
+        "file": "source.mp4"
+      }
+    ],
+    "outputs": [
+      "save_result",
+      "save_projection"
+    ],
+    "models": [
+      "gemma_3_12B_it_fp4_mixed.safetensors",
+      "ltx-2.3-22b-distilled-fp8.safetensors",
+      "ltx-2.3-22b-ic-lora-in-outpainting-0.9.safetensors",
+      "moge_2_vitl_normal_fp16.safetensors"
+    ]
+  },
+  {
+    "file": "restage/hero.api.json",
+    "title": "Re-stage: Hero",
+    "usedBy": "video.restage (comfy-cloud/ltx-2.3-restage)",
+    "inputs": [
+      {
+        "node": "source",
+        "field": "file",
+        "file": "source.mp4"
+      }
+    ],
+    "outputs": [
+      "save_result",
+      "save_projection"
+    ],
+    "models": [
+      "gemma_3_12B_it_fp4_mixed.safetensors",
+      "ltx-2.3-22b-distilled-fp8.safetensors",
+      "ltx-2.3-22b-ic-lora-in-outpainting-0.9.safetensors",
+      "moge_2_vitl_normal_fp16.safetensors"
+    ]
+  },
+  {
+    "file": "performance/pose.api.json",
+    "title": "Performance transfer, pose control",
+    "usedBy": "video.performance-transfer (comfy-cloud/ltx-2.3-union-pose)",
+    "inputs": [
+      {
+        "node": "source",
+        "field": "file",
+        "file": "source.mp4"
+      },
+      {
+        "node": "keyframe",
+        "field": "image",
+        "file": "keyframe.png"
+      }
+    ],
+    "outputs": [
+      "save_result",
+      "save_control"
+    ],
+    "models": [
+      "dw-ll_ucoco_384_bs5.torchscript.pt",
+      "gemma_3_12B_it_fp4_mixed.safetensors",
+      "ltx-2.3-22b-distilled-fp8.safetensors",
+      "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors",
+      "yolox_l.torchscript.pt"
+    ]
+  },
+  {
+    "file": "performance/pose-depth.api.json",
+    "title": "Performance transfer, pose and depth control",
+    "usedBy": "video.performance-transfer (comfy-cloud/ltx-2.3-union-pose)",
+    "inputs": [
+      {
+        "node": "source",
+        "field": "file",
+        "file": "source.mp4"
+      },
+      {
+        "node": "keyframe",
+        "field": "image",
+        "file": "keyframe.png"
+      }
+    ],
+    "outputs": [
+      "save_result",
+      "save_control"
+    ],
+    "models": [
+      "depth_anything_v2_vitl.pth",
+      "dw-ll_ucoco_384_bs5.torchscript.pt",
+      "gemma_3_12B_it_fp4_mixed.safetensors",
+      "ltx-2.3-22b-distilled-fp8.safetensors",
+      "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors",
+      "yolox_l.torchscript.pt"
+    ]
+  },
+  {
+    "file": "experiments/ltx-recast.api.json",
+    "title": "Recast on LTX 2.5 (experiment, not in the Worker)",
+    "usedBy": null,
+    "inputs": [
+      {
+        "node": "source",
+        "field": "file",
+        "file": "source.mp4"
+      },
+      {
+        "node": "reference_0",
+        "field": "image",
+        "file": "reference-0.png"
+      },
+      {
+        "node": "reference_1",
+        "field": "image",
+        "file": "reference-1.png"
+      },
+      {
+        "node": "sheet",
+        "field": "image",
+        "file": "sheet.png"
+      }
+    ],
+    "outputs": [
+      "save_result",
+      "save_generated",
+      "save_keyframe"
+    ],
+    "models": [
+      "dw-ll_ucoco_384_bs5.torchscript.pt",
+      "flux-2-klein-9b.safetensors",
+      "flux2-vae.safetensors",
+      "gemma4-12b-with-proj-ltx-2.5-bf16.safetensors",
+      "ltx-2.3-22b-ic-lora-ingredients-0.9.safetensors",
+      "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors",
+      "ltx-2.5-22b-distilled-transformer-bf16.safetensors",
+      "ltx-2.5-audio-vae-bf16.safetensors",
+      "ltx-2.5-video-vae-bf16.safetensors",
+      "qwen_3_8b_fp8mixed.safetensors",
+      "sam3.1_multiplex_fp16.safetensors",
+      "yolox_l.torchscript.pt"
+    ]
+  }
+]

@@ -1,0 +1,508 @@
+{
+  "source": {
+    "class_type": "LoadVideo",
+    "inputs": {
+      "file": "source.mp4"
+    }
+  },
+  "source_frames": {
+    "class_type": "GetVideoComponents",
+    "inputs": {
+      "video": [
+        "source",
+        0
+      ]
+    }
+  },
+  "source_size": {
+    "class_type": "GetImageSize",
+    "inputs": {
+      "image": [
+        "source_frames",
+        0
+      ]
+    }
+  },
+  "frame_count": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(1, ((min(a, 97) - 1) // 8) * 8 + 1)",
+      "values.a": [
+        "source_size",
+        2
+      ]
+    }
+  },
+  "out_width": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(64, round(a * min(1, 768 / max(a, b)) / 64) * 64)",
+      "values.a": [
+        "source_size",
+        0
+      ],
+      "values.b": [
+        "source_size",
+        1
+      ]
+    }
+  },
+  "out_height": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(64, round(b * min(1, 768 / max(a, b)) / 64) * 64)",
+      "values.a": [
+        "source_size",
+        0
+      ],
+      "values.b": [
+        "source_size",
+        1
+      ]
+    }
+  },
+  "clip": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "source_frames",
+        0
+      ],
+      "batch_index": 0,
+      "length": [
+        "frame_count",
+        1
+      ]
+    }
+  },
+  "clip_fit": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "clip",
+        0
+      ],
+      "upscale_method": "area",
+      "width": [
+        "out_width",
+        1
+      ],
+      "height": [
+        "out_height",
+        1
+      ],
+      "crop": "center"
+    }
+  },
+  "pose": {
+    "class_type": "DWPreprocessor",
+    "inputs": {
+      "image": [
+        "clip_fit",
+        0
+      ],
+      "detect_hand": "enable",
+      "detect_body": "enable",
+      "detect_face": "enable",
+      "resolution": 512,
+      "bbox_detector": "yolox_l.torchscript.pt",
+      "pose_estimator": "dw-ll_ucoco_384_bs5.torchscript.pt",
+      "scale_stick_for_xinsr_cn": "disable"
+    }
+  },
+  "pose_fit": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "pose",
+        0
+      ],
+      "upscale_method": "bilinear",
+      "width": [
+        "out_width",
+        1
+      ],
+      "height": [
+        "out_height",
+        1
+      ],
+      "crop": "disabled"
+    }
+  },
+  "checkpoint": {
+    "class_type": "CheckpointLoaderSimple",
+    "inputs": {
+      "ckpt_name": "ltx-2.3-22b-distilled-fp8.safetensors"
+    }
+  },
+  "union_control": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "model": [
+        "checkpoint",
+        0
+      ],
+      "lora_name": "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors",
+      "strength_model": 1
+    }
+  },
+  "iclora_parameters": {
+    "class_type": "GetICLoRAParameters",
+    "inputs": {
+      "iclora_model": [
+        "union_control",
+        0
+      ]
+    }
+  },
+  "text_encoder": {
+    "class_type": "LTXAVTextEncoderLoader",
+    "inputs": {
+      "text_encoder": "gemma_3_12B_it_fp4_mixed.safetensors",
+      "ckpt_name": "ltx-2.3-22b-distilled-fp8.safetensors",
+      "device": "default"
+    }
+  },
+  "audio_vae": {
+    "class_type": "LTXVAudioVAELoader",
+    "inputs": {
+      "ckpt_name": "ltx-2.3-22b-distilled-fp8.safetensors"
+    }
+  },
+  "positive_text": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "Theo, a weathered lighthouse keeper with a grey beard and a navy wool sweater, performs the same movement in a stone cottage kitchen.",
+      "clip": [
+        "text_encoder",
+        0
+      ]
+    }
+  },
+  "negative_text": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "pc game, console game, video game, cartoon, childish, ugly, deformed face, extra limbs, distorted hands",
+      "clip": [
+        "text_encoder",
+        0
+      ]
+    }
+  },
+  "conditioning": {
+    "class_type": "LTXVConditioning",
+    "inputs": {
+      "positive": [
+        "positive_text",
+        0
+      ],
+      "negative": [
+        "negative_text",
+        0
+      ],
+      "frame_rate": [
+        "source_frames",
+        2
+      ]
+    }
+  },
+  "empty_video": {
+    "class_type": "EmptyLTXVLatentVideo",
+    "inputs": {
+      "width": [
+        "out_width",
+        1
+      ],
+      "height": [
+        "out_height",
+        1
+      ],
+      "length": [
+        "frame_count",
+        1
+      ],
+      "batch_size": 1
+    }
+  },
+  "guide": {
+    "class_type": "LTXVAddGuide",
+    "inputs": {
+      "positive": [
+        "conditioning",
+        0
+      ],
+      "negative": [
+        "conditioning",
+        1
+      ],
+      "vae": [
+        "checkpoint",
+        2
+      ],
+      "latent": [
+        "keyframe_condition",
+        0
+      ],
+      "image": [
+        "pose_over_depth",
+        0
+      ],
+      "frame_idx": 0,
+      "strength": 0.8,
+      "iclora_parameters": [
+        "iclora_parameters",
+        0
+      ]
+    }
+  },
+  "empty_audio": {
+    "class_type": "LTXVEmptyLatentAudio",
+    "inputs": {
+      "frames_number": [
+        "frame_count",
+        1
+      ],
+      "frame_rate": [
+        "source_frames",
+        2
+      ],
+      "batch_size": 1,
+      "audio_vae": [
+        "audio_vae",
+        0
+      ]
+    }
+  },
+  "av_latent": {
+    "class_type": "LTXVConcatAVLatent",
+    "inputs": {
+      "video_latent": [
+        "guide",
+        2
+      ],
+      "audio_latent": [
+        "empty_audio",
+        0
+      ]
+    }
+  },
+  "sample": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": [
+        "union_control",
+        0
+      ],
+      "seed": 20261030,
+      "steps": 8,
+      "cfg": 1,
+      "sampler_name": "euler_ancestral",
+      "scheduler": "linear_quadratic",
+      "positive": [
+        "guide",
+        0
+      ],
+      "negative": [
+        "guide",
+        1
+      ],
+      "latent_image": [
+        "av_latent",
+        0
+      ],
+      "denoise": 1
+    }
+  },
+  "separate": {
+    "class_type": "LTXVSeparateAVLatent",
+    "inputs": {
+      "av_latent": [
+        "sample",
+        0
+      ]
+    }
+  },
+  "crop_guides": {
+    "class_type": "LTXVCropGuides",
+    "inputs": {
+      "positive": [
+        "guide",
+        0
+      ],
+      "negative": [
+        "guide",
+        1
+      ],
+      "latent": [
+        "separate",
+        0
+      ]
+    }
+  },
+  "decode": {
+    "class_type": "VAEDecodeTiled",
+    "inputs": {
+      "samples": [
+        "crop_guides",
+        2
+      ],
+      "vae": [
+        "checkpoint",
+        2
+      ],
+      "tile_size": 512,
+      "overlap": 64,
+      "temporal_size": 64,
+      "temporal_overlap": 8
+    }
+  },
+  "result_video": {
+    "class_type": "CreateVideo",
+    "inputs": {
+      "images": [
+        "decode",
+        0
+      ],
+      "fps": [
+        "source_frames",
+        2
+      ],
+      "audio": [
+        "source_frames",
+        1
+      ]
+    }
+  },
+  "save_result": {
+    "class_type": "SaveVideo",
+    "inputs": {
+      "video": [
+        "result_video",
+        0
+      ],
+      "filename_prefix": "open_cinema/performance",
+      "format": "mp4",
+      "format.codec": "h264"
+    },
+    "_meta": {
+      "title": "Performance"
+    }
+  },
+  "control_video": {
+    "class_type": "CreateVideo",
+    "inputs": {
+      "images": [
+        "pose_over_depth",
+        0
+      ],
+      "fps": [
+        "source_frames",
+        2
+      ]
+    }
+  },
+  "save_control": {
+    "class_type": "SaveVideo",
+    "inputs": {
+      "video": [
+        "control_video",
+        0
+      ],
+      "filename_prefix": "open_cinema/performance_control",
+      "format": "mp4",
+      "format.codec": "h264"
+    },
+    "_meta": {
+      "title": "Control"
+    }
+  },
+  "depth": {
+    "class_type": "DepthAnythingV2Preprocessor",
+    "inputs": {
+      "image": [
+        "clip_fit",
+        0
+      ],
+      "ckpt_name": "depth_anything_v2_vitl.pth",
+      "resolution": 512
+    }
+  },
+  "depth_fit": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "depth",
+        0
+      ],
+      "upscale_method": "bilinear",
+      "width": [
+        "out_width",
+        1
+      ],
+      "height": [
+        "out_height",
+        1
+      ],
+      "crop": "disabled"
+    }
+  },
+  "pose_over_depth": {
+    "class_type": "ImageBlend",
+    "inputs": {
+      "image1": [
+        "depth_fit",
+        0
+      ],
+      "image2": [
+        "pose_fit",
+        0
+      ],
+      "blend_factor": 1,
+      "blend_mode": "screen"
+    }
+  },
+  "keyframe": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "keyframe.png"
+    }
+  },
+  "keyframe_fit": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "keyframe",
+        0
+      ],
+      "upscale_method": "lanczos",
+      "width": [
+        "out_width",
+        1
+      ],
+      "height": [
+        "out_height",
+        1
+      ],
+      "crop": "center"
+    }
+  },
+  "keyframe_condition": {
+    "class_type": "LTXVImgToVideoInplace",
+    "inputs": {
+      "vae": [
+        "checkpoint",
+        2
+      ],
+      "image": [
+        "keyframe_fit",
+        0
+      ],
+      "latent": [
+        "empty_video",
+        0
+      ],
+      "strength": 0.6,
+      "bypass": false
+    }
+  }
+}

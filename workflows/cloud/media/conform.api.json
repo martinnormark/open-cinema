@@ -1,0 +1,198 @@
+{
+  "source": {
+    "class_type": "LoadVideo",
+    "inputs": {
+      "file": "source.mp4"
+    }
+  },
+  "source_frames": {
+    "class_type": "GetVideoComponents",
+    "inputs": {
+      "video": [
+        "source",
+        0
+      ]
+    }
+  },
+  "source_size": {
+    "class_type": "GetImageSize",
+    "inputs": {
+      "image": [
+        "source_frames",
+        0
+      ]
+    }
+  },
+  "width": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(2, round(a * 1 / 2) * 2)",
+      "values.a": [
+        "source_size",
+        0
+      ]
+    }
+  },
+  "height": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(2, round(a / 2) * 2)",
+      "values.a": [
+        "source_size",
+        1
+      ]
+    }
+  },
+  "video": {
+    "class_type": "CreateVideo",
+    "inputs": {
+      "images": [
+        "result",
+        0
+      ],
+      "fps": [
+        "source_frames",
+        2
+      ],
+      "audio": [
+        "source_frames",
+        1
+      ]
+    }
+  },
+  "save": {
+    "class_type": "SaveVideo",
+    "inputs": {
+      "video": [
+        "video",
+        0
+      ],
+      "filename_prefix": "open_cinema/conform",
+      "format": "mp4",
+      "format.codec": "h264",
+      "format.codec.encoding": "re-encode",
+      "format.codec.encoding.crf": 16
+    }
+  },
+  "edit": {
+    "class_type": "VHS_LoadVideoFFmpeg",
+    "inputs": {
+      "video": "edit.mp4",
+      "force_rate": [
+        "source_frames",
+        2
+      ],
+      "custom_width": 0,
+      "custom_height": 0,
+      "frame_load_cap": 0,
+      "start_time": 0,
+      "format": "None"
+    }
+  },
+  "edit_fit": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "edit",
+        0
+      ],
+      "upscale_method": "bicubic",
+      "width": [
+        "width",
+        1
+      ],
+      "height": [
+        "height",
+        1
+      ],
+      "crop": "disabled"
+    }
+  },
+  "edit_size": {
+    "class_type": "GetImageSize",
+    "inputs": {
+      "image": [
+        "edit_fit",
+        0
+      ]
+    }
+  },
+  "edit_last_index": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(0, a - 1)",
+      "values.a": [
+        "edit_size",
+        2
+      ]
+    }
+  },
+  "edit_hold_count": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(1, a - b)",
+      "values.a": [
+        "source_size",
+        2
+      ],
+      "values.b": [
+        "edit_size",
+        2
+      ]
+    }
+  },
+  "edit_last": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "edit_fit",
+        0
+      ],
+      "batch_index": [
+        "edit_last_index",
+        1
+      ],
+      "length": 1
+    }
+  },
+  "edit_hold": {
+    "class_type": "RepeatImageBatch",
+    "inputs": {
+      "image": [
+        "edit_last",
+        0
+      ],
+      "amount": [
+        "edit_hold_count",
+        1
+      ]
+    }
+  },
+  "edit_held": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "edit_fit",
+        0
+      ],
+      "image2": [
+        "edit_hold",
+        0
+      ]
+    }
+  },
+  "result": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "edit_held",
+        0
+      ],
+      "batch_index": 0,
+      "length": [
+        "source_size",
+        2
+      ]
+    }
+  }
+}

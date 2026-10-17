@@ -1,0 +1,828 @@
+{
+  "source": {
+    "class_type": "LoadVideo",
+    "inputs": {
+      "file": "source.mp4"
+    }
+  },
+  "source_frames": {
+    "class_type": "GetVideoComponents",
+    "inputs": {
+      "video": [
+        "source",
+        0
+      ]
+    }
+  },
+  "source_size": {
+    "class_type": "GetImageSize",
+    "inputs": {
+      "image": [
+        "source_frames",
+        0
+      ]
+    }
+  },
+  "source_length": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(1, ((min(a, 97) - 1) // 8) * 8 + 1)",
+      "values.a": [
+        "source_size",
+        2
+      ]
+    }
+  },
+  "source_gen_width": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(64, round(a * min(1, 768 / max(a, b)) / 32) * 32)",
+      "values.a": [
+        "source_size",
+        0
+      ],
+      "values.b": [
+        "source_size",
+        1
+      ]
+    }
+  },
+  "source_gen_height": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(64, round(b * min(1, 768 / max(a, b)) / 32) * 32)",
+      "values.a": [
+        "source_size",
+        0
+      ],
+      "values.b": [
+        "source_size",
+        1
+      ]
+    }
+  },
+  "source_clip": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "source_frames",
+        0
+      ],
+      "batch_index": 0,
+      "length": [
+        "source_length",
+        1
+      ]
+    }
+  },
+  "source_small": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "source_clip",
+        0
+      ],
+      "upscale_method": "bilinear",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "crop": "disabled"
+    }
+  },
+  "source_first": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "source_clip",
+        0
+      ],
+      "batch_index": 0,
+      "length": 1
+    }
+  },
+  "keyframe_unet": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "flux-2-klein-9b.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "keyframe_clip": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen_3_8b_fp8mixed.safetensors",
+      "type": "flux2",
+      "device": "default"
+    }
+  },
+  "keyframe_vae": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "flux2-vae.safetensors"
+    }
+  },
+  "keyframe_text": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "Restyle the first image in the visual style of the second image and the third image: Hand-painted watercolour, soft paper texture, muted harbour blues. Keep the exact composition, framing and camera angle, every person's pose, expression and position, and the place of every object. Change only the look: palette, light, materials, texture and rendering.",
+      "clip": [
+        "keyframe_clip",
+        0
+      ]
+    }
+  },
+  "keyframe_zero": {
+    "class_type": "ConditioningZeroOut",
+    "inputs": {
+      "conditioning": [
+        "keyframe_text",
+        0
+      ]
+    }
+  },
+  "keyframe_frame": {
+    "class_type": "ImageScaleToTotalPixels",
+    "inputs": {
+      "image": [
+        "source_first",
+        0
+      ],
+      "upscale_method": "lanczos",
+      "megapixels": 1,
+      "resolution_steps": 16
+    }
+  },
+  "keyframe_size": {
+    "class_type": "GetImageSize",
+    "inputs": {
+      "image": [
+        "keyframe_frame",
+        0
+      ]
+    }
+  },
+  "reference_0": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "reference-0.png"
+    }
+  },
+  "reference_0_scaled": {
+    "class_type": "ImageScaleToTotalPixels",
+    "inputs": {
+      "image": [
+        "reference_0",
+        0
+      ],
+      "upscale_method": "lanczos",
+      "megapixels": 1,
+      "resolution_steps": 16
+    }
+  },
+  "reference_1": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "reference-1.png"
+    }
+  },
+  "reference_1_scaled": {
+    "class_type": "ImageScaleToTotalPixels",
+    "inputs": {
+      "image": [
+        "reference_1",
+        0
+      ],
+      "upscale_method": "lanczos",
+      "megapixels": 1,
+      "resolution_steps": 16
+    }
+  },
+  "keyframe_latent_0": {
+    "class_type": "VAEEncode",
+    "inputs": {
+      "pixels": [
+        "keyframe_frame",
+        0
+      ],
+      "vae": [
+        "keyframe_vae",
+        0
+      ]
+    }
+  },
+  "keyframe_pos_0": {
+    "class_type": "ReferenceLatent",
+    "inputs": {
+      "conditioning": [
+        "keyframe_text",
+        0
+      ],
+      "latent": [
+        "keyframe_latent_0",
+        0
+      ]
+    }
+  },
+  "keyframe_neg_0": {
+    "class_type": "ReferenceLatent",
+    "inputs": {
+      "conditioning": [
+        "keyframe_zero",
+        0
+      ],
+      "latent": [
+        "keyframe_latent_0",
+        0
+      ]
+    }
+  },
+  "keyframe_latent_1": {
+    "class_type": "VAEEncode",
+    "inputs": {
+      "pixels": [
+        "reference_0_scaled",
+        0
+      ],
+      "vae": [
+        "keyframe_vae",
+        0
+      ]
+    }
+  },
+  "keyframe_pos_1": {
+    "class_type": "ReferenceLatent",
+    "inputs": {
+      "conditioning": [
+        "keyframe_pos_0",
+        0
+      ],
+      "latent": [
+        "keyframe_latent_1",
+        0
+      ]
+    }
+  },
+  "keyframe_neg_1": {
+    "class_type": "ReferenceLatent",
+    "inputs": {
+      "conditioning": [
+        "keyframe_neg_0",
+        0
+      ],
+      "latent": [
+        "keyframe_latent_1",
+        0
+      ]
+    }
+  },
+  "keyframe_latent_2": {
+    "class_type": "VAEEncode",
+    "inputs": {
+      "pixels": [
+        "reference_1_scaled",
+        0
+      ],
+      "vae": [
+        "keyframe_vae",
+        0
+      ]
+    }
+  },
+  "keyframe_pos_2": {
+    "class_type": "ReferenceLatent",
+    "inputs": {
+      "conditioning": [
+        "keyframe_pos_1",
+        0
+      ],
+      "latent": [
+        "keyframe_latent_2",
+        0
+      ]
+    }
+  },
+  "keyframe_neg_2": {
+    "class_type": "ReferenceLatent",
+    "inputs": {
+      "conditioning": [
+        "keyframe_neg_1",
+        0
+      ],
+      "latent": [
+        "keyframe_latent_2",
+        0
+      ]
+    }
+  },
+  "keyframe_empty": {
+    "class_type": "EmptyFlux2LatentImage",
+    "inputs": {
+      "width": [
+        "keyframe_size",
+        0
+      ],
+      "height": [
+        "keyframe_size",
+        1
+      ],
+      "batch_size": 1
+    }
+  },
+  "keyframe_sigmas": {
+    "class_type": "Flux2Scheduler",
+    "inputs": {
+      "steps": 4,
+      "width": [
+        "keyframe_size",
+        0
+      ],
+      "height": [
+        "keyframe_size",
+        1
+      ]
+    }
+  },
+  "keyframe_noise": {
+    "class_type": "RandomNoise",
+    "inputs": {
+      "noise_seed": 20261030
+    }
+  },
+  "keyframe_sampler": {
+    "class_type": "KSamplerSelect",
+    "inputs": {
+      "sampler_name": "euler"
+    }
+  },
+  "keyframe_guider": {
+    "class_type": "CFGGuider",
+    "inputs": {
+      "model": [
+        "keyframe_unet",
+        0
+      ],
+      "positive": [
+        "keyframe_pos_2",
+        0
+      ],
+      "negative": [
+        "keyframe_neg_2",
+        0
+      ],
+      "cfg": 1
+    }
+  },
+  "keyframe_sample": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": [
+        "keyframe_noise",
+        0
+      ],
+      "guider": [
+        "keyframe_guider",
+        0
+      ],
+      "sampler": [
+        "keyframe_sampler",
+        0
+      ],
+      "sigmas": [
+        "keyframe_sigmas",
+        0
+      ],
+      "latent_image": [
+        "keyframe_empty",
+        0
+      ]
+    }
+  },
+  "keyframe_decode": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "keyframe_sample",
+        0
+      ],
+      "vae": [
+        "keyframe_vae",
+        0
+      ]
+    }
+  },
+  "keyframe_fit": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "keyframe_decode",
+        0
+      ],
+      "upscale_method": "lanczos",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "crop": "center"
+    }
+  },
+  "depth": {
+    "class_type": "DepthAnythingV2Preprocessor",
+    "inputs": {
+      "image": [
+        "source_small",
+        0
+      ],
+      "ckpt_name": "depth_anything_v2_vitl.pth",
+      "resolution": 512
+    }
+  },
+  "depth_fit": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "depth",
+        0
+      ],
+      "upscale_method": "bilinear",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "crop": "disabled"
+    }
+  },
+  "ltx_ckpt": {
+    "class_type": "CheckpointLoaderSimple",
+    "inputs": {
+      "ckpt_name": "ltx-2.3-22b-distilled-fp8.safetensors"
+    }
+  },
+  "ltx_text_encoder": {
+    "class_type": "LTXAVTextEncoderLoader",
+    "inputs": {
+      "text_encoder": "gemma_3_12B_it_fp4_mixed.safetensors",
+      "ckpt_name": "ltx-2.3-22b-distilled-fp8.safetensors",
+      "device": "default"
+    }
+  },
+  "ltx_audio_vae": {
+    "class_type": "LTXVAudioVAELoader",
+    "inputs": {
+      "ckpt_name": "ltx-2.3-22b-distilled-fp8.safetensors"
+    }
+  },
+  "ltx_lora_0": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "model": [
+        "ltx_ckpt",
+        0
+      ],
+      "lora_name": "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors",
+      "strength_model": 1
+    }
+  },
+  "ltx_positive": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "Hand-painted watercolour, soft paper texture, muted harbour blues. The same shot and action as the first frame, held in this style in every frame, with the original movement and camera.",
+      "clip": [
+        "ltx_text_encoder",
+        0
+      ]
+    }
+  },
+  "ltx_negative": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "blurry, out of focus, overexposed, underexposed, low contrast, washed out colors, excessive noise, flickering, distorted proportions, deformed facial features, extra limbs, disfigured hands, watermark, logo, subtitles, text overlay, vignette, dark corners, circular frame, keyhole mask, fisheye",
+      "clip": [
+        "ltx_text_encoder",
+        0
+      ]
+    }
+  },
+  "ltx_conditioning": {
+    "class_type": "LTXVConditioning",
+    "inputs": {
+      "positive": [
+        "ltx_positive",
+        0
+      ],
+      "negative": [
+        "ltx_negative",
+        0
+      ],
+      "frame_rate": [
+        "source_frames",
+        2
+      ]
+    }
+  },
+  "ltx_empty": {
+    "class_type": "EmptyLTXVLatentVideo",
+    "inputs": {
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "length": [
+        "source_length",
+        1
+      ],
+      "batch_size": 1
+    }
+  },
+  "ltx_first_prep": {
+    "class_type": "LTXVPreprocess",
+    "inputs": {
+      "image": [
+        "keyframe_fit",
+        0
+      ],
+      "img_compression": 33
+    }
+  },
+  "ltx_first_frame": {
+    "class_type": "LTXVImgToVideoInplace",
+    "inputs": {
+      "vae": [
+        "ltx_ckpt",
+        2
+      ],
+      "image": [
+        "ltx_first_prep",
+        0
+      ],
+      "latent": [
+        "ltx_empty",
+        0
+      ],
+      "strength": 1,
+      "bypass": false
+    }
+  },
+  "ltx_ic_params": {
+    "class_type": "GetICLoRAParameters",
+    "inputs": {
+      "iclora_model": [
+        "ltx_lora_0",
+        0
+      ]
+    }
+  },
+  "ltx_guide": {
+    "class_type": "LTXVAddGuide",
+    "inputs": {
+      "positive": [
+        "ltx_conditioning",
+        0
+      ],
+      "negative": [
+        "ltx_conditioning",
+        1
+      ],
+      "vae": [
+        "ltx_ckpt",
+        2
+      ],
+      "latent": [
+        "ltx_first_frame",
+        0
+      ],
+      "image": [
+        "depth_fit",
+        0
+      ],
+      "frame_idx": 0,
+      "strength": 1,
+      "iclora_parameters": [
+        "ltx_ic_params",
+        0
+      ]
+    }
+  },
+  "ltx_empty_audio": {
+    "class_type": "LTXVEmptyLatentAudio",
+    "inputs": {
+      "frames_number": [
+        "source_length",
+        1
+      ],
+      "frame_rate": [
+        "source_frames",
+        2
+      ],
+      "batch_size": 1,
+      "audio_vae": [
+        "ltx_audio_vae",
+        0
+      ]
+    }
+  },
+  "ltx_av": {
+    "class_type": "LTXVConcatAVLatent",
+    "inputs": {
+      "video_latent": [
+        "ltx_guide",
+        2
+      ],
+      "audio_latent": [
+        "ltx_empty_audio",
+        0
+      ]
+    }
+  },
+  "ltx_noise": {
+    "class_type": "RandomNoise",
+    "inputs": {
+      "noise_seed": 20261030
+    }
+  },
+  "ltx_guider": {
+    "class_type": "CFGGuider",
+    "inputs": {
+      "model": [
+        "ltx_lora_0",
+        0
+      ],
+      "positive": [
+        "ltx_guide",
+        0
+      ],
+      "negative": [
+        "ltx_guide",
+        1
+      ],
+      "cfg": 1
+    }
+  },
+  "ltx_sampler": {
+    "class_type": "KSamplerSelect",
+    "inputs": {
+      "sampler_name": "euler_ancestral"
+    }
+  },
+  "ltx_sigmas": {
+    "class_type": "ManualSigmas",
+    "inputs": {
+      "sigmas": "1.0, 0.99375, 0.9875, 0.98125, 0.975, 0.909375, 0.725, 0.421875, 0.0"
+    }
+  },
+  "ltx_sample": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": [
+        "ltx_noise",
+        0
+      ],
+      "guider": [
+        "ltx_guider",
+        0
+      ],
+      "sampler": [
+        "ltx_sampler",
+        0
+      ],
+      "sigmas": [
+        "ltx_sigmas",
+        0
+      ],
+      "latent_image": [
+        "ltx_av",
+        0
+      ]
+    }
+  },
+  "ltx_separate": {
+    "class_type": "LTXVSeparateAVLatent",
+    "inputs": {
+      "av_latent": [
+        "ltx_sample",
+        0
+      ]
+    }
+  },
+  "ltx_crop": {
+    "class_type": "LTXVCropGuides",
+    "inputs": {
+      "positive": [
+        "ltx_guide",
+        0
+      ],
+      "negative": [
+        "ltx_guide",
+        1
+      ],
+      "latent": [
+        "ltx_separate",
+        0
+      ]
+    }
+  },
+  "ltx_decode": {
+    "class_type": "VAEDecodeTiled",
+    "inputs": {
+      "samples": [
+        "ltx_crop",
+        2
+      ],
+      "vae": [
+        "ltx_ckpt",
+        2
+      ],
+      "tile_size": 512,
+      "overlap": 64,
+      "temporal_size": 64,
+      "temporal_overlap": 8
+    }
+  },
+  "ltx_audio": {
+    "class_type": "LTXVAudioVAEDecode",
+    "inputs": {
+      "samples": [
+        "ltx_separate",
+        1
+      ],
+      "audio_vae": [
+        "ltx_audio_vae",
+        0
+      ]
+    }
+  },
+  "generated_full": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "ltx_decode",
+        0
+      ],
+      "upscale_method": "lanczos",
+      "width": [
+        "source_size",
+        0
+      ],
+      "height": [
+        "source_size",
+        1
+      ],
+      "crop": "disabled"
+    }
+  },
+  "save_result_video": {
+    "class_type": "CreateVideo",
+    "inputs": {
+      "images": [
+        "generated_full",
+        0
+      ],
+      "fps": [
+        "source_frames",
+        2
+      ],
+      "audio": [
+        "source_frames",
+        1
+      ]
+    }
+  },
+  "save_result": {
+    "class_type": "SaveVideo",
+    "inputs": {
+      "video": [
+        "save_result_video",
+        0
+      ],
+      "filename_prefix": "open_cinema/restyle",
+      "format": "mp4",
+      "format.codec": "h264"
+    }
+  },
+  "save_keyframe": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": [
+        "keyframe_decode",
+        0
+      ],
+      "filename_prefix": "open_cinema/restyle_keyframe"
+    }
+  }
+}

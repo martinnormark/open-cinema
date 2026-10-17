@@ -64,12 +64,12 @@ Status as of this document; update it as items land.
 - [x] Open-source license ([MIT](../LICENSE))
 - [x] Setup instructions a stranger can follow ([README](../README.md))
 - [x] Uses Comfy Router through the official Comfy SDK
-- [ ] Workflow files for each supported capability committed alongside the code
+- [x] Workflow files for each supported capability committed alongside the code: [`workflows/`](../workflows/README.md). Every Comfy Cloud graph is generated from the app's code into `workflows/cloud/` (a test fails on drift), checked against Cloud's node catalogue and opened in the ComfyUI editor; the Kling graphs sit beside them
 - [ ] Deployed instance behind [Cloudflare Access](auth.md), with a demo account or public read-only gallery for judges
 - [x] Example outputs in the [README](../README.md#example-outputs) (stills, LTX clip, before/after revisions); a finished multi-shot sequence is still missing
 - [ ] Demo video, ≤ 2:00, explaining how it was built and naming FLUX 3 and LTX: a [captioned cut](media/open-cinema-demo.mp4) exists (1:58); re-record on the deployed studio with voice-over before submitting
-- [ ] Social post with #OpenSourceHiggsfield; link captured for the form
-- [ ] Entry form submitted before the deadline
+- [ ] Social post with #OpenSourceHiggsfield; link captured for the form: drafted in [competition/social-post.md](competition/social-post.md) (short, thread, carousel, Reddit); not posted
+- [ ] Entry form submitted before the deadline: answers drafted in [competition/entry-form.md](competition/entry-form.md) from the live form's questions; Martin fills in personal details, the video and post links, and the agreements
 
 ## Judge access
 

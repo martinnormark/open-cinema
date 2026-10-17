@@ -1,0 +1,7564 @@
+{
+  "source": {
+    "class_type": "LoadVideo",
+    "inputs": {
+      "file": "source.mp4"
+    }
+  },
+  "source_frames": {
+    "class_type": "GetVideoComponents",
+    "inputs": {
+      "video": [
+        "source",
+        0
+      ]
+    }
+  },
+  "source_size": {
+    "class_type": "GetImageSize",
+    "inputs": {
+      "image": [
+        "source_frames",
+        0
+      ]
+    }
+  },
+  "source_length": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(1, ((min(a, 97) - 1) // 8) * 8 + 1)",
+      "values.a": [
+        "source_size",
+        2
+      ]
+    }
+  },
+  "source_gen_width": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(64, round(a * min(1, 768 / max(a, b)) / 32) * 32)",
+      "values.a": [
+        "source_size",
+        0
+      ],
+      "values.b": [
+        "source_size",
+        1
+      ]
+    }
+  },
+  "source_gen_height": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(64, round(b * min(1, 768 / max(a, b)) / 32) * 32)",
+      "values.a": [
+        "source_size",
+        0
+      ],
+      "values.b": [
+        "source_size",
+        1
+      ]
+    }
+  },
+  "source_clip": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "source_frames",
+        0
+      ],
+      "batch_index": 0,
+      "length": [
+        "source_length",
+        1
+      ]
+    }
+  },
+  "source_small": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "source_clip",
+        0
+      ],
+      "upscale_method": "bilinear",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "crop": "disabled"
+    }
+  },
+  "source_first": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "source_clip",
+        0
+      ],
+      "batch_index": 0,
+      "length": 1
+    }
+  },
+  "last_index": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "a - 1",
+      "values.a": [
+        "source_length",
+        1
+      ]
+    }
+  },
+  "last_frame": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "source_small",
+        0
+      ],
+      "batch_index": [
+        "last_index",
+        1
+      ],
+      "length": 1
+    }
+  },
+  "last_repeat": {
+    "class_type": "RepeatImageBatch",
+    "inputs": {
+      "image": [
+        "last_frame",
+        0
+      ],
+      "amount": 97
+    }
+  },
+  "padded_all": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "source_small",
+        0
+      ],
+      "image2": [
+        "last_repeat",
+        0
+      ]
+    }
+  },
+  "padded": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "padded_all",
+        0
+      ],
+      "batch_index": 0,
+      "length": 97
+    }
+  },
+  "moge": {
+    "class_type": "LoadMoGeModel",
+    "inputs": {
+      "model_name": "moge_2_vitl_normal_fp16.safetensors"
+    }
+  },
+  "lens_frame": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "padded",
+        0
+      ],
+      "batch_index": 0,
+      "length": 1
+    }
+  },
+  "lens_geometry": {
+    "class_type": "MoGeInference",
+    "inputs": {
+      "moge_model": [
+        "moge",
+        0
+      ],
+      "image": [
+        "lens_frame",
+        0
+      ],
+      "resolution_level": 6,
+      "fov_x_degrees": 0,
+      "batch_size": 1,
+      "force_projection": true,
+      "apply_mask": true,
+      "refine_steps": 0
+    }
+  },
+  "lens": {
+    "class_type": "MoGeGeometryToFOV",
+    "inputs": {
+      "moge_geometry": [
+        "lens_geometry",
+        0
+      ],
+      "axis": "horizontal",
+      "unit": "degrees"
+    }
+  },
+  "geometry": {
+    "class_type": "MoGeInference",
+    "inputs": {
+      "moge_model": [
+        "moge",
+        0
+      ],
+      "image": [
+        "padded",
+        0
+      ],
+      "resolution_level": 6,
+      "fov_x_degrees": [
+        "lens",
+        0
+      ],
+      "batch_size": 4,
+      "force_projection": true,
+      "apply_mask": true,
+      "refine_steps": 0
+    }
+  },
+  "zoom": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "a / (b * tan(c * 0.00872665))",
+      "values.a": [
+        "source_gen_width",
+        1
+      ],
+      "values.b": [
+        "source_gen_height",
+        1
+      ],
+      "values.c": [
+        "lens",
+        0
+      ]
+    }
+  },
+  "camera": {
+    "class_type": "CreateCameraInfo",
+    "inputs": {
+      "mode": "look_at",
+      "mode.position_x": 0,
+      "mode.position_y": -0.15,
+      "mode.position_z": 0,
+      "target_x": 0,
+      "target_y": 0,
+      "target_z": -2,
+      "roll": 0,
+      "fov": 90,
+      "zoom": [
+        "zoom",
+        0
+      ],
+      "camera_type": "perspective"
+    }
+  },
+  "mesh_0": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 0,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_0": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_0",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_0": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_0",
+        1
+      ]
+    }
+  },
+  "mesh_1": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 1,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_1": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_1",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_1": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_1",
+        1
+      ]
+    }
+  },
+  "projected_1": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "render_0",
+        0
+      ],
+      "image2": [
+        "render_1",
+        0
+      ]
+    }
+  },
+  "coverage_1": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "covered_0",
+        0
+      ],
+      "image2": [
+        "covered_1",
+        0
+      ]
+    }
+  },
+  "mesh_2": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 2,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_2": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_2",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_2": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_2",
+        1
+      ]
+    }
+  },
+  "projected_2": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_1",
+        0
+      ],
+      "image2": [
+        "render_2",
+        0
+      ]
+    }
+  },
+  "coverage_2": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_1",
+        0
+      ],
+      "image2": [
+        "covered_2",
+        0
+      ]
+    }
+  },
+  "mesh_3": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 3,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_3": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_3",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_3": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_3",
+        1
+      ]
+    }
+  },
+  "projected_3": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_2",
+        0
+      ],
+      "image2": [
+        "render_3",
+        0
+      ]
+    }
+  },
+  "coverage_3": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_2",
+        0
+      ],
+      "image2": [
+        "covered_3",
+        0
+      ]
+    }
+  },
+  "mesh_4": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 4,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_4": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_4",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_4": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_4",
+        1
+      ]
+    }
+  },
+  "projected_4": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_3",
+        0
+      ],
+      "image2": [
+        "render_4",
+        0
+      ]
+    }
+  },
+  "coverage_4": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_3",
+        0
+      ],
+      "image2": [
+        "covered_4",
+        0
+      ]
+    }
+  },
+  "mesh_5": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 5,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_5": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_5",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_5": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_5",
+        1
+      ]
+    }
+  },
+  "projected_5": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_4",
+        0
+      ],
+      "image2": [
+        "render_5",
+        0
+      ]
+    }
+  },
+  "coverage_5": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_4",
+        0
+      ],
+      "image2": [
+        "covered_5",
+        0
+      ]
+    }
+  },
+  "mesh_6": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 6,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_6": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_6",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_6": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_6",
+        1
+      ]
+    }
+  },
+  "projected_6": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_5",
+        0
+      ],
+      "image2": [
+        "render_6",
+        0
+      ]
+    }
+  },
+  "coverage_6": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_5",
+        0
+      ],
+      "image2": [
+        "covered_6",
+        0
+      ]
+    }
+  },
+  "mesh_7": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 7,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_7": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_7",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_7": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_7",
+        1
+      ]
+    }
+  },
+  "projected_7": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_6",
+        0
+      ],
+      "image2": [
+        "render_7",
+        0
+      ]
+    }
+  },
+  "coverage_7": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_6",
+        0
+      ],
+      "image2": [
+        "covered_7",
+        0
+      ]
+    }
+  },
+  "mesh_8": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 8,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_8": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_8",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_8": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_8",
+        1
+      ]
+    }
+  },
+  "projected_8": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_7",
+        0
+      ],
+      "image2": [
+        "render_8",
+        0
+      ]
+    }
+  },
+  "coverage_8": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_7",
+        0
+      ],
+      "image2": [
+        "covered_8",
+        0
+      ]
+    }
+  },
+  "mesh_9": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 9,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_9": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_9",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_9": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_9",
+        1
+      ]
+    }
+  },
+  "projected_9": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_8",
+        0
+      ],
+      "image2": [
+        "render_9",
+        0
+      ]
+    }
+  },
+  "coverage_9": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_8",
+        0
+      ],
+      "image2": [
+        "covered_9",
+        0
+      ]
+    }
+  },
+  "mesh_10": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 10,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_10": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_10",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_10": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_10",
+        1
+      ]
+    }
+  },
+  "projected_10": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_9",
+        0
+      ],
+      "image2": [
+        "render_10",
+        0
+      ]
+    }
+  },
+  "coverage_10": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_9",
+        0
+      ],
+      "image2": [
+        "covered_10",
+        0
+      ]
+    }
+  },
+  "mesh_11": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 11,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_11": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_11",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_11": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_11",
+        1
+      ]
+    }
+  },
+  "projected_11": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_10",
+        0
+      ],
+      "image2": [
+        "render_11",
+        0
+      ]
+    }
+  },
+  "coverage_11": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_10",
+        0
+      ],
+      "image2": [
+        "covered_11",
+        0
+      ]
+    }
+  },
+  "mesh_12": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 12,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_12": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_12",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_12": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_12",
+        1
+      ]
+    }
+  },
+  "projected_12": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_11",
+        0
+      ],
+      "image2": [
+        "render_12",
+        0
+      ]
+    }
+  },
+  "coverage_12": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_11",
+        0
+      ],
+      "image2": [
+        "covered_12",
+        0
+      ]
+    }
+  },
+  "mesh_13": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 13,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_13": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_13",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_13": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_13",
+        1
+      ]
+    }
+  },
+  "projected_13": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_12",
+        0
+      ],
+      "image2": [
+        "render_13",
+        0
+      ]
+    }
+  },
+  "coverage_13": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_12",
+        0
+      ],
+      "image2": [
+        "covered_13",
+        0
+      ]
+    }
+  },
+  "mesh_14": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 14,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_14": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_14",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_14": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_14",
+        1
+      ]
+    }
+  },
+  "projected_14": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_13",
+        0
+      ],
+      "image2": [
+        "render_14",
+        0
+      ]
+    }
+  },
+  "coverage_14": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_13",
+        0
+      ],
+      "image2": [
+        "covered_14",
+        0
+      ]
+    }
+  },
+  "mesh_15": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 15,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_15": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_15",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_15": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_15",
+        1
+      ]
+    }
+  },
+  "projected_15": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_14",
+        0
+      ],
+      "image2": [
+        "render_15",
+        0
+      ]
+    }
+  },
+  "coverage_15": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_14",
+        0
+      ],
+      "image2": [
+        "covered_15",
+        0
+      ]
+    }
+  },
+  "mesh_16": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 16,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_16": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_16",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_16": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_16",
+        1
+      ]
+    }
+  },
+  "projected_16": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_15",
+        0
+      ],
+      "image2": [
+        "render_16",
+        0
+      ]
+    }
+  },
+  "coverage_16": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_15",
+        0
+      ],
+      "image2": [
+        "covered_16",
+        0
+      ]
+    }
+  },
+  "mesh_17": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 17,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_17": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_17",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_17": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_17",
+        1
+      ]
+    }
+  },
+  "projected_17": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_16",
+        0
+      ],
+      "image2": [
+        "render_17",
+        0
+      ]
+    }
+  },
+  "coverage_17": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_16",
+        0
+      ],
+      "image2": [
+        "covered_17",
+        0
+      ]
+    }
+  },
+  "mesh_18": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 18,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_18": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_18",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_18": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_18",
+        1
+      ]
+    }
+  },
+  "projected_18": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_17",
+        0
+      ],
+      "image2": [
+        "render_18",
+        0
+      ]
+    }
+  },
+  "coverage_18": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_17",
+        0
+      ],
+      "image2": [
+        "covered_18",
+        0
+      ]
+    }
+  },
+  "mesh_19": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 19,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_19": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_19",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_19": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_19",
+        1
+      ]
+    }
+  },
+  "projected_19": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_18",
+        0
+      ],
+      "image2": [
+        "render_19",
+        0
+      ]
+    }
+  },
+  "coverage_19": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_18",
+        0
+      ],
+      "image2": [
+        "covered_19",
+        0
+      ]
+    }
+  },
+  "mesh_20": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 20,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_20": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_20",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_20": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_20",
+        1
+      ]
+    }
+  },
+  "projected_20": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_19",
+        0
+      ],
+      "image2": [
+        "render_20",
+        0
+      ]
+    }
+  },
+  "coverage_20": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_19",
+        0
+      ],
+      "image2": [
+        "covered_20",
+        0
+      ]
+    }
+  },
+  "mesh_21": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 21,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_21": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_21",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_21": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_21",
+        1
+      ]
+    }
+  },
+  "projected_21": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_20",
+        0
+      ],
+      "image2": [
+        "render_21",
+        0
+      ]
+    }
+  },
+  "coverage_21": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_20",
+        0
+      ],
+      "image2": [
+        "covered_21",
+        0
+      ]
+    }
+  },
+  "mesh_22": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 22,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_22": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_22",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_22": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_22",
+        1
+      ]
+    }
+  },
+  "projected_22": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_21",
+        0
+      ],
+      "image2": [
+        "render_22",
+        0
+      ]
+    }
+  },
+  "coverage_22": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_21",
+        0
+      ],
+      "image2": [
+        "covered_22",
+        0
+      ]
+    }
+  },
+  "mesh_23": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 23,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_23": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_23",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_23": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_23",
+        1
+      ]
+    }
+  },
+  "projected_23": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_22",
+        0
+      ],
+      "image2": [
+        "render_23",
+        0
+      ]
+    }
+  },
+  "coverage_23": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_22",
+        0
+      ],
+      "image2": [
+        "covered_23",
+        0
+      ]
+    }
+  },
+  "mesh_24": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 24,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_24": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_24",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_24": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_24",
+        1
+      ]
+    }
+  },
+  "projected_24": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_23",
+        0
+      ],
+      "image2": [
+        "render_24",
+        0
+      ]
+    }
+  },
+  "coverage_24": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_23",
+        0
+      ],
+      "image2": [
+        "covered_24",
+        0
+      ]
+    }
+  },
+  "mesh_25": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 25,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_25": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_25",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_25": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_25",
+        1
+      ]
+    }
+  },
+  "projected_25": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_24",
+        0
+      ],
+      "image2": [
+        "render_25",
+        0
+      ]
+    }
+  },
+  "coverage_25": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_24",
+        0
+      ],
+      "image2": [
+        "covered_25",
+        0
+      ]
+    }
+  },
+  "mesh_26": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 26,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_26": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_26",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_26": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_26",
+        1
+      ]
+    }
+  },
+  "projected_26": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_25",
+        0
+      ],
+      "image2": [
+        "render_26",
+        0
+      ]
+    }
+  },
+  "coverage_26": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_25",
+        0
+      ],
+      "image2": [
+        "covered_26",
+        0
+      ]
+    }
+  },
+  "mesh_27": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 27,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_27": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_27",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_27": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_27",
+        1
+      ]
+    }
+  },
+  "projected_27": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_26",
+        0
+      ],
+      "image2": [
+        "render_27",
+        0
+      ]
+    }
+  },
+  "coverage_27": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_26",
+        0
+      ],
+      "image2": [
+        "covered_27",
+        0
+      ]
+    }
+  },
+  "mesh_28": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 28,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_28": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_28",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_28": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_28",
+        1
+      ]
+    }
+  },
+  "projected_28": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_27",
+        0
+      ],
+      "image2": [
+        "render_28",
+        0
+      ]
+    }
+  },
+  "coverage_28": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_27",
+        0
+      ],
+      "image2": [
+        "covered_28",
+        0
+      ]
+    }
+  },
+  "mesh_29": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 29,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_29": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_29",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_29": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_29",
+        1
+      ]
+    }
+  },
+  "projected_29": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_28",
+        0
+      ],
+      "image2": [
+        "render_29",
+        0
+      ]
+    }
+  },
+  "coverage_29": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_28",
+        0
+      ],
+      "image2": [
+        "covered_29",
+        0
+      ]
+    }
+  },
+  "mesh_30": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 30,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_30": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_30",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_30": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_30",
+        1
+      ]
+    }
+  },
+  "projected_30": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_29",
+        0
+      ],
+      "image2": [
+        "render_30",
+        0
+      ]
+    }
+  },
+  "coverage_30": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_29",
+        0
+      ],
+      "image2": [
+        "covered_30",
+        0
+      ]
+    }
+  },
+  "mesh_31": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 31,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_31": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_31",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_31": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_31",
+        1
+      ]
+    }
+  },
+  "projected_31": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_30",
+        0
+      ],
+      "image2": [
+        "render_31",
+        0
+      ]
+    }
+  },
+  "coverage_31": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_30",
+        0
+      ],
+      "image2": [
+        "covered_31",
+        0
+      ]
+    }
+  },
+  "mesh_32": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 32,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_32": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_32",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_32": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_32",
+        1
+      ]
+    }
+  },
+  "projected_32": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_31",
+        0
+      ],
+      "image2": [
+        "render_32",
+        0
+      ]
+    }
+  },
+  "coverage_32": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_31",
+        0
+      ],
+      "image2": [
+        "covered_32",
+        0
+      ]
+    }
+  },
+  "mesh_33": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 33,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_33": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_33",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_33": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_33",
+        1
+      ]
+    }
+  },
+  "projected_33": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_32",
+        0
+      ],
+      "image2": [
+        "render_33",
+        0
+      ]
+    }
+  },
+  "coverage_33": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_32",
+        0
+      ],
+      "image2": [
+        "covered_33",
+        0
+      ]
+    }
+  },
+  "mesh_34": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 34,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_34": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_34",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_34": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_34",
+        1
+      ]
+    }
+  },
+  "projected_34": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_33",
+        0
+      ],
+      "image2": [
+        "render_34",
+        0
+      ]
+    }
+  },
+  "coverage_34": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_33",
+        0
+      ],
+      "image2": [
+        "covered_34",
+        0
+      ]
+    }
+  },
+  "mesh_35": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 35,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_35": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_35",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_35": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_35",
+        1
+      ]
+    }
+  },
+  "projected_35": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_34",
+        0
+      ],
+      "image2": [
+        "render_35",
+        0
+      ]
+    }
+  },
+  "coverage_35": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_34",
+        0
+      ],
+      "image2": [
+        "covered_35",
+        0
+      ]
+    }
+  },
+  "mesh_36": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 36,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_36": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_36",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_36": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_36",
+        1
+      ]
+    }
+  },
+  "projected_36": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_35",
+        0
+      ],
+      "image2": [
+        "render_36",
+        0
+      ]
+    }
+  },
+  "coverage_36": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_35",
+        0
+      ],
+      "image2": [
+        "covered_36",
+        0
+      ]
+    }
+  },
+  "mesh_37": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 37,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_37": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_37",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_37": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_37",
+        1
+      ]
+    }
+  },
+  "projected_37": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_36",
+        0
+      ],
+      "image2": [
+        "render_37",
+        0
+      ]
+    }
+  },
+  "coverage_37": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_36",
+        0
+      ],
+      "image2": [
+        "covered_37",
+        0
+      ]
+    }
+  },
+  "mesh_38": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 38,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_38": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_38",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_38": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_38",
+        1
+      ]
+    }
+  },
+  "projected_38": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_37",
+        0
+      ],
+      "image2": [
+        "render_38",
+        0
+      ]
+    }
+  },
+  "coverage_38": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_37",
+        0
+      ],
+      "image2": [
+        "covered_38",
+        0
+      ]
+    }
+  },
+  "mesh_39": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 39,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_39": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_39",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_39": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_39",
+        1
+      ]
+    }
+  },
+  "projected_39": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_38",
+        0
+      ],
+      "image2": [
+        "render_39",
+        0
+      ]
+    }
+  },
+  "coverage_39": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_38",
+        0
+      ],
+      "image2": [
+        "covered_39",
+        0
+      ]
+    }
+  },
+  "mesh_40": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 40,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_40": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_40",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_40": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_40",
+        1
+      ]
+    }
+  },
+  "projected_40": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_39",
+        0
+      ],
+      "image2": [
+        "render_40",
+        0
+      ]
+    }
+  },
+  "coverage_40": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_39",
+        0
+      ],
+      "image2": [
+        "covered_40",
+        0
+      ]
+    }
+  },
+  "mesh_41": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 41,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_41": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_41",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_41": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_41",
+        1
+      ]
+    }
+  },
+  "projected_41": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_40",
+        0
+      ],
+      "image2": [
+        "render_41",
+        0
+      ]
+    }
+  },
+  "coverage_41": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_40",
+        0
+      ],
+      "image2": [
+        "covered_41",
+        0
+      ]
+    }
+  },
+  "mesh_42": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 42,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_42": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_42",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_42": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_42",
+        1
+      ]
+    }
+  },
+  "projected_42": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_41",
+        0
+      ],
+      "image2": [
+        "render_42",
+        0
+      ]
+    }
+  },
+  "coverage_42": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_41",
+        0
+      ],
+      "image2": [
+        "covered_42",
+        0
+      ]
+    }
+  },
+  "mesh_43": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 43,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_43": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_43",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_43": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_43",
+        1
+      ]
+    }
+  },
+  "projected_43": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_42",
+        0
+      ],
+      "image2": [
+        "render_43",
+        0
+      ]
+    }
+  },
+  "coverage_43": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_42",
+        0
+      ],
+      "image2": [
+        "covered_43",
+        0
+      ]
+    }
+  },
+  "mesh_44": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 44,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_44": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_44",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_44": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_44",
+        1
+      ]
+    }
+  },
+  "projected_44": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_43",
+        0
+      ],
+      "image2": [
+        "render_44",
+        0
+      ]
+    }
+  },
+  "coverage_44": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_43",
+        0
+      ],
+      "image2": [
+        "covered_44",
+        0
+      ]
+    }
+  },
+  "mesh_45": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 45,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_45": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_45",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_45": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_45",
+        1
+      ]
+    }
+  },
+  "projected_45": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_44",
+        0
+      ],
+      "image2": [
+        "render_45",
+        0
+      ]
+    }
+  },
+  "coverage_45": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_44",
+        0
+      ],
+      "image2": [
+        "covered_45",
+        0
+      ]
+    }
+  },
+  "mesh_46": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 46,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_46": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_46",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_46": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_46",
+        1
+      ]
+    }
+  },
+  "projected_46": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_45",
+        0
+      ],
+      "image2": [
+        "render_46",
+        0
+      ]
+    }
+  },
+  "coverage_46": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_45",
+        0
+      ],
+      "image2": [
+        "covered_46",
+        0
+      ]
+    }
+  },
+  "mesh_47": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 47,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_47": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_47",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_47": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_47",
+        1
+      ]
+    }
+  },
+  "projected_47": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_46",
+        0
+      ],
+      "image2": [
+        "render_47",
+        0
+      ]
+    }
+  },
+  "coverage_47": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_46",
+        0
+      ],
+      "image2": [
+        "covered_47",
+        0
+      ]
+    }
+  },
+  "mesh_48": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 48,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_48": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_48",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_48": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_48",
+        1
+      ]
+    }
+  },
+  "projected_48": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_47",
+        0
+      ],
+      "image2": [
+        "render_48",
+        0
+      ]
+    }
+  },
+  "coverage_48": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_47",
+        0
+      ],
+      "image2": [
+        "covered_48",
+        0
+      ]
+    }
+  },
+  "mesh_49": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 49,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_49": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_49",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_49": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_49",
+        1
+      ]
+    }
+  },
+  "projected_49": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_48",
+        0
+      ],
+      "image2": [
+        "render_49",
+        0
+      ]
+    }
+  },
+  "coverage_49": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_48",
+        0
+      ],
+      "image2": [
+        "covered_49",
+        0
+      ]
+    }
+  },
+  "mesh_50": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 50,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_50": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_50",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_50": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_50",
+        1
+      ]
+    }
+  },
+  "projected_50": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_49",
+        0
+      ],
+      "image2": [
+        "render_50",
+        0
+      ]
+    }
+  },
+  "coverage_50": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_49",
+        0
+      ],
+      "image2": [
+        "covered_50",
+        0
+      ]
+    }
+  },
+  "mesh_51": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 51,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_51": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_51",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_51": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_51",
+        1
+      ]
+    }
+  },
+  "projected_51": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_50",
+        0
+      ],
+      "image2": [
+        "render_51",
+        0
+      ]
+    }
+  },
+  "coverage_51": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_50",
+        0
+      ],
+      "image2": [
+        "covered_51",
+        0
+      ]
+    }
+  },
+  "mesh_52": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 52,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_52": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_52",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_52": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_52",
+        1
+      ]
+    }
+  },
+  "projected_52": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_51",
+        0
+      ],
+      "image2": [
+        "render_52",
+        0
+      ]
+    }
+  },
+  "coverage_52": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_51",
+        0
+      ],
+      "image2": [
+        "covered_52",
+        0
+      ]
+    }
+  },
+  "mesh_53": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 53,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_53": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_53",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_53": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_53",
+        1
+      ]
+    }
+  },
+  "projected_53": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_52",
+        0
+      ],
+      "image2": [
+        "render_53",
+        0
+      ]
+    }
+  },
+  "coverage_53": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_52",
+        0
+      ],
+      "image2": [
+        "covered_53",
+        0
+      ]
+    }
+  },
+  "mesh_54": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 54,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_54": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_54",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_54": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_54",
+        1
+      ]
+    }
+  },
+  "projected_54": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_53",
+        0
+      ],
+      "image2": [
+        "render_54",
+        0
+      ]
+    }
+  },
+  "coverage_54": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_53",
+        0
+      ],
+      "image2": [
+        "covered_54",
+        0
+      ]
+    }
+  },
+  "mesh_55": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 55,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_55": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_55",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_55": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_55",
+        1
+      ]
+    }
+  },
+  "projected_55": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_54",
+        0
+      ],
+      "image2": [
+        "render_55",
+        0
+      ]
+    }
+  },
+  "coverage_55": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_54",
+        0
+      ],
+      "image2": [
+        "covered_55",
+        0
+      ]
+    }
+  },
+  "mesh_56": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 56,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_56": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_56",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_56": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_56",
+        1
+      ]
+    }
+  },
+  "projected_56": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_55",
+        0
+      ],
+      "image2": [
+        "render_56",
+        0
+      ]
+    }
+  },
+  "coverage_56": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_55",
+        0
+      ],
+      "image2": [
+        "covered_56",
+        0
+      ]
+    }
+  },
+  "mesh_57": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 57,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_57": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_57",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_57": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_57",
+        1
+      ]
+    }
+  },
+  "projected_57": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_56",
+        0
+      ],
+      "image2": [
+        "render_57",
+        0
+      ]
+    }
+  },
+  "coverage_57": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_56",
+        0
+      ],
+      "image2": [
+        "covered_57",
+        0
+      ]
+    }
+  },
+  "mesh_58": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 58,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_58": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_58",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_58": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_58",
+        1
+      ]
+    }
+  },
+  "projected_58": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_57",
+        0
+      ],
+      "image2": [
+        "render_58",
+        0
+      ]
+    }
+  },
+  "coverage_58": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_57",
+        0
+      ],
+      "image2": [
+        "covered_58",
+        0
+      ]
+    }
+  },
+  "mesh_59": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 59,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_59": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_59",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_59": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_59",
+        1
+      ]
+    }
+  },
+  "projected_59": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_58",
+        0
+      ],
+      "image2": [
+        "render_59",
+        0
+      ]
+    }
+  },
+  "coverage_59": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_58",
+        0
+      ],
+      "image2": [
+        "covered_59",
+        0
+      ]
+    }
+  },
+  "mesh_60": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 60,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_60": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_60",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_60": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_60",
+        1
+      ]
+    }
+  },
+  "projected_60": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_59",
+        0
+      ],
+      "image2": [
+        "render_60",
+        0
+      ]
+    }
+  },
+  "coverage_60": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_59",
+        0
+      ],
+      "image2": [
+        "covered_60",
+        0
+      ]
+    }
+  },
+  "mesh_61": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 61,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_61": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_61",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_61": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_61",
+        1
+      ]
+    }
+  },
+  "projected_61": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_60",
+        0
+      ],
+      "image2": [
+        "render_61",
+        0
+      ]
+    }
+  },
+  "coverage_61": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_60",
+        0
+      ],
+      "image2": [
+        "covered_61",
+        0
+      ]
+    }
+  },
+  "mesh_62": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 62,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_62": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_62",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_62": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_62",
+        1
+      ]
+    }
+  },
+  "projected_62": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_61",
+        0
+      ],
+      "image2": [
+        "render_62",
+        0
+      ]
+    }
+  },
+  "coverage_62": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_61",
+        0
+      ],
+      "image2": [
+        "covered_62",
+        0
+      ]
+    }
+  },
+  "mesh_63": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 63,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_63": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_63",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_63": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_63",
+        1
+      ]
+    }
+  },
+  "projected_63": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_62",
+        0
+      ],
+      "image2": [
+        "render_63",
+        0
+      ]
+    }
+  },
+  "coverage_63": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_62",
+        0
+      ],
+      "image2": [
+        "covered_63",
+        0
+      ]
+    }
+  },
+  "mesh_64": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 64,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_64": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_64",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_64": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_64",
+        1
+      ]
+    }
+  },
+  "projected_64": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_63",
+        0
+      ],
+      "image2": [
+        "render_64",
+        0
+      ]
+    }
+  },
+  "coverage_64": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_63",
+        0
+      ],
+      "image2": [
+        "covered_64",
+        0
+      ]
+    }
+  },
+  "mesh_65": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 65,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_65": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_65",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_65": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_65",
+        1
+      ]
+    }
+  },
+  "projected_65": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_64",
+        0
+      ],
+      "image2": [
+        "render_65",
+        0
+      ]
+    }
+  },
+  "coverage_65": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_64",
+        0
+      ],
+      "image2": [
+        "covered_65",
+        0
+      ]
+    }
+  },
+  "mesh_66": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 66,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_66": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_66",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_66": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_66",
+        1
+      ]
+    }
+  },
+  "projected_66": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_65",
+        0
+      ],
+      "image2": [
+        "render_66",
+        0
+      ]
+    }
+  },
+  "coverage_66": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_65",
+        0
+      ],
+      "image2": [
+        "covered_66",
+        0
+      ]
+    }
+  },
+  "mesh_67": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 67,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_67": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_67",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_67": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_67",
+        1
+      ]
+    }
+  },
+  "projected_67": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_66",
+        0
+      ],
+      "image2": [
+        "render_67",
+        0
+      ]
+    }
+  },
+  "coverage_67": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_66",
+        0
+      ],
+      "image2": [
+        "covered_67",
+        0
+      ]
+    }
+  },
+  "mesh_68": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 68,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_68": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_68",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_68": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_68",
+        1
+      ]
+    }
+  },
+  "projected_68": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_67",
+        0
+      ],
+      "image2": [
+        "render_68",
+        0
+      ]
+    }
+  },
+  "coverage_68": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_67",
+        0
+      ],
+      "image2": [
+        "covered_68",
+        0
+      ]
+    }
+  },
+  "mesh_69": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 69,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_69": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_69",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_69": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_69",
+        1
+      ]
+    }
+  },
+  "projected_69": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_68",
+        0
+      ],
+      "image2": [
+        "render_69",
+        0
+      ]
+    }
+  },
+  "coverage_69": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_68",
+        0
+      ],
+      "image2": [
+        "covered_69",
+        0
+      ]
+    }
+  },
+  "mesh_70": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 70,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_70": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_70",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_70": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_70",
+        1
+      ]
+    }
+  },
+  "projected_70": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_69",
+        0
+      ],
+      "image2": [
+        "render_70",
+        0
+      ]
+    }
+  },
+  "coverage_70": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_69",
+        0
+      ],
+      "image2": [
+        "covered_70",
+        0
+      ]
+    }
+  },
+  "mesh_71": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 71,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_71": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_71",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_71": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_71",
+        1
+      ]
+    }
+  },
+  "projected_71": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_70",
+        0
+      ],
+      "image2": [
+        "render_71",
+        0
+      ]
+    }
+  },
+  "coverage_71": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_70",
+        0
+      ],
+      "image2": [
+        "covered_71",
+        0
+      ]
+    }
+  },
+  "mesh_72": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 72,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_72": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_72",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_72": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_72",
+        1
+      ]
+    }
+  },
+  "projected_72": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_71",
+        0
+      ],
+      "image2": [
+        "render_72",
+        0
+      ]
+    }
+  },
+  "coverage_72": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_71",
+        0
+      ],
+      "image2": [
+        "covered_72",
+        0
+      ]
+    }
+  },
+  "mesh_73": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 73,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_73": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_73",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_73": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_73",
+        1
+      ]
+    }
+  },
+  "projected_73": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_72",
+        0
+      ],
+      "image2": [
+        "render_73",
+        0
+      ]
+    }
+  },
+  "coverage_73": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_72",
+        0
+      ],
+      "image2": [
+        "covered_73",
+        0
+      ]
+    }
+  },
+  "mesh_74": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 74,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_74": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_74",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_74": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_74",
+        1
+      ]
+    }
+  },
+  "projected_74": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_73",
+        0
+      ],
+      "image2": [
+        "render_74",
+        0
+      ]
+    }
+  },
+  "coverage_74": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_73",
+        0
+      ],
+      "image2": [
+        "covered_74",
+        0
+      ]
+    }
+  },
+  "mesh_75": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 75,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_75": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_75",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_75": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_75",
+        1
+      ]
+    }
+  },
+  "projected_75": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_74",
+        0
+      ],
+      "image2": [
+        "render_75",
+        0
+      ]
+    }
+  },
+  "coverage_75": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_74",
+        0
+      ],
+      "image2": [
+        "covered_75",
+        0
+      ]
+    }
+  },
+  "mesh_76": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 76,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_76": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_76",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_76": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_76",
+        1
+      ]
+    }
+  },
+  "projected_76": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_75",
+        0
+      ],
+      "image2": [
+        "render_76",
+        0
+      ]
+    }
+  },
+  "coverage_76": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_75",
+        0
+      ],
+      "image2": [
+        "covered_76",
+        0
+      ]
+    }
+  },
+  "mesh_77": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 77,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_77": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_77",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_77": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_77",
+        1
+      ]
+    }
+  },
+  "projected_77": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_76",
+        0
+      ],
+      "image2": [
+        "render_77",
+        0
+      ]
+    }
+  },
+  "coverage_77": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_76",
+        0
+      ],
+      "image2": [
+        "covered_77",
+        0
+      ]
+    }
+  },
+  "mesh_78": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 78,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_78": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_78",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_78": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_78",
+        1
+      ]
+    }
+  },
+  "projected_78": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_77",
+        0
+      ],
+      "image2": [
+        "render_78",
+        0
+      ]
+    }
+  },
+  "coverage_78": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_77",
+        0
+      ],
+      "image2": [
+        "covered_78",
+        0
+      ]
+    }
+  },
+  "mesh_79": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 79,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_79": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_79",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_79": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_79",
+        1
+      ]
+    }
+  },
+  "projected_79": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_78",
+        0
+      ],
+      "image2": [
+        "render_79",
+        0
+      ]
+    }
+  },
+  "coverage_79": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_78",
+        0
+      ],
+      "image2": [
+        "covered_79",
+        0
+      ]
+    }
+  },
+  "mesh_80": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 80,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_80": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_80",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_80": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_80",
+        1
+      ]
+    }
+  },
+  "projected_80": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_79",
+        0
+      ],
+      "image2": [
+        "render_80",
+        0
+      ]
+    }
+  },
+  "coverage_80": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_79",
+        0
+      ],
+      "image2": [
+        "covered_80",
+        0
+      ]
+    }
+  },
+  "mesh_81": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 81,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_81": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_81",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_81": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_81",
+        1
+      ]
+    }
+  },
+  "projected_81": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_80",
+        0
+      ],
+      "image2": [
+        "render_81",
+        0
+      ]
+    }
+  },
+  "coverage_81": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_80",
+        0
+      ],
+      "image2": [
+        "covered_81",
+        0
+      ]
+    }
+  },
+  "mesh_82": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 82,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_82": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_82",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_82": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_82",
+        1
+      ]
+    }
+  },
+  "projected_82": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_81",
+        0
+      ],
+      "image2": [
+        "render_82",
+        0
+      ]
+    }
+  },
+  "coverage_82": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_81",
+        0
+      ],
+      "image2": [
+        "covered_82",
+        0
+      ]
+    }
+  },
+  "mesh_83": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 83,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_83": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_83",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_83": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_83",
+        1
+      ]
+    }
+  },
+  "projected_83": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_82",
+        0
+      ],
+      "image2": [
+        "render_83",
+        0
+      ]
+    }
+  },
+  "coverage_83": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_82",
+        0
+      ],
+      "image2": [
+        "covered_83",
+        0
+      ]
+    }
+  },
+  "mesh_84": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 84,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_84": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_84",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_84": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_84",
+        1
+      ]
+    }
+  },
+  "projected_84": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_83",
+        0
+      ],
+      "image2": [
+        "render_84",
+        0
+      ]
+    }
+  },
+  "coverage_84": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_83",
+        0
+      ],
+      "image2": [
+        "covered_84",
+        0
+      ]
+    }
+  },
+  "mesh_85": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 85,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_85": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_85",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_85": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_85",
+        1
+      ]
+    }
+  },
+  "projected_85": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_84",
+        0
+      ],
+      "image2": [
+        "render_85",
+        0
+      ]
+    }
+  },
+  "coverage_85": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_84",
+        0
+      ],
+      "image2": [
+        "covered_85",
+        0
+      ]
+    }
+  },
+  "mesh_86": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 86,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_86": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_86",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_86": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_86",
+        1
+      ]
+    }
+  },
+  "projected_86": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_85",
+        0
+      ],
+      "image2": [
+        "render_86",
+        0
+      ]
+    }
+  },
+  "coverage_86": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_85",
+        0
+      ],
+      "image2": [
+        "covered_86",
+        0
+      ]
+    }
+  },
+  "mesh_87": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 87,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_87": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_87",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_87": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_87",
+        1
+      ]
+    }
+  },
+  "projected_87": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_86",
+        0
+      ],
+      "image2": [
+        "render_87",
+        0
+      ]
+    }
+  },
+  "coverage_87": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_86",
+        0
+      ],
+      "image2": [
+        "covered_87",
+        0
+      ]
+    }
+  },
+  "mesh_88": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 88,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_88": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_88",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_88": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_88",
+        1
+      ]
+    }
+  },
+  "projected_88": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_87",
+        0
+      ],
+      "image2": [
+        "render_88",
+        0
+      ]
+    }
+  },
+  "coverage_88": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_87",
+        0
+      ],
+      "image2": [
+        "covered_88",
+        0
+      ]
+    }
+  },
+  "mesh_89": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 89,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_89": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_89",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_89": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_89",
+        1
+      ]
+    }
+  },
+  "projected_89": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_88",
+        0
+      ],
+      "image2": [
+        "render_89",
+        0
+      ]
+    }
+  },
+  "coverage_89": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_88",
+        0
+      ],
+      "image2": [
+        "covered_89",
+        0
+      ]
+    }
+  },
+  "mesh_90": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 90,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_90": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_90",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_90": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_90",
+        1
+      ]
+    }
+  },
+  "projected_90": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_89",
+        0
+      ],
+      "image2": [
+        "render_90",
+        0
+      ]
+    }
+  },
+  "coverage_90": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_89",
+        0
+      ],
+      "image2": [
+        "covered_90",
+        0
+      ]
+    }
+  },
+  "mesh_91": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 91,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_91": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_91",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_91": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_91",
+        1
+      ]
+    }
+  },
+  "projected_91": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_90",
+        0
+      ],
+      "image2": [
+        "render_91",
+        0
+      ]
+    }
+  },
+  "coverage_91": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_90",
+        0
+      ],
+      "image2": [
+        "covered_91",
+        0
+      ]
+    }
+  },
+  "mesh_92": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 92,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_92": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_92",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_92": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_92",
+        1
+      ]
+    }
+  },
+  "projected_92": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_91",
+        0
+      ],
+      "image2": [
+        "render_92",
+        0
+      ]
+    }
+  },
+  "coverage_92": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_91",
+        0
+      ],
+      "image2": [
+        "covered_92",
+        0
+      ]
+    }
+  },
+  "mesh_93": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 93,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_93": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_93",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_93": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_93",
+        1
+      ]
+    }
+  },
+  "projected_93": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_92",
+        0
+      ],
+      "image2": [
+        "render_93",
+        0
+      ]
+    }
+  },
+  "coverage_93": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_92",
+        0
+      ],
+      "image2": [
+        "covered_93",
+        0
+      ]
+    }
+  },
+  "mesh_94": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 94,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_94": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_94",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_94": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_94",
+        1
+      ]
+    }
+  },
+  "projected_94": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_93",
+        0
+      ],
+      "image2": [
+        "render_94",
+        0
+      ]
+    }
+  },
+  "coverage_94": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_93",
+        0
+      ],
+      "image2": [
+        "covered_94",
+        0
+      ]
+    }
+  },
+  "mesh_95": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 95,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_95": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_95",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_95": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_95",
+        1
+      ]
+    }
+  },
+  "projected_95": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_94",
+        0
+      ],
+      "image2": [
+        "render_95",
+        0
+      ]
+    }
+  },
+  "coverage_95": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_94",
+        0
+      ],
+      "image2": [
+        "covered_95",
+        0
+      ]
+    }
+  },
+  "mesh_96": {
+    "class_type": "MoGePointMapToMesh",
+    "inputs": {
+      "moge_geometry": [
+        "geometry",
+        0
+      ],
+      "batch_index": 96,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+  "render_96": {
+    "class_type": "RenderMesh",
+    "inputs": {
+      "mesh": [
+        "mesh_96",
+        0
+      ],
+      "mode": "texture",
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "background": "#000000",
+      "camera_info": [
+        "camera",
+        0
+      ]
+    }
+  },
+  "covered_96": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "render_96",
+        1
+      ]
+    }
+  },
+  "projected_96": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "projected_95",
+        0
+      ],
+      "image2": [
+        "render_96",
+        0
+      ]
+    }
+  },
+  "coverage_96": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "coverage_95",
+        0
+      ],
+      "image2": [
+        "covered_96",
+        0
+      ]
+    }
+  },
+  "coverage": {
+    "class_type": "ImageToMask",
+    "inputs": {
+      "image": [
+        "coverage_96",
+        0
+      ],
+      "channel": "red"
+    }
+  },
+  "holes": {
+    "class_type": "InvertMask",
+    "inputs": {
+      "mask": [
+        "coverage",
+        0
+      ]
+    }
+  },
+  "holes_grown": {
+    "class_type": "LTXVDilateVideoMask",
+    "inputs": {
+      "mask": [
+        "holes",
+        0
+      ],
+      "spatial_radius": 10,
+      "temporal_radius": 0
+    }
+  },
+  "fill_reference": {
+    "class_type": "LTXVInpaintPreprocess",
+    "inputs": {
+      "images": [
+        "projected_96",
+        0
+      ],
+      "mask": [
+        "holes_grown",
+        0
+      ]
+    }
+  },
+  "ltx_ckpt": {
+    "class_type": "CheckpointLoaderSimple",
+    "inputs": {
+      "ckpt_name": "ltx-2.3-22b-distilled-fp8.safetensors"
+    }
+  },
+  "ltx_text_encoder": {
+    "class_type": "LTXAVTextEncoderLoader",
+    "inputs": {
+      "text_encoder": "gemma_3_12B_it_fp4_mixed.safetensors",
+      "ckpt_name": "ltx-2.3-22b-distilled-fp8.safetensors",
+      "device": "default"
+    }
+  },
+  "ltx_audio_vae": {
+    "class_type": "LTXVAudioVAELoader",
+    "inputs": {
+      "ckpt_name": "ltx-2.3-22b-distilled-fp8.safetensors"
+    }
+  },
+  "ltx_lora_0": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "model": [
+        "ltx_ckpt",
+        0
+      ],
+      "lora_name": "ltx-2.3-22b-ic-lora-in-outpainting-0.9.safetensors",
+      "strength_model": 1
+    }
+  },
+  "ltx_positive": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "Two people talk across a kitchen table in warm morning light, a window behind them.",
+      "clip": [
+        "ltx_text_encoder",
+        0
+      ]
+    }
+  },
+  "ltx_negative": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "blurry, out of focus, overexposed, underexposed, low contrast, washed out colors, excessive noise, flickering, distorted proportions, deformed facial features, extra limbs, disfigured hands, watermark, logo, subtitles, text overlay, vignette, dark corners, circular frame, keyhole mask, fisheye",
+      "clip": [
+        "ltx_text_encoder",
+        0
+      ]
+    }
+  },
+  "ltx_conditioning": {
+    "class_type": "LTXVConditioning",
+    "inputs": {
+      "positive": [
+        "ltx_positive",
+        0
+      ],
+      "negative": [
+        "ltx_negative",
+        0
+      ],
+      "frame_rate": [
+        "source_frames",
+        2
+      ]
+    }
+  },
+  "ltx_empty": {
+    "class_type": "EmptyLTXVLatentVideo",
+    "inputs": {
+      "width": [
+        "source_gen_width",
+        1
+      ],
+      "height": [
+        "source_gen_height",
+        1
+      ],
+      "length": 97,
+      "batch_size": 1
+    }
+  },
+  "ltx_ic_params": {
+    "class_type": "GetICLoRAParameters",
+    "inputs": {
+      "iclora_model": [
+        "ltx_lora_0",
+        0
+      ]
+    }
+  },
+  "ltx_guide": {
+    "class_type": "LTXVAddGuide",
+    "inputs": {
+      "positive": [
+        "ltx_conditioning",
+        0
+      ],
+      "negative": [
+        "ltx_conditioning",
+        1
+      ],
+      "vae": [
+        "ltx_ckpt",
+        2
+      ],
+      "latent": [
+        "ltx_empty",
+        0
+      ],
+      "image": [
+        "fill_reference",
+        0
+      ],
+      "frame_idx": 0,
+      "strength": 1,
+      "iclora_parameters": [
+        "ltx_ic_params",
+        0
+      ]
+    }
+  },
+  "ltx_empty_audio": {
+    "class_type": "LTXVEmptyLatentAudio",
+    "inputs": {
+      "frames_number": 97,
+      "frame_rate": [
+        "source_frames",
+        2
+      ],
+      "batch_size": 1,
+      "audio_vae": [
+        "ltx_audio_vae",
+        0
+      ]
+    }
+  },
+  "ltx_av": {
+    "class_type": "LTXVConcatAVLatent",
+    "inputs": {
+      "video_latent": [
+        "ltx_guide",
+        2
+      ],
+      "audio_latent": [
+        "ltx_empty_audio",
+        0
+      ]
+    }
+  },
+  "ltx_noise": {
+    "class_type": "RandomNoise",
+    "inputs": {
+      "noise_seed": 20261030
+    }
+  },
+  "ltx_guider": {
+    "class_type": "CFGGuider",
+    "inputs": {
+      "model": [
+        "ltx_lora_0",
+        0
+      ],
+      "positive": [
+        "ltx_guide",
+        0
+      ],
+      "negative": [
+        "ltx_guide",
+        1
+      ],
+      "cfg": 1
+    }
+  },
+  "ltx_sampler": {
+    "class_type": "KSamplerSelect",
+    "inputs": {
+      "sampler_name": "euler_ancestral"
+    }
+  },
+  "ltx_sigmas": {
+    "class_type": "ManualSigmas",
+    "inputs": {
+      "sigmas": "1.0, 0.99375, 0.9875, 0.98125, 0.975, 0.909375, 0.725, 0.421875, 0.0"
+    }
+  },
+  "ltx_sample": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": [
+        "ltx_noise",
+        0
+      ],
+      "guider": [
+        "ltx_guider",
+        0
+      ],
+      "sampler": [
+        "ltx_sampler",
+        0
+      ],
+      "sigmas": [
+        "ltx_sigmas",
+        0
+      ],
+      "latent_image": [
+        "ltx_av",
+        0
+      ]
+    }
+  },
+  "ltx_separate": {
+    "class_type": "LTXVSeparateAVLatent",
+    "inputs": {
+      "av_latent": [
+        "ltx_sample",
+        0
+      ]
+    }
+  },
+  "ltx_crop": {
+    "class_type": "LTXVCropGuides",
+    "inputs": {
+      "positive": [
+        "ltx_guide",
+        0
+      ],
+      "negative": [
+        "ltx_guide",
+        1
+      ],
+      "latent": [
+        "ltx_separate",
+        0
+      ]
+    }
+  },
+  "ltx_decode": {
+    "class_type": "VAEDecodeTiled",
+    "inputs": {
+      "samples": [
+        "ltx_crop",
+        2
+      ],
+      "vae": [
+        "ltx_ckpt",
+        2
+      ],
+      "tile_size": 512,
+      "overlap": 64,
+      "temporal_size": 64,
+      "temporal_overlap": 8
+    }
+  },
+  "ltx_audio": {
+    "class_type": "LTXVAudioVAEDecode",
+    "inputs": {
+      "samples": [
+        "ltx_separate",
+        1
+      ],
+      "audio_vae": [
+        "ltx_audio_vae",
+        0
+      ]
+    }
+  },
+  "blended": {
+    "class_type": "LTXVLaplacianPyramidBlend",
+    "inputs": {
+      "image_a": [
+        "ltx_decode",
+        0
+      ],
+      "image_b": [
+        "projected_96",
+        0
+      ],
+      "mask": [
+        "holes_grown",
+        0
+      ],
+      "trim_to_shortest": true,
+      "mask_low_res_dilation": 8
+    }
+  },
+  "trimmed": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "blended",
+        0
+      ],
+      "batch_index": 0,
+      "length": [
+        "source_length",
+        1
+      ]
+    }
+  },
+  "restaged": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "trimmed",
+        0
+      ],
+      "upscale_method": "lanczos",
+      "width": [
+        "source_size",
+        0
+      ],
+      "height": [
+        "source_size",
+        1
+      ],
+      "crop": "disabled"
+    }
+  },
+  "projection_trimmed": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "projected_96",
+        0
+      ],
+      "batch_index": 0,
+      "length": [
+        "source_length",
+        1
+      ]
+    }
+  },
+  "save_result_video": {
+    "class_type": "CreateVideo",
+    "inputs": {
+      "images": [
+        "restaged",
+        0
+      ],
+      "fps": [
+        "source_frames",
+        2
+      ],
+      "audio": [
+        "source_frames",
+        1
+      ]
+    }
+  },
+  "save_result": {
+    "class_type": "SaveVideo",
+    "inputs": {
+      "video": [
+        "save_result_video",
+        0
+      ],
+      "filename_prefix": "open_cinema/restage",
+      "format": "mp4",
+      "format.codec": "h264"
+    }
+  },
+  "save_projection_video": {
+    "class_type": "CreateVideo",
+    "inputs": {
+      "images": [
+        "projection_trimmed",
+        0
+      ],
+      "fps": [
+        "source_frames",
+        2
+      ]
+    }
+  },
+  "save_projection": {
+    "class_type": "SaveVideo",
+    "inputs": {
+      "video": [
+        "save_projection_video",
+        0
+      ],
+      "filename_prefix": "open_cinema/restage_projection",
+      "format": "mp4",
+      "format.codec": "h264"
+    }
+  }
+}
