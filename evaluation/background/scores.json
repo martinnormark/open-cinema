@@ -26,6 +26,9 @@
     "c3-aleph2-edit": {"A": [2,4,4,3,4], "B": [3,4,4,4,3,4,4,3], "gates": [], "notes": "Convincing dusk harbor with parallax and lamp rim light, but generic (text only). Frame-exact. Hair texture re-rendered."},
     "c1-comfyui-kling": {"A": [4,4,3,4,4], "B": [3,4,3,4,4,4,4,3], "gates": [], "notes": "Backwards track down the @Harbor pier with consistent parallax; passers-by kept as people on the pier (re-rendered). Warm lamp light on both leads, faces close; protected PSNR 20.3 is mostly the relight. 24 fps source, one frame long."},
     "c1-comfyui-kling+lock": {"A": [4,3,1,4,4], "B": [4,4,4,4,3,4,4,4], "gates": [], "notes": "Source leads over the Kling background: exact performance and edges, but overcast-daylight leads on a dusk pier read as pasted on; the lock costs most on a strong relight."},
-    "c1-comfyui-switchx": {"A": [4,3,2,3,2], "B": [3,4,4,4,3,4,4,2], "gates": [], "notes": "Wide @Harbor view that barely moves while the camera tracks backwards (weak parallax). Heavy blue grade recolours the navy jacket toward denim; passers-by removed. Frame-exact."}
+    "c1-comfyui-switchx": {"A": [4,3,2,3,2], "B": [3,4,4,4,3,4,4,2], "gates": [], "notes": "Wide @Harbor view that barely moves while the camera tracks backwards (weak parallax). Heavy blue grade recolours the navy jacket toward denim; passers-by removed. Frame-exact."},
+    "c2-comfyui-kling": {"A": [4,4,4,4,4], "B": [3,4,3,4,4,4,4,4], "gates": [], "notes": "Café becomes the @Greenhouse with sunlit glass roof. The waiter, tray and apron cross in front intact (occlusion handled); cup to lips intact; table kept. Seated extras removed, the second waiter kept. 24 fps source, one frame long."},
+    "c2-comfyui-kling+lock": {"A": [4,4,3,4,4], "B": [4,4,4,4,3,4,4,4], "gates": [], "notes": "Source leads over the Kling background; sunlit greenhouse is close to the café light, so the lock costs little here."},
+    "c2-comfyui-switchx": {"A": [4,3,3,3,4], "B": [2,4,4,4,3,2,3,2], "gates": [], "notes": "Greenhouse matches the reference, but red hair turns brown, the wooden table becomes white marble, and the waiter loses the tray and apron while crossing. Frame-exact."}
   }
 }
