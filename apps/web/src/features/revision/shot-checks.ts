@@ -535,6 +535,27 @@ export function checkResult(
   };
 }
 
+/**
+ * For revisions that change no one (Object Swap, Restyle): every face in the
+ * source is a bystander, compared with the face in the same place.
+ */
+export function checkPeople(
+  source: ShotScan,
+  result: ShotScan,
+  thresholds = RESULT_THRESHOLDS,
+  now = new Date(),
+): ResultChecks {
+  // A mark outside the frame selects no target.
+  return checkResult(
+    source,
+    result,
+    { x: -1, y: -1, timeMs: 0 },
+    [],
+    thresholds,
+    now,
+  );
+}
+
 /** Evenly spaced sample times, away from the first and last frame. */
 export function sampleTimes(durationMs: number, count: number) {
   const n = Math.max(1, count);

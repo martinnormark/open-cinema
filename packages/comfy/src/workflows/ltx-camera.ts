@@ -147,10 +147,21 @@ export function ltxRestageGraph(o: LtxRestageGraphOptions): Graph {
   return {
     ...source.nodes,
     ...ltx.nodes,
+    // Back at the take's size, so the comparison lines up frame for frame.
+    restaged: {
+      class_type: "ImageScale",
+      inputs: {
+        image: ltx.frames,
+        upscale_method: "lanczos",
+        width: source.width,
+        height: source.height,
+        crop: "disabled",
+      },
+    },
     // A new angle is a new picture; the take's sound still fits it.
     ...saveVideoNodes(
       "save_result",
-      ltx.frames,
+      ["restaged", 0],
       source.fps,
       source.audio,
       "restage",
