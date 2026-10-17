@@ -26,4 +26,5 @@ Primary entry points: [developer documentation](https://docs.comfy.org/developme
 
 - [Foundation](foundation.md): contracts, persistence, workflow dispatch, and how to add a workflow kind.
 - [Media library and uploads](library.md): upload path, limits, the picker and how other features use uploads as sources and references.
+- [Phase 0: background replacement](phase0-background.md): evaluation results, supported envelope, turnaround, cost and the MVP release-bar call.
 - [Router model catalog](comfy-router-catalog.md): every Router model and the inputs of those our workflows use.
