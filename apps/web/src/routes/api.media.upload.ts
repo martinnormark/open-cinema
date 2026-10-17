@@ -9,7 +9,7 @@ import {
   markMediaAssetReady,
 } from "@open-cinema/database/mutations";
 import { requireSameOrigin, requireSession } from "@/server/session";
-import { assetToItem } from "@/server/media";
+import { assetToItem } from "@/server/media-items";
 import { MAX_VIDEO_SECONDS } from "@/features/library/model";
 
 function dimension(value: string | null) {

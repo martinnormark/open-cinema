@@ -1,0 +1,50 @@
+/* Library motion. Tokens come from styles.css (transitions.dev scale); only
+   opacity and transform animate so upload progress never triggers layout. */
+
+/* Thumbnails resolve over their placeholder once decoded (skeleton reveal). */
+.library-thumb {
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-smooth-out);
+}
+.library-thumb[data-loaded="true"] {
+  opacity: 1;
+}
+
+/* Off-screen tiles skip layout and paint in large libraries. */
+.library-tile {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 240px;
+}
+
+/* A new upload settles into the grid. */
+.library-tile-enter {
+  animation: library-enter var(--duration-fast) var(--ease-smooth-out);
+}
+@keyframes library-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+/* Drop target: the crop frame brightens instead of the page shifting. */
+.library-drop {
+  opacity: 0;
+  transition: opacity var(--duration-quick) var(--ease-smooth-out);
+}
+.library-drop[data-active="true"] {
+  opacity: 1;
+  transition-duration: var(--duration-fast);
+}
+
+/* Thumbnail lift on hover stays on the compositor. */
+@media (hover: hover) {
+  .library-tile .library-thumb[data-loaded="true"] {
+    transition:
+      opacity var(--duration-fast) var(--ease-smooth-out),
+      transform var(--duration-medium) var(--ease-smooth-out);
+  }
+  .library-tile button:hover .library-thumb[data-loaded="true"] {
+    transform: scale(1.03);
+  }
+}

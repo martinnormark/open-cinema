@@ -1,0 +1,170 @@
+import { Film, ImageIcon, RotateCcw, X } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { cn } from "@/lib/utils";
+import { formatBytes, formatDuration, type MediaItem } from "./model";
+import {
+  cancelUpload,
+  dismissUpload,
+  retryUpload,
+  useLibrary,
+  type UploadEntry,
+} from "./store";
+
+/** Marks cached images loaded at attach time; `onLoad` covers the rest. */
+function revealWhenLoaded(img: HTMLImageElement | null) {
+  if (img?.complete && img.naturalWidth) img.dataset.loaded = "true";
+}
+
+/** Fades in over a placeholder icon; a failed load leaves the icon visible. */
+export function Thumbnail({
+  src,
+  kind,
+  className,
+}: {
+  src: string | null;
+  kind: MediaItem["kind"];
+  className?: string;
+}) {
+  const Icon = kind === "video" ? Film : ImageIcon;
+  return (
+    <div className={cn("relative overflow-hidden bg-surface", className)}>
+      <Icon
+        aria-hidden="true"
+        strokeWidth={1.5}
+        className="absolute inset-0 m-auto size-6 text-subtle-foreground"
+      />
+      {src && (
+        <img
+          ref={revealWhenLoaded}
+          src={src}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          draggable={false}
+          onLoad={(event) => (event.currentTarget.dataset.loaded = "true")}
+          className="library-thumb absolute inset-0 size-full object-cover"
+        />
+      )}
+    </div>
+  );
+}
+
+function describe(item: MediaItem) {
+  const parts = [item.origin === "upload" ? "Upload" : "Generated"];
+  if (item.width && item.height) parts.push(`${item.width}×${item.height}`);
+  else if (item.sizeBytes !== null) parts.push(formatBytes(item.sizeBytes));
+  return parts.join(" · ");
+}
+
+export function MediaTile({
+  item,
+  selected,
+  onOpen,
+}: {
+  item: MediaItem;
+  selected?: boolean;
+  onOpen: (item: MediaItem) => void;
+}) {
+  return (
+    <li className="library-tile">
+      <button
+        type="button"
+        onClick={() => onOpen(item)}
+        aria-pressed={selected}
+        className="group block w-full rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background"
+      >
+        <div className="relative">
+          <Thumbnail
+            src={item.thumbnailUrl}
+            kind={item.kind}
+            className={cn(
+              "aspect-square rounded-lg",
+              selected && "ring-2 ring-tungsten",
+            )}
+          />
+          {item.kind === "video" && (
+            <span className="tabular absolute right-2 bottom-2 flex items-center gap-1 rounded-sm bg-background/80 px-1.5 py-0.5 text-xs font-medium">
+              <Film aria-hidden="true" className="size-3" />
+              {formatDuration(item.durationSeconds) || "Video"}
+            </span>
+          )}
+        </div>
+        <span className="mt-2 block truncate text-sm group-hover:text-foreground">
+          {item.title}
+        </span>
+        <span className="tabular mt-0.5 block truncate text-xs text-muted-foreground">
+          {describe(item)}
+        </span>
+      </button>
+    </li>
+  );
+}
+
+const phaseLabel: Record<UploadEntry["phase"], string> = {
+  preparing: "Preparing",
+  uploading: "Uploading",
+  finishing: "Saving",
+  failed: "Not uploaded",
+};
+
+/** Subscribes to one upload so progress ticks re-render only this tile. */
+export function UploadTile({ uploadKey }: { uploadKey: string }) {
+  const entry = useLibrary((s) => s.uploads.find((u) => u.key === uploadKey));
+  if (!entry) return null;
+  const failed = entry.phase === "failed";
+  const percent = Math.round(entry.progress * 100);
+  return (
+    <li className="library-tile library-tile-enter">
+      <div className="relative">
+        <Thumbnail
+          src={entry.previewUrl}
+          kind={entry.kind}
+          className={cn("aspect-square rounded-lg", !failed && "opacity-60")}
+        />
+        <div className="absolute inset-x-3 bottom-3">
+          {!failed && (
+            <Progress
+              value={entry.phase === "uploading" ? percent : 100}
+              aria-label={`Uploading ${entry.name}`}
+              className="bg-background/70 [&>[data-slot=progress-indicator]]:bg-tungsten"
+            />
+          )}
+        </div>
+        <div className="absolute top-2 right-2 flex gap-1">
+          {failed && (
+            <button
+              type="button"
+              onClick={() => retryUpload(entry.key)}
+              className="flex size-7 items-center justify-center rounded-md bg-background/85 text-foreground hover:bg-elevated focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              aria-label={`Retry ${entry.name}`}
+            >
+              <RotateCcw aria-hidden="true" className="size-3.5" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() =>
+              failed ? dismissUpload(entry.key) : cancelUpload(entry.key)
+            }
+            className="flex size-7 items-center justify-center rounded-md bg-background/85 text-foreground hover:bg-elevated focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            aria-label={`${failed ? "Dismiss" : "Cancel"} ${entry.name}`}
+          >
+            <X aria-hidden="true" className="size-3.5" />
+          </button>
+        </div>
+      </div>
+      <span className="mt-2 block truncate text-sm">{entry.name}</span>
+      <span
+        role={failed ? "alert" : undefined}
+        className={cn(
+          "tabular mt-0.5 block text-xs",
+          failed ? "text-destructive" : "text-muted-foreground",
+        )}
+      >
+        {failed
+          ? entry.error
+          : `${phaseLabel[entry.phase]}${entry.phase === "uploading" ? ` · ${percent}%` : ""}`}
+      </span>
+    </li>
+  );
+}

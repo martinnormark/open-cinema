@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { assetRefSchema, mediaKindSchema } from "@open-cinema/contracts";
+import {
+  assetRefKey,
+  assetRefSchema,
+  mediaKindSchema,
+  type AssetRef,
+} from "@open-cinema/contracts";
 export type { AssetRef, MediaKind } from "@open-cinema/contracts";
 
 // Browser-safe view of uploads and generated outputs for the library and picker.
@@ -39,4 +44,24 @@ export function formatDuration(seconds: number | null) {
   if (seconds === null) return "";
   const whole = Math.max(1, Math.round(seconds));
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
+}
+
+/** Inverse of `assetRefKey` from contracts, for search params like `?source=asset:…`. */
+export function parseAssetRefKey(value: string): AssetRef | null {
+  const [type, a, b] = value.split(":");
+  if (type === "asset" && a) return { type: "media-asset", assetId: a };
+  if (type === "output" && a && b)
+    return { type: "job-output", jobId: a, outputId: b };
+  return null;
+}
+
+/**
+ * Where "Use as source" and "Use as reference" lead. Destinations read the
+ * `source` or `reference` search param with `parseAssetRefKey`.
+ */
+export function mediaUseHref(item: MediaItem, role: MediaRole) {
+  const key = assetRefKey(item.ref);
+  return role === "reference"
+    ? `/elements/new?reference=${encodeURIComponent(key)}`
+    : `/?source=${encodeURIComponent(key)}`;
 }
