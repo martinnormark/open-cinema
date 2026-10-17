@@ -26,6 +26,7 @@ Primary entry points: [developer documentation](https://docs.comfy.org/developme
 
 - [Foundation](foundation.md): contracts, persistence, workflow dispatch, and how to add a workflow kind.
 - [Character sheets](character-sheets.md): the three-panel sheet, close portraits with and without a smile, states as sheets of their own, and how heads are removed from the full-body panels.
+- [Character recast on LTX 2.5](recast-ltx.md): an all-Lightricks open-weights recast graph, its live comparison with Kling, and the proposal for our own recast IC-LoRA.
 - [Reuse a performance](performance-transfer.md): the LTX 2.3 Union Control pose graph on Comfy Cloud, its limits and the live run.
 - [Media library and uploads](library.md): upload path, limits, the picker and how other features use uploads as sources and references.
 - [Phase 0: background replacement](phase0-background.md): evaluation results, supported envelope, turnaround, cost and the MVP release-bar call.

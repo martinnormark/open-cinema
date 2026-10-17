@@ -7,6 +7,11 @@
  *   bun scripts/ltx-graph.ts <server> <out-dir> restage source=<clip> angle=low-angle [prompt="..."]
  *   bun scripts/ltx-graph.ts <server> <out-dir> restyle source=<clip> ref=<img>[,<img>] prompt="..." [style="..."]
  *   bun scripts/ltx-graph.ts <server> <out-dir> swap source=<clip> ref=<img> original="a red mug" replacement="a brass lantern" [name="Lantern"]
+ *   bun scripts/ltx-graph.ts <server> <out-dir> recast source=<clip> ref=<img>[,<img>] [sheet=<img>] box=x,y,w,h \
+ *     target="the woman on the left" name=Mara identity="..." wardrobe="..." action="..." [pose=0.9]
+ *
+ * Add submit-only=1 to stop once the server has accepted the graph (a check
+ * against a local ComfyUI with placeholder model files).
  *
  * <server> is Comfy Cloud through the development relay (http://127.0.0.1:8790,
  * see docs/foundation.md) or a ComfyUI with the same models. A Cloud run
@@ -22,6 +27,10 @@ import {
   ltxEditPrompts,
 } from "../packages/comfy/src/workflows/ltx-edit";
 import type { Graph } from "../packages/comfy/src/workflows/ltx-graph";
+import {
+  ltxRecastGraph,
+  ltxRecastPrompts,
+} from "../packages/comfy/src/workflows/ltx-recast";
 import type {
   CameraMove,
   RestageAngle,
@@ -103,6 +112,29 @@ if (kind === "camera") {
   });
   files.push(["source", "file", args.source!]);
   refs.forEach((path, i) => files.push([`reference_${i}`, "image", path]));
+} else if (kind === "recast") {
+  const sheet = !!args.sheet;
+  const prompts = ltxRecastPrompts({
+    target: args.target ?? "the person",
+    name: args.name ?? "the Character",
+    identity: args.identity ?? "",
+    wardrobe: args.wardrobe ?? "",
+    action: args.action ?? "",
+    references: refs.length,
+    sheet,
+  });
+  const [x, y, width, height] = (args.box ?? "0,0,1,1").split(",").map(Number);
+  graph = ltxRecastGraph({
+    ...prompts,
+    references: refs.length,
+    sheet,
+    target: { x: x!, y: y!, width: width!, height: height! },
+    poseStrength: Number(args.pose ?? 0.9),
+    seed,
+  });
+  files.push(["source", "file", args.source!]);
+  refs.forEach((path, i) => files.push([`reference_${i}`, "image", path]));
+  if (sheet) files.push(["sheet", "image", args.sheet!]);
 } else throw new Error(`unknown graph ${kind}`);
 
 for (const [node, field, path] of files) {
@@ -127,6 +159,7 @@ if (!id) {
   process.exit(1);
 }
 console.log(`submitted ${id}`);
+if (args["submit-only"]) process.exit(0);
 type Job = {
   status: string;
   outputs?: Record<
