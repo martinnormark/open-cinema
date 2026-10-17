@@ -29,6 +29,21 @@ The bar is met with caveats that matter for a release decision:
 
 The default is already wired: `DEFAULT_BACKGROUND_PIPELINE = "kling"` in [`packages/comfy/src/workflows/background-replace.ts`](../packages/comfy/src/workflows/background-replace.ts). The foreground lock, frame-rate conform, source audio and the unlocked variant are built into the job; see [background-job.md](background-job.md). The job mattes with Bria instead of SwitchX.
 
+## Real camera footage (2026-10-17)
+
+The shipped job (Kling 3.0 Omni edit, Bria matte, Comfy Cloud lock and conform) ran from the app, on a fresh database, on two real camera takes from the recast evaluation set ([clips.json](../evaluation/recast/clips.json)): Mixkit stock footage, 1280×720, 25 fps, 5 s, with sensor noise, shallow focus and compression. The Location was a saved @HarborWall with one approved FLUX 3 still.
+
+| Take                      | What it stresses                                                   | Result (locked variant)                                                                                                                                         | Protected PSNR / SSIM (median) | Frames, fps        | Turnaround |
+| ------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | ------------------ | ---------- |
+| U1 couple at a wall       | Two people, close interaction, leaning on a wall, shallow focus    | Street behind replaced by the harbour and cottages, the wall they lean on and both performers kept as shot; the defocus of the new background matches the take. | 41.6 dB / 0.987                | 125 at 25 = source | 6 min      |
+| U2 five people at a table | Five people, hands on shared papers, cups and teapots, a red table | Cafeteria replaced by the harbour; all five people, the table, cups, teapots and papers kept; nothing dropped where hands touch the table.                      | 42.0 dB / 0.989                | 125 at 25 = source | 6 min      |
+
+Kling returned 24 fps and 121 frames both times; the lock and conform put both variants back on the source's 125 frames at 25 fps. The relit variant re-renders the performers (protected PSNR 22–23 dB), as expected.
+
+Read with care: the protected-region numbers use the job's own Bria matte, so the locked variant scores high by construction; they confirm the source pixels survive, not that the matte is right. The contact sheets were reviewed by an AI, not a person. The one visible weakness is the known one: U2's flat indoor light over a sunlit exterior reads as composited (A3 about 2), which is what the Relit variant is for. Evidence: `real-take-u1-*` and `real-take-u2-*` in the project's `phase-closeout/` folder.
+
+With these, five generated and two real takes pass every gate, and the proposed bar in the [rubric](../evaluation/rubric.md#proposed-mvp-release-bar-per-mode) is met for background replacement. The bar is still a proposal until the project owner agrees it.
+
 ## Supported envelope
 
 State this before generation and refuse or warn outside it.
@@ -39,12 +54,12 @@ State this before generation and refuse or warn outside it.
 | Resolution | 720 px or more on the short side, up to 2160 px. Output is 720p in the packaged graph. | Provider limit; tested 720p    |
 | Frame rate | 24–60 fps in; Kling returns 24 fps, so the lock or a conform restores the source rate. | C4 (25 fps) conformed exactly  |
 | Camera     | Locked-off, slow push-in, handheld backwards track, orbit with strong parallax.        | C5, C4, C1, C3                 |
-| People     | One or two performers, faces partly or fully visible.                                  | C1–C5                          |
+| People     | One to five performers, faces partly or fully visible.                                 | C1–C5, U1, U2 (real footage)   |
 | Occlusion  | A person crossing in front of the performer.                                           | C2 (waiter)                    |
 | Things     | Held objects and a hand-off of an object across a table; props on the table stay.      | C3 (bicycle), C4 (box), C2 cup |
 | Location   | One to four approved references of a saved Location, establishing view first.          | @Harbor (2 refs), @Greenhouse  |
 
-Not tested, so outside the envelope until measured: real camera footage, takes longer than 6 s, fast action or whip pans, crowds, night exteriors, more than two performers, and dialogue audio (the graphs drop audio; the job should keep the source audio track).
+Not tested, so outside the envelope until measured: takes longer than 6 s, fast action or whip pans, crowds, night exteriors, and dialogue audio (the job keeps the source audio track, but no dialogue take has been run). Real camera footage and five performers at a table passed on 2026-10-17 (above).
 
 Background extras behave inconsistently and should be stated as such: Kling kept the passers-by in C1 (re-rendered on the pier), and in C2 removed the seated café patrons in one run and kept them in another.
 
@@ -111,6 +126,6 @@ If `push` records a Build id in `comfy-build.yaml`, commit it. Serving the relea
 ## Follow-ups
 
 1. ~~Build the foreground lock into the job~~ and 2. ~~offer the unlocked Kling result as a variant~~: done, see [background-job.md](background-job.md).
-3. Repeat the evaluation on real camera footage and with a human reviewer before calling the envelope measured.
-4. Measure Router queue time under normal load and decide the execution route.
-5. Run Wan 2.7 on C2 and C4, which this evaluation skipped to limit queue load. The Router account ran out of credits after the evaluation finished, so no further runs were possible tonight; no planned run was lost to credits.
+2. ~~Repeat the evaluation on real camera footage~~ (two real takes passed on 2026-10-17); a human reviewer is still needed before calling the envelope measured.
+3. Measure Router queue time under normal load and decide the execution route.
+4. Run Wan 2.7 on C2 and C4, which this evaluation skipped to limit queue load. The Router account ran out of credits after the evaluation finished, so no further runs were possible tonight; no planned run was lost to credits.

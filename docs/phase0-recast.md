@@ -1,6 +1,6 @@
 # Phase 0: character recast
 
-> **Deferred (2026-10-17):** results are not good enough yet; finding a better model, nodes or workflow is deferred. See [known-limitations.md](known-limitations.md).
+> **Deferred (2026-10-17):** results are not good enough yet; finding a better model, nodes or workflow is deferred. See [known-limitations.md](known-limitations.md). Later that day the owner also took recast out of the MVP release gate; it stays in the app as an experimental mode.
 
 Evaluation of `video.character-replace` for issues #3 and #6, run on 2026-10-17 with the harness in [`evaluation/recast/`](../evaluation/recast/README.md) and scored with the shared [rubric](../evaluation/rubric.md) plus the recast addendum (identity through views, wardrobe intent, body fit, selection, gate G6 face-only). Every number below comes from [`evaluation/recast/results.md`](../evaluation/recast/results.md), which is generated from [`scores.json`](../evaluation/recast/scores.json) and the run evidence. The evidence itself (side-by-sides, contact sheets, metrics, identity measurements and Router logs) is in `artifacts/evaluation/recast/runs/<pipeline>/<clip>/` and is not committed.
 
