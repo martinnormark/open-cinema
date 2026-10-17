@@ -59,7 +59,7 @@ it("submits an LTX text-to-video request and archives its video_url output as MP
   );
   const client = createComfyClient({ apiKey: "test-key", workflow: request });
   const receipt = await client.submit(
-    request as unknown as Record<string, unknown>,
+    request,
     crypto.randomUUID(),
     AbortSignal.timeout(5000),
   );

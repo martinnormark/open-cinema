@@ -51,7 +51,7 @@ it("persists reference keys and sends stored images to Router as base64", async 
   );
   const ready = await materializeRouterRequest(request, load);
   await createComfyClient({ apiKey: "test-key", workflow: ready }).submit(
-    ready as unknown as Record<string, unknown>,
+    ready,
     crypto.randomUUID(),
     AbortSignal.timeout(5000),
   );

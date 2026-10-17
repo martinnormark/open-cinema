@@ -6,10 +6,11 @@
 export type ImageSource =
   { kind: "url"; url: string } | { kind: "asset"; r2Key: string };
 
-export interface RouterRequest {
+/** A type alias, not an interface, so it stays assignable to persisted JSON records. */
+export type RouterRequest = {
   model: string;
   input: Record<string, unknown>;
-}
+};
 
 const IMAGE_FIELDS = ["images", "keyframes"] as const;
 /** Router rejects base64 payloads above 20 MB; leave headroom for encoding. */
