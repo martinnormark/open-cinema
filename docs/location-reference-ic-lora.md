@@ -1,6 +1,6 @@
 # Location reference IC-LoRA: a training plan
 
-Reference shots run on Kling 3.0 Omni today, because Router's LTX 2.5 reads text only and no official LTX adapter takes a reference video of a place ([location-references.md](location-references.md#trade-offs)). Martin chose on 2026-10-17 to keep Kling for now and plan an adapter of our own, so reference shots can move to LTX without anyone else's weights ([third-party-ip.md](third-party-ip.md)). This is that plan. **Parked:** Martin decided on 2026-10-17 not to run it, as too expensive; nothing here has been started and Kling stays the model for reference shots.
+Reference shots run on Kling 3.0 Omni today, because Router's LTX 2.5 reads text only and no official LTX adapter takes a reference video of a place ([location-references.md](location-references.md#trade-offs)). Martin chose on 2026-10-17 to keep Kling for now and plan an adapter of our own, so reference shots can move to LTX without anyone else's weights ([third-party-ip.md](third-party-ip.md)). This is that plan. **Deferred:** on 2026-10-17 Martin deferred the training; nothing here has been started and Kling stays the model for reference shots.
 
 ## What the adapter learns
 
