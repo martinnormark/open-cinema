@@ -13,6 +13,7 @@ import {
 } from "./model";
 import { useElements } from "./store";
 import { ElementCover, SessionRequired, typeIcons } from "./visuals";
+import { CastBoard } from "./state-sheets";
 
 export function ElementIndex() {
   const { status, elements } = useElements();
@@ -141,6 +142,8 @@ function TypeSection({
         <p className="mt-4 max-w-xl text-sm leading-6 text-muted-foreground">
           No {info.plural} yet. {info.establishes}
         </p>
+      ) : type === "character" ? (
+        <CastBoard characters={elements} />
       ) : (
         <ul className="mt-5 grid grid-cols-2 gap-x-5 gap-y-7 sm:grid-cols-3 lg:grid-cols-5">
           {elements.map((element) => (

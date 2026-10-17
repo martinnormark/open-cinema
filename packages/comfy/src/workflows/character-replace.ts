@@ -17,11 +17,17 @@ import type { BuildContext, MediaStage, ProviderRequest } from "./types";
  */
 export const CHARACTER_REPLACE_MODEL = "kling/kling-v3-omni";
 
-/** Most informative views first: whole body and wardrobe, then the face. */
+/**
+ * The close portrait leads as the face; the sheet follows for body, build and
+ * outfit. Its full-body panels are headless on purpose, so the face can only
+ * come from the portrait (docs/character-sheets.md).
+ */
 const VIEW_PRIORITY: readonly ReferenceView[] = [
+  "face-closeup",
+  "sheet",
+  "smile",
   "full-body",
   "front",
-  "face-closeup",
   "three-quarter",
   "rear",
   "profile",
@@ -34,7 +40,11 @@ function viewRank(view: ReferenceView | null) {
 }
 
 /** Views that show the face without the Character's outfit. */
-const FACE_VIEWS: readonly ReferenceView[] = ["face-closeup", "expression"];
+export const FACE_VIEWS: readonly ReferenceView[] = [
+  "face-closeup",
+  "smile",
+  "expression",
+];
 
 /**
  * Orders a Character's approved references for an identity-and-body recast.
@@ -63,6 +73,28 @@ export function characterReferences(
       (r.roles.includes("identity") && !r.roles.includes("wardrobe")),
   );
   return faces.length ? faces : ordered;
+}
+
+/**
+ * Says which reference image does what, so a headless sheet is read as an
+ * outfit and the face comes only from the close portrait.
+ */
+export function referenceGuide(
+  images: readonly { tag: string; view: ReferenceView | null }[],
+): string {
+  const tags = (views: readonly ReferenceView[]) =>
+    images.filter((i) => i.view && views.includes(i.view)).map((i) => i.tag);
+  const faces = tags(["face-closeup", "smile"]);
+  const sheets = tags(["sheet"]);
+  if (!sheets.length) return "";
+  return [
+    faces.length
+      ? `Take the face only from the close portrait in ${faces.join(", ")}.`
+      : "",
+    `${sheets.join(", ")} ${sheets.length === 1 ? "is a character sheet" : "are character sheets"}: body, build, hair from behind and clothing; the heads are left out of the full-body panels on purpose.`,
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 /**
@@ -96,6 +128,8 @@ export interface CharacterReplacePromptOptions {
   /** True when the creator asked to keep the source person's clothing. */
   keepSourceWardrobe: boolean;
   imageTags: readonly string[];
+  /** What each image shows, when a sheet is among them. */
+  guide?: string;
   direction?: string | undefined;
 }
 
@@ -114,6 +148,7 @@ export function characterReplacePrompt(o: CharacterReplacePromptOptions) {
   const identity = o.character.description.trim().replace(/[.\s]+$/, "");
   return [
     `In <<<video_1>>>, replace ${o.target} with the person shown in ${o.imageTags.join(", ")}: ${who}${identity ? `, ${identity}` : ""}.`,
+    o.guide ?? "",
     wardrobe,
     "Keep the replaced person's exact performance: body movement, pose, gestures, facial expression, gaze, head turns, lip movement and timing. Keep every other person, the background, all objects, the framing, the lighting and the camera movement exactly as in the original video. Photorealistic, same film look.",
     o.direction?.trim() ?? "",
@@ -143,19 +178,18 @@ export async function characterReplaceRequest(
 
   const keepSourceWardrobe = inputs.preservation.preserve.includes("wardrobe");
   const refs = [
-    ...inputs.references,
-    ...characterReferences(mention, { faceOnly: keepSourceWardrobe }).map(
-      (r) => r.asset,
-    ),
+    ...inputs.references.map((asset) => ({ asset, view: null })),
+    ...characterReferences(mention, { faceOnly: keepSourceWardrobe }),
   ].slice(0, KLING_EDIT_LIMITS.maxReferenceImages);
   if (!refs.length)
     throw new Error("Approve at least one reference image for this Character");
   const images = await Promise.all(
     refs.map(async (ref) => {
-      const asset = await context.asset(ref);
+      const asset = await context.asset(ref.asset);
       return { image_url: asset.publicUrl ?? (await asset.base64()) };
     }),
   );
+  const imageTags = images.map((_, i) => `<<<image_${i + 1}>>>`);
 
   return {
     model: CHARACTER_REPLACE_MODEL,
@@ -164,7 +198,10 @@ export async function characterReplaceRequest(
         target: describeTarget(inputs.target),
         character: mention,
         keepSourceWardrobe,
-        imageTags: images.map((_, i) => `<<<image_${i + 1}>>>`),
+        imageTags,
+        guide: referenceGuide(
+          refs.map((ref, i) => ({ tag: imageTags[i]!, view: ref.view })),
+        ),
         direction: inputs.prompt,
       }),
       mode: "pro",

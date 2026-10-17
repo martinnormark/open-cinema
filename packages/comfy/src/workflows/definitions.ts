@@ -30,6 +30,7 @@ import {
 import {
   CHARACTER_REPLACE_MODEL,
   characterConformStage,
+  characterReferences,
   characterReplaceRequest,
 } from "./character-replace";
 import type {
@@ -72,13 +73,33 @@ export function ltxVideoOutputs(data: unknown): ProviderOutput[] {
   return ltx.length ? ltx : singleOutput("sample", "video", "video/mp4")(data);
 }
 
+/** Each mention's approved references, a Character's close portrait first. */
+function mentionReferences(context: BuildContext) {
+  return context.mentions.flatMap((m) =>
+    m.type === "character" ? characterReferences(m) : m.references,
+  );
+}
+
+/**
+ * A Character sheet's full-body panels have no heads on purpose; without
+ * saying so FLUX may draw a headless figure or invent a face for the body.
+ */
+export const SHEET_GUIDE =
+  "Character sheets among the reference images show the body from the front and back with the head left out on purpose: use them for build and clothing, and take each face only from that character's close portrait.";
+
+function withSheetGuide(prompt: string, context: BuildContext) {
+  return mentionReferences(context).some((r) => r.view === "sheet")
+    ? `${prompt} ${SHEET_GUIDE}`
+    : prompt;
+}
+
 /** Explicit references first, then each mention's approved sheet, deduplicated. */
 function referenceRefs(explicit: readonly AssetRef[], context: BuildContext) {
   const seen = new Set<string>();
   const refs: AssetRef[] = [];
   for (const ref of [
     ...explicit,
-    ...context.mentions.flatMap((m) => m.references.map((r) => r.asset)),
+    ...mentionReferences(context).map((r) => r.asset),
   ]) {
     const key = JSON.stringify(ref);
     if (seen.has(key)) continue;
@@ -127,7 +148,10 @@ export const fluxReferenceWorkflow: WorkflowDefinition<"image.flux-reference"> =
         input: {
           ...fluxImageInput({
             ...inputs,
-            prompt: expandMentions(inputs.prompt, context.mentions),
+            prompt: withSheetGuide(
+              expandMentions(inputs.prompt, context.mentions),
+              context,
+            ),
           }),
           images,
         },

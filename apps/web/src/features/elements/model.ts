@@ -13,6 +13,8 @@ import {
   approvedReferences,
   generationRequestSchema,
 } from "@open-cinema/contracts";
+import type { ImageAspectRatio, ImageResolution } from "@open-cinema/contracts";
+import { characterShotPrompt, type CharacterShot } from "./sheet-prompt";
 
 export type {
   Element,
@@ -31,6 +33,12 @@ export interface GuidanceSlot {
   required: boolean;
   /** Framing appended to the identity description for complementary views. */
   framing: string;
+  /** Character views follow the sheet rules in sheet-prompt.ts instead. */
+  shot?: CharacterShot;
+  /** Approved views that guide this one; all approved views when unset. */
+  guidedBy?: readonly ReferenceView[];
+  aspectRatio?: ImageAspectRatio;
+  resolution?: ImageResolution;
 }
 
 export interface ElementTypeInfo {
@@ -54,55 +62,38 @@ export const elementTypes: Record<ElementType, ElementTypeInfo> = {
     placeholderName: "Mara",
     placeholderThought:
       "A lighthouse keeper in her late thirties, weathered olive skin, short salt-and-pepper hair, a thin scar through her left eyebrow, wears a heavy wool sweater.",
-    stateExamples: ["Smiling", "Exhausted", "Rain-soaked", "Formal wear"],
+    stateExamples: ["Wet", "Injured", "Formal wear", "Disguised"],
     slots: [
       {
         id: "face-closeup",
-        label: "Face close-up",
-        hint: "Facial structure, eyes, skin and distinguishing marks in detail.",
+        label: "Close portrait",
+        hint: "The face every shot copies: three-quarter view, large and sharp, mouth closed. Make it first.",
         required: true,
-        framing:
-          "tight close-up portrait, neutral expression, looking at camera, soft even studio light, plain light gray background, sharp facial detail",
+        framing: "",
+        shot: "portrait",
+        guidedBy: ["face-closeup"],
+        aspectRatio: "3:4",
       },
       {
-        id: "front",
-        label: "Front, full body",
-        hint: "Height, proportions, posture and the complete outfit.",
+        id: "smile",
+        label: "Smiling close-up",
+        hint: "The same face smiling, so a laugh never arrives with somebody else's teeth.",
         required: true,
-        framing:
-          "full body shot from head to toe, facing the camera, standing in a relaxed neutral pose, plain light gray background, even studio light",
+        framing: "",
+        shot: "smile",
+        guidedBy: ["face-closeup"],
+        aspectRatio: "3:4",
       },
       {
-        id: "three-quarter",
-        label: "Three-quarter view",
-        hint: "How the face and body turn between front and profile.",
+        id: "sheet",
+        label: "Character sheet",
+        hint: "Front and back full body beside a large portrait. The bodies lose their heads, so the face only comes from the portrait.",
         required: true,
-        framing:
-          "three-quarter view from the waist up, body turned 45 degrees, plain light gray background, even studio light",
-      },
-      {
-        id: "profile",
-        label: "Profile",
-        hint: "Silhouette of the nose, jaw and hairline from the side.",
-        required: true,
-        framing:
-          "strict side profile from the chest up, facing left, plain light gray background, even studio light",
-      },
-      {
-        id: "rear",
-        label: "Rear view",
-        hint: "Hair, back of clothing and posture from behind.",
-        required: true,
-        framing:
-          "full body seen from directly behind, plain light gray background, even studio light",
-      },
-      {
-        id: "expression",
-        label: "Expressions",
-        hint: "Emotion that still reads as the same person.",
-        required: false,
-        framing:
-          "close-up portrait showing a strong, natural emotional expression, plain light gray background, soft studio light",
+        framing: "",
+        shot: "sheet",
+        guidedBy: ["face-closeup", "sheet"],
+        aspectRatio: "21:9",
+        resolution: "1.5k",
       },
     ],
   },
@@ -168,7 +159,7 @@ export const elementTypes: Record<ElementType, ElementTypeInfo> = {
         hint: "The overall shape and proportions in one clear image.",
         required: true,
         framing:
-          "product photograph, front three-quarter view, isolated on a plain light gray background, soft studio light",
+          "product photograph, front three-quarter view, isolated on a plain light grey background, soft even light, no studio, no equipment",
       },
       {
         id: "front",
@@ -176,7 +167,7 @@ export const elementTypes: Record<ElementType, ElementTypeInfo> = {
         hint: "The face it shows the camera, square on.",
         required: true,
         framing:
-          "product photograph, straight-on front view, isolated on a plain light gray background, soft studio light",
+          "product photograph, straight-on front view, isolated on a plain light grey background, soft even light, no studio, no equipment",
       },
       {
         id: "side",
@@ -184,7 +175,7 @@ export const elementTypes: Record<ElementType, ElementTypeInfo> = {
         hint: "The silhouette and depth from the side.",
         required: true,
         framing:
-          "product photograph, side view, isolated on a plain light gray background, soft studio light",
+          "product photograph, side view, isolated on a plain light grey background, soft even light, no studio, no equipment",
       },
       {
         id: "detail",
@@ -200,7 +191,7 @@ export const elementTypes: Record<ElementType, ElementTypeInfo> = {
         hint: "What the camera sees from behind.",
         required: false,
         framing:
-          "product photograph, rear view, isolated on a plain light gray background, soft studio light",
+          "product photograph, rear view, isolated on a plain light grey background, soft even light, no studio, no equipment",
       },
       {
         id: "top",
@@ -208,7 +199,7 @@ export const elementTypes: Record<ElementType, ElementTypeInfo> = {
         hint: "Its footprint seen from above.",
         required: false,
         framing:
-          "product photograph, top-down view from directly above, plain light gray background, soft studio light",
+          "product photograph, top-down view from directly above, plain light grey background, soft even light, no studio, no equipment",
       },
     ],
   },
@@ -241,6 +232,58 @@ export function assetUrl(asset: AssetRef): string {
 
 export function stateHandle(state: Pick<ElementState, "name">): string {
   return toStateHandle(state.name);
+}
+
+/** Labels for views earlier sheets were tagged with. */
+const legacyViewLabels: Partial<Record<ReferenceView, string>> = {
+  front: "Front, full body",
+  rear: "Rear view",
+  profile: "Profile",
+  "three-quarter": "Three-quarter view",
+  expression: "Expression",
+  "full-body": "Full body",
+};
+
+export function viewLabel(
+  type: ElementType,
+  view: ReferenceView | null,
+): string {
+  return (
+    elementTypes[type].slots.find((s) => s.id === view)?.label ??
+    (view && legacyViewLabels[view]) ??
+    "Untagged reference"
+  );
+}
+
+export interface StateSheet {
+  /** Null for the Character's base look. */
+  state: ElementState | null;
+  sheet: ElementReference | null;
+  portrait: ElementReference | null;
+  smile: ElementReference | null;
+}
+
+/**
+ * One row per look a Character has in the film, base first: the approved
+ * sheet and the two close portraits that belong to it.
+ */
+export function stateSheets(element: Element): StateSheet[] {
+  const pick = (stateId: string | null, view: ReferenceView) =>
+    element.references
+      .filter(
+        (r) =>
+          r.status === "approved" && r.stateId === stateId && r.view === view,
+      )
+      .sort((a, b) => a.sortOrder - b.sortOrder)[0] ?? null;
+  return [null, ...element.states].map((state) => {
+    const id = state?.id ?? null;
+    return {
+      state,
+      sheet: pick(id, "sheet"),
+      portrait: pick(id, "face-closeup"),
+      smile: pick(id, "smile"),
+    };
+  });
 }
 
 export interface SheetReview {
@@ -288,9 +331,12 @@ export function reviewSheet(
     warnings.push(
       `${untagged} approved ${untagged === 1 ? "reference does" : "references do"} not say what ${untagged === 1 ? "it shows" : "they show"}. Tag the view so it is used for the right shots.`,
     );
+  // A Character's states are full sheets of their own; other types' states
+  // only add the views where the change shows.
+  const ownSheet = stateId === null || element.type === "character";
   return {
     slots,
-    missingRequired: stateId === null ? missingRequired : [],
+    missingRequired: ownSheet ? missingRequired : [],
     warnings,
     approvedCount: approved.length,
     coverage: {
@@ -305,7 +351,14 @@ export function viewPrompt(
   element: Element,
   slot: GuidanceSlot,
   state: ElementState | null,
+  guided = false,
 ): string {
+  if (slot.shot)
+    return characterShotPrompt(slot.shot, {
+      identity: element.description.trim() || `A person called ${element.name}`,
+      state,
+      guided,
+    });
   const subject =
     element.description.trim() ||
     `${elementTypes[element.type].label} ${element.name}`;
@@ -316,8 +369,10 @@ export function viewPrompt(
 }
 
 const viewHints: [RegExp, ReferenceView][] = [
+  [/sheet|turnaround|model-?sheet/, "sheet"],
+  [/smil|laugh|grin/, "smile"],
   [/face|close-?up|portrait|headshot/, "face-closeup"],
-  [/expression|smil|laugh|angry|sad|cry/, "expression"],
+  [/expression|angry|sad|cry/, "expression"],
   [/three-?quarter|3-?4|34|3q/, "three-quarter"],
   [/profile/, "profile"],
   [/back|rear|behind/, "rear"],
@@ -342,14 +397,37 @@ export function guessView(
   return null;
 }
 
-/** Approved references that hold this identity; a state's own views lead. */
+/** Views that show the clothing; a state never borrows them from the base. */
+const WARDROBE_VIEWS: ReadonlySet<ReferenceView | null> = new Set([
+  "sheet",
+  "front",
+  "rear",
+  "full-body",
+  "three-quarter",
+]);
+
+/**
+ * Approved references that guide a new view; a state's own views lead. A
+ * state's sheet is guided by the face, never by the base outfit, which would
+ * otherwise come back in place of the state's.
+ */
 export function conditioningReferences(
   element: Element,
   state: ElementState | null,
   limit = 6,
+  slot?: GuidanceSlot,
 ): AssetRef[] {
   return approvedReferences(element, state?.id)
-    .sort((a, b) => Number(!!b.stateId) - Number(!!a.stateId))
+    .filter(
+      (r) =>
+        (!slot?.guidedBy || (r.view && slot.guidedBy.includes(r.view))) &&
+        !(
+          slot?.shot &&
+          state &&
+          r.stateId === null &&
+          WARDROBE_VIEWS.has(r.view)
+        ),
+    )
     .slice(0, limit)
     .map((r) => r.asset);
 }
@@ -363,23 +441,29 @@ export function viewRequest(
   slot: GuidanceSlot,
   state: ElementState | null,
 ): GenerationRequest {
-  const references = conditioningReferences(element, state);
-  const prompt = viewPrompt(element, slot, state);
-  return references.length
+  const references = conditioningReferences(element, state, 6, slot);
+  const guided = references.length > 0;
+  const prompt = viewPrompt(element, slot, state, guided);
+  const size = {
+    aspectRatio: slot.aspectRatio ?? "1:1",
+    resolution: slot.resolution ?? "1k",
+  };
+  return guided
     ? generationRequestSchema.parse({
         workflowKind: "image.flux-reference",
         inputs: {
-          prompt:
-            `Same ${elementTypes[element.type].label.toLowerCase()} as the reference images. ${prompt}`.slice(
-              0,
-              2000,
-            ),
-          aspectRatio: "1:1",
+          prompt: slot.shot
+            ? prompt
+            : `Same ${elementTypes[element.type].label.toLowerCase()} as the reference images. ${prompt}`.slice(
+                0,
+                2000,
+              ),
+          ...size,
           references,
         },
       })
     : generationRequestSchema.parse({
         workflowKind: "image.flux",
-        inputs: { prompt },
+        inputs: { prompt, ...size },
       });
 }

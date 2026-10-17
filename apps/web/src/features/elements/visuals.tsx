@@ -19,10 +19,15 @@ export const typeIcons: Record<ElementType, LucideIcon> = {
   thing: Box,
 };
 
-/** First approved identity reference, else the newest exploration. */
+/** The approved close portrait, else the first approved identity reference,
+ * else the newest exploration. */
 export function coverUrl(element: Element) {
+  const approved = element.references.filter(
+    (r) => r.status === "approved" && !r.stateId,
+  );
   const reference =
-    element.references.find((r) => r.status === "approved" && !r.stateId) ??
+    approved.find((r) => r.view === "face-closeup") ??
+    approved[0] ??
     [...element.references].reverse().find((r) => r.status === "experiment");
   return reference ? assetUrl(reference.asset) : null;
 }

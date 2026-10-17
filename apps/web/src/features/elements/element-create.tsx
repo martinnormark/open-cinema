@@ -70,9 +70,11 @@ export function ElementCreate({
   const taken = !!handle && handleTaken(handle);
   const canExplore = thought.trim().length >= 3;
   const willExplore = explore && canExplore;
+  // A Character's sheet and smile are guided by its approved close portrait,
+  // so only the portrait can start from the description alone.
   const firstViews = info.slots
     .filter((s) => s.required)
-    .slice(0, EXPLORATIONS);
+    .slice(0, type === "character" ? 1 : EXPLORATIONS);
   const busy = !!progress;
 
   if (status === "signed-out") return <SessionRequired />;
@@ -379,7 +381,7 @@ export function ElementCreate({
               </span>
               <span className="block text-xs leading-5 text-muted-foreground">
                 {canExplore
-                  ? `Generates ${firstViews.length} first views: ${firstViews
+                  ? `Generates ${firstViews.length === 1 ? "a first view" : `${firstViews.length} first views`}: ${firstViews
                       .map((s) => s.label.toLowerCase())
                       .join(
                         " and ",

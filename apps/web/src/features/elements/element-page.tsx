@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { Suspense, use, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   AlertTriangle,
@@ -34,6 +34,7 @@ import {
   guessView,
   reviewSheet,
   stateHandle,
+  viewLabel,
   viewRequest,
   type Element,
   type ElementReference,
@@ -54,6 +55,8 @@ import {
 import { MediaPicker, uploadFiles, type AssetRef } from "@/features/library";
 import { ConfirmDelete } from "./confirm-delete";
 import { SessionRequired, typeIcons } from "./visuals";
+import { headlessSheet } from "./headless";
+import { CharacterLooks } from "./state-sheets";
 
 export function ElementPage({
   elementId,
@@ -137,9 +140,10 @@ function ElementWorkspace({
       setGenerating(null);
     }
   }
-  const complementary = state
-    ? info.slots.filter((s) => s.required).slice(0, 1)
-    : nextSlots(element, review.missingRequired, 1);
+  const complementary =
+    state && element.type !== "character"
+      ? info.slots.filter((s) => s.required).slice(0, 1)
+      : nextSlots(element, review.missingRequired, 1);
   const preferences = useCostPreferences();
 
   return (
@@ -171,6 +175,9 @@ function ElementWorkspace({
       <div className="mt-8 grid gap-12 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0">
           {state && <StateHeader element={element} state={state} />}
+          {element.type === "character" && (
+            <CharacterLooks element={element} current={state} />
+          )}
           <ReferenceSheet
             element={element}
             state={state}
@@ -184,9 +191,19 @@ function ElementWorkspace({
           className="lg:sticky lg:top-6 lg:self-start"
         >
           <h2 className="text-base font-medium">
-            {state ? `${state.name} views` : "Reference guidance"}
+            {state ? `${state.name} sheet` : "Reference guidance"}
           </h2>
-          {state ? (
+          {state && element.type === "character" ? (
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              {review.coverage.done} of {review.coverage.total} views approved.
+              This state is its own sheet: until it has its own close portrait,
+              the base portrait keeps the face. Mention it as{" "}
+              <span className="font-medium text-foreground">
+                @{element.handle}:{stateHandle(state)}
+              </span>
+              .
+            </p>
+          ) : state ? (
             <p className="mt-1 text-sm leading-6 text-muted-foreground">
               Show this state from the views where it matters. Identity
               references still apply when you mention{" "}
@@ -563,7 +580,11 @@ function StateForm({
           onChange={(event) => setDescription(event.target.value)}
           rows={2}
           maxLength={600}
-          placeholder="Optional. A wide warm smile, eyes creased, relaxed shoulders."
+          placeholder={
+            element.type === "character"
+              ? "What changes, head to toe: hair, skin, marks, every piece of clothing. Soaking wet, hair plastered flat, water dripping from the chin, coat dark and sodden."
+              : "Optional. What changes in this state, and where it shows."
+          }
           className="mt-2 w-full resize-y rounded-lg border border-input bg-transparent p-3 text-sm leading-6 outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
         />
       </div>
@@ -696,7 +717,7 @@ function ReferenceSheet({
         {approved.length ? (
           <ul className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
             {approved.map((reference) => (
-              <li key={reference.id}>
+              <li key={reference.id} className={tileClass(reference.view)}>
                 <SavedReference element={element} reference={reference} />
               </li>
             ))}
@@ -756,7 +777,7 @@ function ReferenceSheet({
         {reviewCount ? (
           <ul className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
             {pending.map((view) => (
-              <li key={view.jobId}>
+              <li key={view.jobId} className={tileClass(view.view)}>
                 <PendingReference
                   element={element}
                   view={view}
@@ -766,7 +787,7 @@ function ReferenceSheet({
               </li>
             ))}
             {experiments.map((reference) => (
-              <li key={reference.id}>
+              <li key={reference.id} className={tileClass(reference.view)}>
                 <SavedReference element={element} reference={reference} />
               </li>
             ))}
@@ -844,10 +865,15 @@ function ViewSelect({
 }
 
 function slotLabel(element: Element, view: ReferenceView | null) {
-  return (
-    elementTypes[element.type].slots.find((s) => s.id === view)?.label ??
-    "Untagged reference"
-  );
+  return viewLabel(element.type, view);
+}
+
+/** A sheet is three panels wide, so it takes a whole row of the grid. */
+function tileClass(view: ReferenceView | null) {
+  return view === "sheet" ? "col-span-full" : undefined;
+}
+function frameClass(view: ReferenceView | null) {
+  return view === "sheet" ? "aspect-[21/9]" : "aspect-square";
 }
 
 function SavedReference({
@@ -874,7 +900,12 @@ function SavedReference({
 
   return (
     <figure aria-busy={busy}>
-      <div className="aspect-square overflow-hidden rounded-xl bg-secondary">
+      <div
+        className={cn(
+          "overflow-hidden rounded-xl bg-secondary",
+          compact ? "aspect-square" : frameClass(reference.view),
+        )}
+      >
         <img
           src={assetUrl(reference.asset)}
           alt={`${element.name}, ${label.toLowerCase()}`}
@@ -981,19 +1012,32 @@ function PendingReference({
   const label = slotLabel(element, view.view);
   const output = job?.output ?? null;
   const failed = !!job && !job.active && !output;
+  // A generated sheet still has its heads; the headless copy is what is kept.
+  const sheet =
+    output && view.view === "sheet"
+      ? headlessSheet(output.url, `${element.name} character sheet`)
+      : null;
 
   async function decide(status: "approved" | "rejected") {
     if (!output) return;
     setBusy(true);
     try {
+      let asset: AssetRef = {
+        type: "job-output",
+        jobId: output.jobId,
+        outputId: output.outputId,
+      };
+      if (sheet && status === "approved") {
+        const edited = await sheet;
+        if ("error" in edited) throw new Error(edited.error);
+        const [stored] = await uploadFiles([edited.file]);
+        if (!stored) throw new Error("The headless sheet could not be saved.");
+        asset = stored.ref;
+      }
       await addReference({
         elementId: element.id,
         ...(view.stateId ? { stateId: view.stateId } : {}),
-        asset: {
-          type: "job-output",
-          jobId: output.jobId,
-          outputId: output.outputId,
-        },
+        asset,
         status,
         view: view.view,
       });
@@ -1004,16 +1048,28 @@ function PendingReference({
     }
   }
 
+  const alt = `${element.name}, ${label.toLowerCase()}`;
   return (
     <figure aria-busy={busy}>
-      <div className="aspect-square overflow-hidden rounded-xl bg-secondary">
+      <div
+        className={cn(
+          "overflow-hidden rounded-xl bg-secondary",
+          frameClass(view.view),
+        )}
+      >
         {output ? (
-          <img
-            src={output.url}
-            alt={`${element.name}, ${label.toLowerCase()}`}
-            decoding="async"
-            className="reference-reveal size-full object-cover"
-          />
+          sheet ? (
+            <Suspense fallback={<PendingBadge text="Removing heads" />}>
+              <HeadlessImage sheet={sheet} alt={alt} />
+            </Suspense>
+          ) : (
+            <img
+              src={output.url}
+              alt={alt}
+              decoding="async"
+              className="reference-reveal size-full object-cover"
+            />
+          )
         ) : failed ? (
           <div className="flex size-full flex-col justify-end gap-1 p-3">
             <span className="text-xs font-medium text-destructive">
@@ -1024,19 +1080,17 @@ function PendingReference({
             </span>
           </div>
         ) : (
-          <div
-            className="reference-pending flex size-full items-end p-3"
-            role="status"
-          >
-            <span className="tabular rounded-full bg-elevated/90 px-2.5 py-1 text-xs font-medium">
-              {job
+          <PendingBadge
+            text={`${
+              job
                 ? (jobLabels[job.state] ?? "Generating")
-                : "Waiting for status"}
-              {job?.progress != null && job.active
+                : "Waiting for status"
+            }${
+              job?.progress != null && job.active
                 ? ` · ${Math.round(job.progress * 100)}%`
-                : ""}
-            </span>
-          </div>
+                : ""
+            }`}
+          />
         )}
       </div>
       <figcaption className="mt-2">
@@ -1048,7 +1102,13 @@ function PendingReference({
           warn={false}
         />
         <p className="truncate text-xs text-muted-foreground">
-          {output ? "Generated · not saved yet" : "Generating"}
+          {output
+            ? sheet
+              ? "Generated · heads removed from the full-body panels · not saved yet"
+              : "Generated · not saved yet"
+            : failed
+              ? "Not generated"
+              : "Generating"}
         </p>
       </figcaption>
       <div className="mt-2 flex flex-wrap gap-1.5">
@@ -1082,6 +1142,43 @@ function PendingReference({
         )}
       </div>
     </figure>
+  );
+}
+
+function PendingBadge({ text }: { text: string }) {
+  return (
+    <div
+      className="reference-pending flex size-full items-end p-3"
+      role="status"
+    >
+      <span className="tabular rounded-full bg-elevated/90 px-2.5 py-1 text-xs font-medium">
+        {text}
+      </span>
+    </div>
+  );
+}
+
+function HeadlessImage({
+  sheet,
+  alt,
+}: {
+  sheet: ReturnType<typeof headlessSheet>;
+  alt: string;
+}) {
+  const edited = use(sheet);
+  if ("error" in edited)
+    return (
+      <div className="flex size-full items-end p-3">
+        <span className="text-xs text-destructive">{edited.error}</span>
+      </div>
+    );
+  return (
+    <img
+      src={edited.url}
+      alt={alt}
+      decoding="async"
+      className="reference-reveal size-full object-cover"
+    />
   );
 }
 

@@ -25,6 +25,7 @@ Primary entry points: [developer documentation](https://docs.comfy.org/developme
 ## Project internals
 
 - [Foundation](foundation.md): contracts, persistence, workflow dispatch, and how to add a workflow kind.
+- [Character sheets](character-sheets.md): the three-panel sheet, close portraits with and without a smile, states as sheets of their own, and how heads are removed from the full-body panels.
 - [Media library and uploads](library.md): upload path, limits, the picker and how other features use uploads as sources and references.
 - [Phase 0: background replacement](phase0-background.md): evaluation results, supported envelope, turnaround, cost and the MVP release-bar call.
 - [Background replacement job](background-job.md): the staged job (Kling edit, matte, foreground lock and conform as Comfy Cloud graphs), its variants, and how to check the graphs locally.
