@@ -187,8 +187,12 @@ export function RecipeEditor({
           aria-label="Makes"
           className="justify-start"
         >
-          <ToggleGroupItem value="image">Still image</ToggleGroupItem>
-          <ToggleGroupItem value="video">Video</ToggleGroupItem>
+          <ToggleGroupItem value="image" className="px-3">
+            Still image
+          </ToggleGroupItem>
+          <ToggleGroupItem value="video" className="px-3">
+            Video
+          </ToggleGroupItem>
         </ToggleGroup>
         <Field label="Template" htmlFor={`${id}-template`}>
           <Textarea
@@ -219,7 +223,11 @@ export function RecipeEditor({
                   aria-label={`${slot.label} is a`}
                 >
                   {Object.values(elementTypes).map((t) => (
-                    <ToggleGroupItem key={t.type} value={t.type}>
+                    <ToggleGroupItem
+                      key={t.type}
+                      value={t.type}
+                      className="px-3"
+                    >
                       {t.label}
                     </ToggleGroupItem>
                   ))}
@@ -272,7 +280,7 @@ export function RecipeEditor({
             className="justify-start"
           >
             {ASPECTS.map((a) => (
-              <ToggleGroupItem key={a.id} value={a.id}>
+              <ToggleGroupItem key={a.id} value={a.id} className="px-3">
                 {a.label}
               </ToggleGroupItem>
             ))}
@@ -290,7 +298,11 @@ export function RecipeEditor({
             className="justify-start"
           >
             {DURATIONS.map((d) => (
-              <ToggleGroupItem key={d} value={String(d)} className="tabular">
+              <ToggleGroupItem
+                key={d}
+                value={String(d)}
+                className="tabular px-3"
+              >
                 {d} s
               </ToggleGroupItem>
             ))}
@@ -396,9 +408,9 @@ function Section({
 }) {
   return (
     <fieldset className="grid gap-4">
-      <legend className="text-[0.9375rem] font-medium">{title}</legend>
+      <legend className="mb-3 text-[0.9375rem] font-medium">{title}</legend>
       {description && (
-        <p className="-mt-2 max-w-prose text-sm leading-6 text-muted-foreground">
+        <p className="-mt-1 max-w-prose text-sm leading-6 text-muted-foreground">
           {description}
         </p>
       )}
