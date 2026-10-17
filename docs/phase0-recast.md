@@ -64,7 +64,7 @@ Six candidates on the two real multi-person clips (U1: a couple, recast the woma
 | Wan 2.7 video edit                         | Video edit with three reference images.                                      | Right person on both, half the price ($0.50), but other people's poses drift from the source (B2 = 2) and likeness is weaker (ref_sim 0.36–0.45). 30 fps output. Fallback candidate.                                            |
 | Kling O1 edit                              | Same request on the previous Kling model.                                    | Rejected. **Recast the wrong person** on U1 (the man became Mara) and rewrote the table on U2 (cups and teapots removed, papers added). G4 on both.                                                                               |
 | HappyHorse 1.0 video edit                  | Wan-family video edit.                                                       | Rejected. Turned **two** women into Mara on U2 (G4) and refused U1 under its content policy (G5).                                                                                                                                 |
-| Runway Aleph 2 (FLUX 3 first-frame guide)  | Recast the first frame with FLUX 3, then propagate with Aleph.               | No result. The FLUX keyframe for U2 failed with a provider error; U1 was still queued when the account ran out of credits. At $2.00 per 5 s it was the most expensive open-ended option.                                          |
+| Runway Aleph 2 (FLUX 3 first-frame guide)  | Recast the first frame with FLUX 3, then propagate with Aleph.               | Runner-up on U1: right person, strong preservation (protected PSNR 32.1, faces 0.87) and the **only frame-exact result** (source 25 fps kept), but softer likeness (ref_sim 0.30) and $2.06 per 5 s. The U2 keyframe failed with a provider error and could not be retried after credits ran out. Worth a full-set run when timing exactness matters. |
 
 ## Successes
 
@@ -115,6 +115,7 @@ Product decision this leaves open: ship recast on a closed partner model now (Kl
 | Wan 2.7 edit    | $0.10/s                    | $0.50      | 57–79 min                                   |
 | HappyHorse edit | $0.14/s                    | $0.71      | 86 min                                      |
 | Genjutsu        | $0.97/s (720p)             | $4.57      | 81–83 min                                   |
+| Aleph 2 + FLUX keyframe | $0.40/s + $0.06    | $2.06      | 94 min                                      |
 
 Turnaround is wall time from submission to downloaded result and is almost entirely the shared Router queue: eight overnight threads submitted into one account, and requests sat `IN_QUEUE` for over an hour before rendering. It is not the model's speed. The background-replacement thread measured the same Kling request through a packaged ComfyUI graph (partner-node path) at 176 s end to end. The 60 minute `deadlineMs` on `video.character-replace` is right for production; tonight's queue would have missed it on every run.
 

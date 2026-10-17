@@ -384,6 +384,28 @@
    ],
    "gates": [],
    "notes": "Wrong wardrobe intent again: asked to keep the black suit and tie, it dressed Theo in his peacoat, roll-neck and beanie (A1 capped at 2). Otherwise strong: Theo's likeness (ref_sim 0.66, min 0.60), 9:16 framing kept, the handshake lands on the source frames. One frame longer than the source."
+  },
+  "aleph2-keyframe/U1-couple-wall": {
+   "A": [
+    3,
+    4,
+    4,
+    3,
+    4
+   ],
+   "A1w": 4,
+   "B": [
+    4,
+    4,
+    4,
+    4,
+    3,
+    4,
+    4,
+    4
+   ],
+   "gates": [],
+   "notes": "Right person; bob, freckles and mustard jacket carried from the FLUX first-frame guide; the man and every head turn kept (face 0.87, protected PSNR 32.1). The only frame-exact result (25 fps, 125 frames). Likeness softer than Kling (ref_sim 0.30). $2.06 per 5 s."
   }
  }
 }
