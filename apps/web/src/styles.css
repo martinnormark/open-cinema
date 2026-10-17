@@ -182,6 +182,19 @@
 [data-slot="select-content"][data-state="closed"] {
   animation-duration: var(--duration-quick);
 }
+/* Page change (transitions.dev page slide, without blur on a surface this
+   large): a newly opened page settles 8px up as it fades in. Only the route's
+   own root animates, so the sidebar, header and Orb stay put, and nothing
+   waits on the old page. Backwards fill leaves no transform behind. */
+#main-content > * {
+  animation: page-in var(--duration-fast) var(--ease-smooth-out) backwards;
+}
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
