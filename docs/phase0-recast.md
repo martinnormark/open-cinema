@@ -28,7 +28,7 @@ Caveats that matter for the release decision:
 - **The evidence is narrow.** Ten clips of 5 s (five real Mixkit takes, five generated), two Characters, one run per clip, one reviewer, and that reviewer is an AI working from contact sheets at matched timestamps plus ArcFace and protected-region measurements. Treat "passes" as "good enough to put in front of users with a stated envelope", not as a measured production rate.
 - **Likeness drifts older.** Mara's sheet is a woman in her early thirties; in three of seven Kling runs she reads ten to twenty years older (U4, G2, G5). The platinum "silver-white" hair is the likely cue. Characters with distinctive hair colour should carry an explicit age in their description, and the job should warn when the result's face similarity to the Character is low (below about 0.35 ArcFace).
 - **Turnaround through the shared Router queue was 57–117 minutes tonight**, which misses the 60 minute deadline the workflow registry sets. See below.
-- **The Router account ran out of credits at about 03:45 UTC** (`402 insufficient_credits`), which stopped the follow-up experiment on source wardrobe described below.
+- **The Router account ran out of credits shortly after 03:00 UTC** (`402 insufficient_credits`), which stopped the follow-up experiment on source wardrobe described below.
 
 The default is wired: `video.character-replace` builds the Kling 3.0 Omni request in [`packages/comfy/src/workflows/character-replace.ts`](../packages/comfy/src/workflows/character-replace.ts) (tests in `apps/jobs/test/character-replace.test.ts`), and the equivalent ComfyUI graph is packaged in [`workflows/character-replace/`](../workflows/character-replace/README.md).
 
