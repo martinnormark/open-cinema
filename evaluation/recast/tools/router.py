@@ -65,7 +65,7 @@ def submit(model: str, inputs: dict, key: str | None = None) -> dict:
     return {"idempotency_key": key, **body}
 
 
-def wait(model: str, request_id: str, poll: float = 10, limit: float = 3600):
+def wait(model: str, request_id: str, poll: float = 10, limit: float = 4 * 3600):
     started = time.time()
     last = None
     while time.time() - started < limit:
@@ -78,6 +78,8 @@ def wait(model: str, request_id: str, poll: float = 10, limit: float = 3600):
                 print(f"  {model} {request_id[:8]} {last}", file=sys.stderr)
             if body.get("status") == "COMPLETED":
                 return body
+            if body.get("status") in ("FAILED", "CANCELLED", "ERROR"):
+                raise RuntimeError(f"{model} {request_id} {body.get('status')}: {json.dumps(body)[:1000]}")
         time.sleep(poll)
     raise TimeoutError(f"{model} {request_id} did not finish within {limit}s")
 
