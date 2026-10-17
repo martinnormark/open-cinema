@@ -193,13 +193,14 @@ export function LibraryPage({
               value && setFilter(value as LibraryFilter)
             }
             aria-label="Show"
-            className="mt-8 max-w-full overflow-x-auto [scrollbar-width:none]"
+            // Below sm the row can overflow; the right edge fades to say so.
+            className="mt-8 max-w-full overflow-x-auto [scrollbar-width:none] max-sm:pr-6 max-sm:[mask-image:linear-gradient(to_right,black_calc(100%-2rem),transparent)]"
           >
             {filters.map((f) => (
               <ToggleGroupItem
                 key={f.value}
                 value={f.value}
-                className="flex-none px-3"
+                className="flex-none px-2.5 sm:px-3"
               >
                 {f.label}
                 <span className="tabular text-xs text-muted-foreground">

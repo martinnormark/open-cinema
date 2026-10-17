@@ -107,7 +107,9 @@ export function StudioDirection({
             </button>
           </span>
         )}
-        <div className="min-w-0 flex-1">
+        {/* Below sm the summary takes its own row under the project and the
+            disclosure, so it never squeezes into a one-word column. */}
+        <div className="order-last min-w-0 grow basis-full sm:order-none sm:basis-0">
           {parts.length ? (
             <DirectionChips parts={parts} />
           ) : (
@@ -123,7 +125,7 @@ export function StudioDirection({
           aria-expanded={open}
           aria-controls="studio-direction-panel"
           onClick={() => setOpen(!open)}
-          className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          className="ml-auto inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           Direct this shot
           {overrideCount > 0 && (

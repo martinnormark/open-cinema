@@ -33,16 +33,21 @@ export function WorldPage({
 }) {
   return (
     <section
-      className="mx-auto w-full max-w-4xl px-6 pt-10 pb-32 md:px-12 md:pt-14"
+      className="mx-auto w-full max-w-6xl px-6 pt-10 pb-32 md:px-12 md:pt-14"
       aria-labelledby="page-title"
     >
-      <PageHeader
-        title="Move your world"
-        description="Take your cast, places, recipes and sequences to another project or another Open Cinema. Everything travels with its approved references and the prompts that made it."
-      />
-      <div className="mt-10 grid gap-10">
-        <ExportWorld projects={projects} initialProjectId={initialProjectId} />
-        <ImportWorld />
+      <div className="max-w-4xl">
+        <PageHeader
+          title="Move your world"
+          description="Take your cast, places, recipes and sequences to another project or another Open Cinema. Everything travels with its approved references and the prompts that made it."
+        />
+        <div className="mt-10 grid gap-10">
+          <ExportWorld
+            projects={projects}
+            initialProjectId={initialProjectId}
+          />
+          <ImportWorld />
+        </div>
       </div>
     </section>
   );
