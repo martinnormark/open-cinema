@@ -16,7 +16,7 @@ import {
  * Omni path (./character-replace.ts). Every adapter is Lightricks' own; no
  * community LoRA is used. See docs/recast-ltx.md for the measured result.
  *
- * 1. FLUX.2 Klein recasts the take's first frame: the marked person becomes
+ * 1. FLUX 3 Klein recasts the take's first frame: the marked person becomes
  *    the Character from their references, in the same place and pose.
  * 2. LTX 2.5 carries that keyframe through the take. Lightricks' Union Control
  *    IC-LoRA (trained on 2.3; Lightricks' own 2.5 example loads it on the 2.5
@@ -45,7 +45,7 @@ export const LTX_RECAST_LIMITS: GraphLimits & { maxReferences: number } = {
   /** About four seconds at 24 or 25 fps; longer takes keep their first 97 frames. */
   maxFrames: 97,
   maxSide: 768,
-  /** FLUX.2 Klein reads up to four images; the first is the frame itself. */
+  /** The keyframe edit reads up to four images; the first is the frame itself. */
   maxReferences: 3,
 };
 
@@ -72,7 +72,7 @@ export interface TargetBox {
 }
 
 export interface LtxRecastGraphOptions {
-  /** The FLUX.2 Klein instruction for the first frame. */
+  /** The FLUX 3 Klein instruction for the first frame. */
   keyframePrompt: string;
   /** What LTX should see across the clip. */
   videoPrompt: string;
@@ -484,7 +484,7 @@ export interface LtxRecastPromptOptions {
 const clean = (text: string) => text.trim().replace(/[.\s]+$/, "");
 
 /**
- * The keyframe instruction (FLUX.2 Klein; the frame is the first image) and
+ * The keyframe instruction (FLUX 3 Klein; the frame is the first image) and
  * the clip prompt (LTX 2.5). With a sheet the clip prompt opens with the
  * Ingredients adapter's own two-part layout.
  */

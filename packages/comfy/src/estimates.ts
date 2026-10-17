@@ -65,11 +65,11 @@ export const CLOUD_GRAPH_ESTIMATES = {
   },
   swap: {
     seconds: [60, 900],
-    note: "Runs FLUX.2 Klein and LTX 2.3 on Comfy Cloud, billed by GPU time. Uses the first 4 seconds of the take.",
+    note: "Runs FLUX 3 Klein and LTX 2.3 on Comfy Cloud, billed by GPU time. Uses the first 4 seconds of the take.",
   },
   restyle: {
     seconds: [30, 900],
-    note: "Runs FLUX.2 Klein and LTX 2.3 on Comfy Cloud, billed by GPU time. Uses the first 4 seconds of the take.",
+    note: "Runs FLUX 3 Klein and LTX 2.3 on Comfy Cloud, billed by GPU time. Uses the first 4 seconds of the take.",
   },
   restage: {
     seconds: [60, 1200],

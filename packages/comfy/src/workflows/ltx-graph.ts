@@ -28,9 +28,14 @@ export const LTX23_MODELS = {
   /** Lightricks' union IC-LoRA: depth, pose or edges, references at half size. */
   unionControl: "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors",
 } as const;
-export const FLUX2_KLEIN_MODELS = {
-  unet: "flux-2-klein-9b.safetensors",
-  textEncoder: "qwen_3_8b_fp8mixed.safetensors",
+/**
+ * FLUX 3 Image Klein (distilled), the files Comfy-Org's
+ * image_flux3_klein_distilled_image_edit template loads. Cloud's catalogue
+ * did not list them on 2026-10-17, yet they ran there that day.
+ */
+export const FLUX3_KLEIN_MODELS = {
+  unet: "flux3_image_klein_sd_int8_convrot.safetensors",
+  textEncoder: "qwen3vl_4b_int8_convrot.safetensors",
   vae: "flux2-vae.safetensors",
 } as const;
 

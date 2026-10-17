@@ -61,6 +61,12 @@ const graphOf = (request: CloudWorkflowRequest) =>
 const ofType = (request: CloudWorkflowRequest, type: string) =>
   Object.values(graphOf(request)).filter((n) => n.class_type === type);
 
+/** Images the keyframe edit reads: the take's frame, then each reference. */
+const keyframeImages = (request: CloudWorkflowRequest) =>
+  Object.keys(ofType(request, "ReferenceMultiLatent")[0]!.inputs).filter((k) =>
+    k.startsWith("images."),
+  ).length;
+
 /** Every link names a node that exists and each media input a loader. */
 function expectWired(
   request: CloudWorkflowRequest,
@@ -99,7 +105,8 @@ it("swaps an object with the Thing's sheet and keeps the take outside SAM 3's ma
     "https://comfy-storage.test/lantern-front",
     "https://comfy-storage.test/lantern-detail",
   ]);
-  expect(ofType(request, "ReferenceLatent").length).toBeGreaterThanOrEqual(2);
+  // The frame and both views go to the FLUX 3 Klein edit.
+  expect(keyframeImages(request)).toBe(3);
   const prompts = ofType(request, "CLIPTextEncode").map((n) => n.inputs.text);
   expect(prompts).toContain("the table lamp");
   expect(prompts).toContain("Lantern");
@@ -156,9 +163,8 @@ it("restyles from a style image or from words alone, but not from nothing", asyn
   )) as CloudWorkflowRequest;
   expect(wordsOnly.input.media).toHaveLength(1);
   // Only the take's own frame guides the edit.
-  expect(ofType(wordsOnly, "ReferenceLatent").length).toBeLessThan(
-    ofType(request, "ReferenceLatent").length,
-  );
+  expect(keyframeImages(wordsOnly)).toBe(1);
+  expect(keyframeImages(request)).toBe(2);
 
   const nothing = restyleInputsSchema.parse({
     source,

@@ -38,11 +38,14 @@ interface ManifestEntry {
 /**
  * Model files Cloud runs although its catalogue does not list them. The Alpha
  * Gen IC-LoRA is missing from Cloud's `object_info` on 2026-10-17, yet the
- * exported graph ran with it there that day (jobs f30bd530 and a32a3cf1).
- * Reported as a note, not a failure.
+ * exported graph ran with it there that day (jobs f30bd530 and a32a3cf1); so
+ * did FLUX 3 Klein and its encoder (job baf43ad0). Reported as a note, not a
+ * failure.
  */
 const UNLISTED_ON_CLOUD = new Set([
   "ltx-2.5-22b-ic-lora-alpha-gen-0.9.safetensors",
+  "flux3_image_klein_sd_int8_convrot.safetensors",
+  "qwen3vl_4b_int8_convrot.safetensors",
 ]);
 const notes: string[] = [];
 
@@ -98,12 +101,26 @@ function resolve(
     path = path ? `${path}.${part}` : part;
     if (i === parts.length - 1) return spec;
     if (spec[0] === "COMFY_AUTOGROW_V3") {
+      // A template lists its member names, or a prefix numbered from 0.
       const template = spec[1]?.template as {
-        input: { required: Record<string, Spec> };
-        names: string[];
+        input: {
+          required?: Record<string, Spec>;
+          optional?: Record<string, Spec>;
+        };
+        names?: string[];
+        prefix?: string;
       };
-      if (!template.names.includes(parts[i + 1]!)) return null;
-      return Object.values(template.input.required)[0] ?? null;
+      const member = parts[i + 1]!;
+      const named = template.names
+        ? template.names.includes(member)
+        : new RegExp(`^${template.prefix}\\d+$`).test(member);
+      if (!named) return null;
+      return (
+        Object.values({
+          ...template.input.required,
+          ...template.input.optional,
+        })[0] ?? null
+      );
     }
     if (spec[0] === "COMFY_DYNAMICCOMBO_V3") {
       const chosen = (

@@ -298,13 +298,13 @@
       "save_keyframe"
     ],
     "models": [
-      "flux-2-klein-9b.safetensors",
       "flux2-vae.safetensors",
+      "flux3_image_klein_sd_int8_convrot.safetensors",
       "gemma_3_12B_it_fp4_mixed.safetensors",
       "ltx-2.3-22b-distilled-fp8.safetensors",
       "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors",
       "moge_2_vitl_normal_fp16.safetensors",
-      "qwen_3_8b_fp8mixed.safetensors",
+      "qwen3vl_4b_int8_convrot.safetensors",
       "sam3.1_multiplex_fp16.safetensors"
     ]
   },
@@ -334,13 +334,13 @@
       "save_keyframe"
     ],
     "models": [
-      "flux-2-klein-9b.safetensors",
       "flux2-vae.safetensors",
+      "flux3_image_klein_sd_int8_convrot.safetensors",
       "gemma_3_12B_it_fp4_mixed.safetensors",
       "ltx-2.3-22b-distilled-fp8.safetensors",
       "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors",
       "moge_2_vitl_normal_fp16.safetensors",
-      "qwen_3_8b_fp8mixed.safetensors"
+      "qwen3vl_4b_int8_convrot.safetensors"
     ]
   },
   {
@@ -581,15 +581,15 @@
       "save_keyframe"
     ],
     "models": [
-      "flux-2-klein-9b.safetensors",
       "flux2-vae.safetensors",
+      "flux3_image_klein_sd_int8_convrot.safetensors",
       "gemma4-12b-with-proj-ltx-2.5-bf16.safetensors",
       "ltx-2.3-22b-ic-lora-ingredients-0.9.safetensors",
       "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors",
       "ltx-2.5-22b-distilled-transformer-bf16.safetensors",
       "ltx-2.5-audio-vae-bf16.safetensors",
       "ltx-2.5-video-vae-bf16.safetensors",
-      "qwen_3_8b_fp8mixed.safetensors",
+      "qwen3vl_4b_int8_convrot.safetensors",
       "sam3.1_multiplex_fp16.safetensors"
     ]
   }

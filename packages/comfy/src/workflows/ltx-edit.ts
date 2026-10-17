@@ -1,5 +1,5 @@
 import {
-  FLUX2_KLEIN_MODELS,
+  FLUX3_KLEIN_MODELS,
   LTX23_MODELS,
   ltxSamplerNodes,
   saveVideoNodes,
@@ -14,7 +14,7 @@ import { LTX_RESTAGE_MODELS } from "./ltx-restage";
  * Object Swap and Restyle as one open-weights graph on Comfy Cloud, FLUX then
  * LTX:
  *
- * 1. FLUX.2 Klein 9B edits the take's first frame with the reference images
+ * 1. FLUX 3 Klein edits the take's first frame with the reference images
  *    (a Thing's sheet for a swap; a Location or style reference for a
  *    restyle). This keyframe is the look the creator approves.
  * 2. LTX 2.3 carries the keyframe through the take with Lightricks' union
@@ -40,7 +40,7 @@ export const LTX_EDIT_LIMITS: GraphLimits & { maxReferences: number } = {
   /** About four seconds at 24 or 25 fps; longer takes keep their first 97 frames. */
   maxFrames: 97,
   maxSide: 768,
-  /** FLUX.2 Klein reads up to four images; the first is the frame itself. */
+  /** The keyframe edit reads up to four images; the first is the frame itself. */
   maxReferences: 3,
 };
 
@@ -55,7 +55,7 @@ export const LTX_EDIT_OUTPUT_NODES = ["save_result", "save_keyframe"] as const;
 
 export interface LtxEditGraphOptions {
   mode: LtxEditMode;
-  /** The FLUX.2 Klein instruction for the first frame. */
+  /** The FLUX 3 Klein instruction for the first frame. */
   keyframePrompt: string;
   /** What LTX should see across the clip (style words, the new object). */
   videoPrompt: string;
@@ -65,7 +65,12 @@ export interface LtxEditGraphOptions {
   swap?: { original: string; replacement: string } | undefined;
 }
 
-/** FLUX.2 Klein edits the take's first frame with the references (also used by ./ltx-recast.ts). */
+/**
+ * FLUX 3 Klein edits the take's first frame with the references (also used by
+ * ./ltx-recast.ts), following Comfy-Org's image_flux3_klein_distilled_image_edit
+ * template: every image goes to both conditionings at about 1 MP, and the
+ * result takes the frame's size.
+ */
 export function keyframeNodes(
   first: Link,
   prompt: string,
@@ -75,19 +80,19 @@ export function keyframeNodes(
   const nodes: Graph = {
     keyframe_unet: {
       class_type: "UNETLoader",
-      inputs: { unet_name: FLUX2_KLEIN_MODELS.unet, weight_dtype: "default" },
+      inputs: { unet_name: FLUX3_KLEIN_MODELS.unet, weight_dtype: "default" },
     },
     keyframe_clip: {
       class_type: "CLIPLoader",
       inputs: {
-        clip_name: FLUX2_KLEIN_MODELS.textEncoder,
-        type: "flux2",
+        clip_name: FLUX3_KLEIN_MODELS.textEncoder,
+        type: "flux3",
         device: "default",
       },
     },
     keyframe_vae: {
       class_type: "VAELoader",
-      inputs: { vae_name: FLUX2_KLEIN_MODELS.vae },
+      inputs: { vae_name: FLUX3_KLEIN_MODELS.vae },
     },
     keyframe_text: {
       class_type: "CLIPTextEncode",
@@ -97,90 +102,41 @@ export function keyframeNodes(
       class_type: "ConditioningZeroOut",
       inputs: { conditioning: ["keyframe_text", 0] },
     },
-    keyframe_frame: {
-      class_type: "ImageScaleToTotalPixels",
-      inputs: {
-        image: first,
-        upscale_method: "lanczos",
-        megapixels: 1,
-        resolution_steps: 16,
-      },
-    },
-    keyframe_size: {
-      class_type: "GetImageSize",
-      inputs: { image: ["keyframe_frame", 0] },
-    },
   };
-  // The frame is reference 0, so the edit keeps its composition.
-  const images: Link[] = [["keyframe_frame", 0]];
+  // The frame is image 0, so the edit keeps its composition and size.
+  const images: Record<string, Link> = { "images.image0": first };
   for (let i = 0; i < references; i++) {
     nodes[`reference_${i}`] = {
       class_type: "LoadImage",
       inputs: { image: "" },
     };
-    nodes[`reference_${i}_scaled`] = {
-      class_type: "ImageScaleToTotalPixels",
-      inputs: {
-        image: [`reference_${i}`, 0],
-        upscale_method: "lanczos",
-        megapixels: 1,
-        resolution_steps: 16,
-      },
-    };
-    images.push([`reference_${i}_scaled`, 0]);
+    images[`images.image${i + 1}`] = [`reference_${i}`, 0];
   }
-  let positive: Link = ["keyframe_text", 0];
-  let negative: Link = ["keyframe_zero", 0];
-  images.forEach((image, i) => {
-    nodes[`keyframe_latent_${i}`] = {
-      class_type: "VAEEncode",
-      inputs: { pixels: image, vae: ["keyframe_vae", 0] },
-    };
-    nodes[`keyframe_pos_${i}`] = {
-      class_type: "ReferenceLatent",
-      inputs: { conditioning: positive, latent: [`keyframe_latent_${i}`, 0] },
-    };
-    nodes[`keyframe_neg_${i}`] = {
-      class_type: "ReferenceLatent",
-      inputs: { conditioning: negative, latent: [`keyframe_latent_${i}`, 0] },
-    };
-    positive = [`keyframe_pos_${i}`, 0];
-    negative = [`keyframe_neg_${i}`, 0];
-  });
   Object.assign(nodes, {
-    keyframe_empty: {
-      class_type: "EmptyFlux2LatentImage",
+    keyframe_references: {
+      class_type: "ReferenceMultiLatent",
       inputs: {
-        width: ["keyframe_size", 0],
-        height: ["keyframe_size", 1],
-        batch_size: 1,
+        positive: ["keyframe_text", 0],
+        negative: ["keyframe_zero", 0],
+        vae: ["keyframe_vae", 0],
+        resolution: "resize",
+        "resolution.megapixels": 1,
+        ...images,
       },
-    },
-    keyframe_sigmas: {
-      class_type: "Flux2Scheduler",
-      inputs: {
-        steps: 4,
-        width: ["keyframe_size", 0],
-        height: ["keyframe_size", 1],
-      },
-    },
-    keyframe_noise: { class_type: "RandomNoise", inputs: { noise_seed: seed } },
-    keyframe_sampler: {
-      class_type: "KSamplerSelect",
-      inputs: { sampler_name: "euler" },
-    },
-    keyframe_guider: {
-      class_type: "CFGGuider",
-      inputs: { model: ["keyframe_unet", 0], positive, negative, cfg: 1 },
     },
     keyframe_sample: {
-      class_type: "SamplerCustomAdvanced",
+      class_type: "KSampler",
       inputs: {
-        noise: ["keyframe_noise", 0],
-        guider: ["keyframe_guider", 0],
-        sampler: ["keyframe_sampler", 0],
-        sigmas: ["keyframe_sigmas", 0],
-        latent_image: ["keyframe_empty", 0],
+        model: ["keyframe_unet", 0],
+        positive: ["keyframe_references", 0],
+        negative: ["keyframe_references", 1],
+        latent_image: ["keyframe_references", 2],
+        seed,
+        steps: 16,
+        cfg: 1,
+        sampler_name: "euler",
+        scheduler: "simple",
+        denoise: 1,
       },
     },
     keyframe_decode: {
@@ -387,7 +343,7 @@ const sentence = (text: string) => {
   return t ? `${t[0]!.toUpperCase()}${t.slice(1)}.` : "";
 };
 
-/** Which images hold the references, in words FLUX.2 Klein follows. */
+/** Which images hold the references, in words FLUX 3 Klein follows. */
 function referenceImages(count: number) {
   const names = ORDINALS.slice(0, Math.max(1, count)).map(
     (o) => `the ${o} image`,
@@ -398,7 +354,7 @@ function referenceImages(count: number) {
 }
 
 /**
- * The keyframe instruction (FLUX.2 Klein, the frame is the first image) and
+ * The keyframe instruction (FLUX 3 Klein, the frame is the first image) and
  * the clip prompt (LTX 2.3). Both keep the shot and change only what the mode
  * changes.
  */

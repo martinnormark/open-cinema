@@ -224,7 +224,7 @@ export async function restyleRequest(
 
 export const objectSwapWorkflow: WorkflowDefinition<"video.object-swap"> = {
   kind: "video.object-swap",
-  displayModel: "FLUX.2 Klein + LTX 2.3",
+  displayModel: "FLUX 3 Klein + LTX 2.3",
   deadlineMs: 45 * 60_000,
   model: () => LTX_EDIT_MODEL_IDS.swap,
   provider: () => "cloud-workflow",
@@ -235,7 +235,7 @@ export const objectSwapWorkflow: WorkflowDefinition<"video.object-swap"> = {
 
 export const restyleWorkflow: WorkflowDefinition<"video.restyle"> = {
   kind: "video.restyle",
-  displayModel: "FLUX.2 Klein + LTX 2.3",
+  displayModel: "FLUX 3 Klein + LTX 2.3",
   deadlineMs: 45 * 60_000,
   model: () => LTX_EDIT_MODEL_IDS.restyle,
   provider: () => "cloud-workflow",
