@@ -1,6 +1,14 @@
 # Third-party IP
 
-The rule for the competition entry: the app does not rely on other people's IP, so it uses **no LoRA made by someone else**. Base models from the platform and its model vendors are allowed, as are Lightricks' own official LTX adapters, since Lightricks makes the base model. The competition page asks for submissions "without unlicensed intellectual property" ([competition.md](competition.md)). Audited on 2026-10-17 against `packages/comfy/src/workflows`, `packages/comfy/src/flux-klein.ts`, `packages/comfy/src/shot-planner.ts`, the jobs Worker registry (`packages/comfy/src/workflows/index.ts`), the studio's on-device models and its bundled code. Authors and licences are from each model's Hugging Face page.
+The rule, as Martin set it on 2026-10-17: the app does not rely on other people's IP. A model, LoRA or component is allowed when it is one of these:
+
+1. **Lightricks' own**, since Lightricks makes the LTX base models (their official IC-LoRAs and camera LoRAs included).
+2. **Ours**: written or trained in this repository.
+3. **MIT-licensed**, whoever made it.
+
+Non-commercial licences and unclear licences are out. Other permissive licences (Apache 2.0, BSD) are not MIT, so those items are listed under [Permissive, not MIT, awaiting confirmation](#permissive-not-mit-awaiting-confirmation) until Martin decides. Where an MIT or built-in alternative is easy, it is preferred. Hosted models through Comfy Router are platform services the competition names, not borrowed weights. The competition page asks for submissions "without unlicensed intellectual property" ([competition.md](competition.md)).
+
+Audited on 2026-10-17 against `packages/comfy/src/workflows`, `packages/comfy/src/flux-klein.ts`, `packages/comfy/src/shot-planner.ts`, the jobs Worker registry (`packages/comfy/src/workflows/index.ts`), the studio's on-device models and its bundled code. Authors and licences are from each model's Hugging Face page.
 
 ## Verdict
 
@@ -21,18 +29,18 @@ The rule for the competition entry: the app does not rely on other people's IP, 
 
 ## Open weights run on Comfy Cloud
 
-| Model                                                            | Used by                                                   | Provider                                  | Licence                     | Allowed                      |
-| ---------------------------------------------------------------- | --------------------------------------------------------- | ----------------------------------------- | --------------------------- | ---------------------------- |
-| LTX-2 19B distilled                                              | Camera moves                                              | Lightricks                                | LTX-2 Community License     | Yes                          |
-| LTX 2.3 22B distilled                                            | Object Swap, Restyle, Re-stage, performance transfer      | Lightricks                                | LTX-2 Community License     | Yes                          |
-| LTX 2.5 22B distilled, video and audio VAEs                      | Background replacement, LTX path                          | Lightricks                                | LTX-2.x Community License   | Yes                          |
-| Gemma 3 12B (LTX-2, 2.3) and Gemma 4 12B (LTX 2.5) text encoders | Every LTX graph                                           | Google, packaged for LTX by Lightricks    | Gemma Terms of Use          | Yes, part of the LTX release |
-| FLUX.2 Klein 9B, FLUX.2 VAE, Qwen 3 8B encoder                   | Object Swap and Restyle keyframe                          | Black Forest Labs                         | FLUX Non-Commercial License | Yes for the entry; see notes |
-| FLUX 3 Klein, Qwen3-VL 4B encoder                                | Cloud connection check (`flux-klein.ts`)                  | Black Forest Labs, Qwen                   | BFL licence, Apache 2.0     | Yes                          |
-| MoGe-2 ViT-L (`moge_2_vitl_normal_fp16`)                         | Re-stage geometry                                         | Microsoft Research (Ruicheng Wang et al.) | MIT                         | Yes                          |
-| SAM 3.1 (`sam3.1_multiplex_fp16`)                                | Object Swap composite; the LTX recast experiment          | Meta                                      | SAM License                 | Yes                          |
-| Depth Anything V2 Large (`depth_anything_v2_vitl`)               | Depth guide for Object Swap and Restyle                   | Depth Anything team                       | CC BY-NC 4.0                | Yes for the entry; see notes |
-| DWPose (`dw-ll_ucoco_384`) with YOLOX-L detector                 | Pose guide for the LTX recast experiment (not in the app) | Yang et al., Megvii                       | Apache 2.0                  | Yes                          |
+| Model                                                            | Used by                                                                                                                                     | Provider                                  | Licence                     | Allowed                                                 |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | --------------------------- | ------------------------------------------------------- |
+| LTX-2 19B distilled                                              | Camera moves                                                                                                                                | Lightricks                                | LTX-2 Community License     | Yes                                                     |
+| LTX 2.3 22B distilled                                            | Object Swap, Restyle, Re-stage, performance transfer                                                                                        | Lightricks                                | LTX-2 Community License     | Yes                                                     |
+| LTX 2.5 22B distilled, video and audio VAEs                      | Background replacement, LTX path                                                                                                            | Lightricks                                | LTX-2.x Community License   | Yes                                                     |
+| Gemma 3 12B (LTX-2, 2.3) and Gemma 4 12B (LTX 2.5) text encoders | Every LTX graph                                                                                                                             | Google, packaged for LTX by Lightricks    | Gemma Terms of Use          | Awaiting confirmation; part of the LTX release          |
+| FLUX.2 Klein 9B, FLUX.2 VAE, Qwen 3 8B encoder                   | Object Swap and Restyle keyframe                                                                                                            | Black Forest Labs                         | FLUX Non-Commercial License | **No under the rule; still wired, needs Martin's call** |
+| FLUX 3 Klein, Qwen3-VL 4B encoder                                | Cloud connection check (`flux-klein.ts`)                                                                                                    | Black Forest Labs, Qwen                   | BFL licence, Apache 2.0     | Awaiting confirmation                                   |
+| MoGe-2 ViT-L (`moge_2_vitl_normal_fp16`)                         | Re-stage geometry; depth guide for Object Swap and Restyle (`MoGeRender` depth)                                                             | Microsoft Research (Ruicheng Wang et al.) | MIT                         | Yes                                                     |
+| SAM 3.1 (`sam3.1_multiplex_fp16`)                                | Object Swap composite; the LTX recast experiment                                                                                            | Meta                                      | SAM License                 | Awaiting confirmation                                   |
+| Depth Anything V2 Large (`depth_anything_v2_vitl`)               | Was the depth guide for Object Swap and Restyle, now MoGe-2; was the performance-transfer depth option                                      | Depth Anything team                       | CC BY-NC 4.0                | **No, removed**                                         |
+| DWPose (`dw-ll_ucoco_384`) with YOLOX-L detector                 | Was the pose guide for performance transfer and the LTX recast experiment, now ComfyUI's core `ImageBlur` + `Canny` edge guide (no weights) | Yang et al., Megvii                       | Apache 2.0                  | **No, removed**                                         |
 
 ## Hosted models through Comfy Router
 
@@ -73,12 +81,32 @@ The scripts under `evaluation/` are for Phase 0 scoring and are not shipped in t
 ## What was removed
 
 - **Cseti's CrossView-Prompt IC-LoRA**, Re-stage's former model. Its graph, prompt builder and model entry are deleted; Re-stage now runs on the graph described above.
-- Nothing else: every other LoRA in use is Lightricks'. The Cameraman IC-LoRA had already been passed over for its non-commercial licence.
+- **Depth Anything V2 Large** (CC BY-NC 4.0), the Object Swap and Restyle depth guide. MoGe-2 (MIT) renders the depth instead.
+- **DWPose** (Apache 2.0), the pose guide in the LTX recast experiment. ComfyUI's core `ImageBlur` and `Canny` nodes make an edge guide instead, with no weights.
+- Every LoRA still in use is Lightricks'. The Cameraman IC-LoRA had already been passed over for its non-commercial licence.
 
-## Notes for Martin to confirm
+## Permissive, not MIT, awaiting confirmation
+
+These are licensed for commercial use but are not MIT, so they wait for Martin's word under the rule above.
+
+| Item                | Used by                                                | Licence    |
+| ------------------- | ------------------------------------------------------ | ---------- |
+| Qwen3-VL 4B encoder | Cloud connection check (`flux-klein.ts`) only          | Apache 2.0 |
+| Qwen 3 8B encoder   | Part of the FLUX.2 Klein 9B keyframe stack (see below) | Apache 2.0 |
+
+DWPose (Apache 2.0) and Cseti's CrossView-Prompt IC-LoRA (Apache 2.0) were in this group and have been removed rather than waiting.
+
+## Needs Martin's call
+
+These are out under the rule as written, or their licence is unclear, and each still has a use in the app.
+
+- **FLUX.2 Klein 9B** (FLUX Non-Commercial License) makes the Object Swap and Restyle keyframe. Options: swap to FLUX.2 Klein 4B (Apache 2.0, so it would join the list above), move the keyframe to the hosted `bfl/flux-3-image` on Router, or keep it for the entry only. Nothing has been run for either swap.
+- **SAM 3.1** (Meta's SAM License, a custom licence) cuts the object for the Object Swap composite. It permits commercial use but is not MIT.
+- **Gemma 3 and Gemma 4 text encoders** (Gemma Terms of Use) are part of every LTX graph as Lightricks ships it. Replacing them means leaving LTX, so the practical question is whether Lightricks' release covers them.
+- **FLUX 3 Klein** (BFL licence) is used only by the Cloud connection check, which could move to an LTX graph if needed.
+- **On-device face and pose models** (BlazeFace, FaceMesh, FaceRes, MoveNet) have no per-model licence in `@vladmandic/human`, so they are unclear. They power the recast shot checks in the browser; the checks could be switched off without blocking a recast.
+
+## Other notes
 
 - Hosted Router models (Kling, FLUX 3, LTX 2.5, Bria, SwitchX) are treated as platform services. The Open Weights Only category would exclude them; the other categories allow partner models.
-- Two base weights are non-commercial: FLUX.2 Klein 9B and Depth Anything V2 Large. Both are licensed for this use and neither is a LoRA, but an Apache 2.0 swap exists for each (FLUX.2 Klein 4B, Depth Anything V2 Small) if a commercial launch needs it. Neither swap has been run.
-- The Orb29 shader carries XorDev's non-commercial restriction. It stays for the entry, but needs replacing or written permission before any commercial use.
-- The on-device face and pose models have no per-model licence in `@vladmandic/human`; check BlazeFace, FaceMesh, FaceRes and MoveNet upstream before a commercial launch.
 - A re-staging IC-LoRA of our own for bigger moves is planned in [restage-ic-lora.md](restage-ic-lora.md) and not started.
