@@ -8,6 +8,7 @@ import {
 } from "react";
 import { cn } from "@/lib/utils";
 import {
+  approvedMotionReferences,
   approvedReferences,
   combineStates,
   mentionTokens,
@@ -48,6 +49,8 @@ export interface ResolvedMention {
   states: ElementState[];
   /** Approved state references first, then approved identity references. */
   references: MentionReference[];
+  /** Approved moving references (a Location's clips), with the same order. */
+  moves: MentionReference[];
   problem: string | null;
   /**
    * A state that does not resolve, or two that clash: generating would
@@ -68,8 +71,16 @@ export function blockingMentionProblem(
  * The references the server resolves for this mention (`approvedReferences`):
  * the states' own first, then the base sheet's views they do not replace.
  */
-function approved(element: Element, stateIds: string[]): MentionReference[] {
-  return approvedReferences(element, stateIds).map((r) => ({
+function approved(
+  element: Element,
+  stateIds: string[],
+  moving = false,
+): MentionReference[] {
+  return (
+    moving
+      ? approvedMotionReferences(element, stateIds)
+      : approvedReferences(element, stateIds)
+  ).map((r) => ({
     id: r.id,
     view: r.view,
     asset: r.asset,
@@ -93,6 +104,7 @@ export function resolveMentions(
         state: null,
         states: [],
         references: [],
+        moves: [],
         problem: `No Element is named @${token.handle}.`,
         blocking: false,
       };
@@ -111,11 +123,16 @@ export function resolveMentions(
       element,
       states.map((s) => s.id),
     );
+    const moves = approved(
+      element,
+      states.map((s) => s.id),
+      true,
+    );
     const problem = unknown
       ? `@${element.handle} has no state named “${unknown}”.`
       : combined.problem
         ? combined.problem
-        : references.length === 0
+        : references.length + moves.length === 0
           ? `@${element.handle} has no approved references yet.`
           : null;
     return {
@@ -124,6 +141,7 @@ export function resolveMentions(
       state: states[0] ?? null,
       states,
       references,
+      moves,
       problem,
       blocking: !!(unknown || combined.problem),
     };
@@ -471,7 +489,7 @@ export function MentionSummary({
             }
           >
             {mention.problem ??
-              `${mention.references.length} ${mention.references.length === 1 ? "reference" : "references"}${mention.states.length ? ` · ${mention.states.map((s) => s.name).join(" + ")}` : ""}`}
+              `${mention.references.length} ${mention.references.length === 1 ? "reference" : "references"}${mention.moves.length ? ` · ${mention.moves.length === 1 ? "a moving reference" : `${mention.moves.length} moving references`}` : ""}${mention.states.length ? ` · ${mention.states.map((s) => s.name).join(" + ")}` : ""}`}
           </span>
         </li>
       ))}

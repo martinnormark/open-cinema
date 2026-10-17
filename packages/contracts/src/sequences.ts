@@ -104,6 +104,12 @@ export const shotSchema = z.object({
   beat: z.string(),
   /** What the frame shows; may contain @mentions. */
   prompt: z.string(),
+  /**
+   * The geometry in words: who stands where, which side the camera is on,
+   * what the light does. References carry what things look like; this
+   * carries where they are.
+   */
+  staging: z.string().default(""),
   framing: shotFramingSchema,
   camera: shotCameraSchema,
   durationSeconds: shotDurationSchema,
@@ -144,6 +150,7 @@ export const shotDraftSchema = z.object({
   title: z.string().trim().min(1).max(120),
   beat: shotText.default(""),
   prompt: shotText.default(""),
+  staging: shotText.default(""),
   framing: shotFramingSchema.default("medium"),
   camera: shotCameraSchema.default("static"),
   durationSeconds: shotDurationSchema.default(5),
@@ -181,6 +188,7 @@ export const updateShotInputSchema = z.object({
   title: z.string().trim().min(1).max(120).optional(),
   beat: shotText.optional(),
   prompt: shotText.optional(),
+  staging: shotText.optional(),
   framing: shotFramingSchema.optional(),
   camera: shotCameraSchema.optional(),
   durationSeconds: shotDurationSchema.optional(),
@@ -231,11 +239,14 @@ export function approvedTake(shot: Shot, role: TakeRole): ShotTake | null {
  * mentions; the project's look is appended so it never rewrites an Element.
  */
 export function composeShotPrompt(
-  shot: Pick<Shot, "prompt" | "beat" | "framing" | "camera">,
+  shot: Pick<Shot, "prompt" | "beat" | "framing" | "camera"> &
+    Partial<Pick<Shot, "staging">>,
   options: { role: TakeRole; direction?: string | undefined },
 ): string {
   const parts = [
     (shot.prompt || shot.beat).trim().replace(/[.\s]+$/, ""),
+    // Staging follows the subject so positions attach to who they describe.
+    shot.staging?.trim().replace(/[.\s]+$/, ""),
     SHOT_FRAMING_PROMPTS[shot.framing],
   ];
   if (options.role === "motion") parts.push(SHOT_CAMERA_PROMPTS[shot.camera]);

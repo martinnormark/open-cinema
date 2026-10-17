@@ -72,6 +72,8 @@ import {
   framingLabels,
   keyframeRequest,
   motionRequest,
+  prefersReferenceMotion,
+  referenceMotionRequest,
   shotWarnings,
   takeUrl,
   takeView,
@@ -110,6 +112,7 @@ export function ShotRow({
     title: shot.title,
     beat: shot.beat,
     prompt: shot.prompt,
+    staging: shot.staging,
   });
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -200,6 +203,13 @@ export function ShotRow({
   const motionJob = keyframe?.asset
     ? motionRequest(current, keyframe.asset, elements, direction)
     : null;
+  const referenceJob = continuing
+    ? null
+    : referenceMotionRequest(current, elements, direction);
+  // A Location's moving reference makes references the way in; a
+  // continuation keeps its keyframe so the cut has no jump.
+  const referencesFirst =
+    !!referenceJob && !motion && prefersReferenceMotion(current, elements);
 
   return (
     <article
@@ -362,6 +372,27 @@ export function ShotRow({
               placeholder="Who is in it, where, doing what, in what light. Type @ for your Elements."
             />
           </Field>
+          <Field
+            label="Staging"
+            htmlFor={`shot-${shot.id}-staging`}
+            className="mt-3"
+          >
+            <Textarea
+              id={`shot-${shot.id}-staging`}
+              value={draft.staging}
+              rows={2}
+              maxLength={2000}
+              placeholder="Where everyone stands, which side the camera is on, where the light comes from. Mara by the window on the left, Theo at the door; we look past Theo toward her; low sun from behind her."
+              onChange={(e) =>
+                setDraft((d) => ({ ...d, staging: e.target.value }))
+              }
+              onBlur={() => {
+                if (draft.staging !== shot.staging)
+                  void save({ staging: draft.staging });
+              }}
+              className="min-h-0 resize-none"
+            />
+          </Field>
 
           <div className="mt-3 grid grid-cols-3 gap-2">
             <Choice
@@ -460,7 +491,7 @@ export function ShotRow({
               </Button>
             ) : (
               <Button
-                variant={keyframe ? "outline" : "default"}
+                variant={keyframe || referencesFirst ? "outline" : "default"}
                 size="sm"
                 disabled={
                   !!busy ||
@@ -479,8 +510,24 @@ export function ShotRow({
                     : "Make keyframe"}
               </Button>
             )}
+            {referenceJob && (
+              <Button
+                variant={referencesFirst ? "default" : "outline"}
+                size="sm"
+                disabled={!!busy || !live}
+                title="Text to video: the references show the faces and the place, the shot's words say the rest."
+                onClick={() =>
+                  run("references", () => generate("motion", referenceJob))
+                }
+              >
+                <Clapperboard aria-hidden="true" />
+                {busy === "references" ? "Sending…" : "Shoot from references"}
+              </Button>
+            )}
             <Button
-              variant={keyframe && !motion ? "default" : "outline"}
+              variant={
+                keyframe && !motion && !referencesFirst ? "default" : "outline"
+              }
               size="sm"
               disabled={!!busy || !live || !motionJob}
               title={motionJob ? undefined : "Approve a keyframe first."}
@@ -496,10 +543,12 @@ export function ShotRow({
                   : "Animate"}
             </Button>
             <Estimate
-              request={motionJob ?? keyframeJob}
+              request={
+                (referencesFirst ? referenceJob : motionJob) ?? keyframeJob
+              }
               show={shouldShowEstimate(
                 preferences,
-                motionJob ? "video" : "image",
+                referencesFirst || motionJob ? "video" : "image",
               )}
               unit={preferences.unit}
             />

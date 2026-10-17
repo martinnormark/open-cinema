@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { CameraMove } from "./camera";
 import { assetRefSchema } from "./media";
 
 export const elementTypeSchema = z.enum(["character", "location", "thing"]);
@@ -27,6 +28,10 @@ export const referenceViewSchema = z.enum([
   "expression",
   "full-body",
   // Locations
+  /** Moving references: short empty-location clips, see `LOCATION_MOVES`. */
+  "push-in",
+  "drift",
+  "rise",
   "establishing",
   "alternate-angle",
   "landmark",
@@ -36,6 +41,43 @@ export const referenceViewSchema = z.enum([
   "detail",
 ]);
 export type ReferenceView = z.infer<typeof referenceViewSchema>;
+
+/**
+ * A Location's moving references: a few seconds of the empty place with the
+ * camera travelling through it. A still shows one face of a room; a move
+ * shows how its walls, openings and depth sit around the camera, so a later
+ * shot that moves keeps the same architecture. Each view is one move.
+ */
+export const LOCATION_MOVES = {
+  "push-in": {
+    move: "dolly-in",
+    label: "Push in",
+    prompt:
+      "The camera glides slowly forward into the space at walking height, revealing depth and what lies ahead.",
+  },
+  drift: {
+    move: "truck-right",
+    label: "Lateral drift",
+    prompt:
+      "The camera drifts slowly sideways to the right at eye level, so nearer features slide past farther ones.",
+  },
+  rise: {
+    move: "crane-up",
+    label: "Rise",
+    prompt:
+      "The camera rises slowly and steadily, revealing the layout of the place from above.",
+  },
+} as const satisfies Record<
+  string,
+  { move: CameraMove; label: string; prompt: string }
+>;
+export type MovingView = keyof typeof LOCATION_MOVES;
+
+export function isMovingView(
+  view: ReferenceView | null | undefined,
+): view is MovingView {
+  return !!view && view in LOCATION_MOVES;
+}
 
 export const REFERENCE_VIEWS_BY_TYPE = {
   character: [
@@ -49,14 +91,22 @@ export const REFERENCE_VIEWS_BY_TYPE = {
     "expression",
     "full-body",
   ],
-  location: ["establishing", "alternate-angle", "landmark", "detail"],
+  location: [
+    "push-in",
+    "drift",
+    "rise",
+    "establishing",
+    "alternate-angle",
+    "landmark",
+    "detail",
+  ],
   thing: ["front", "side", "rear", "top", "three-quarter", "detail"],
 } as const satisfies Record<ElementType, readonly ReferenceView[]>;
 
 /** Views a reference sheet should cover before it reads as complete. */
 export const RECOMMENDED_VIEWS_BY_TYPE = {
   character: ["face-closeup", "smile", "sheet"],
-  location: ["establishing", "alternate-angle"],
+  location: ["push-in", "establishing"],
   thing: ["front", "side", "three-quarter", "detail"],
 } as const satisfies Record<ElementType, readonly ReferenceView[]>;
 
@@ -371,7 +421,7 @@ export type UpdateElementStateInput = z.infer<
 >;
 
 /**
- * Approved references for a mention: the selected state's, then the base
+ * Approved still references for a mention: the selected state's, then the base
  * sheet's. A state is its own asset, so where it has approved a view (its
  * own sheet, its own close portrait) the base reference for that view is left
  * out: wet Cal does not also bring dry Cal's jacket.
@@ -380,8 +430,27 @@ export function approvedReferences(
   element: Pick<Element, "references">,
   stateId?: string | readonly string[],
 ): ElementReference[] {
+  return approvedOf(element, stateId, false);
+}
+
+/**
+ * Approved moving references (videos), with the same state rules. They are
+ * kept apart from `approvedReferences` because most models only take images.
+ */
+export function approvedMotionReferences(
+  element: Pick<Element, "references">,
+  stateId?: string | readonly string[],
+): ElementReference[] {
+  return approvedOf(element, stateId, true);
+}
+
+function approvedOf(
+  element: Pick<Element, "references">,
+  stateId: string | readonly string[] | undefined,
+  moving: boolean,
+): ElementReference[] {
   const approved = element.references.filter(
-    (ref) => ref.status === "approved",
+    (ref) => ref.status === "approved" && isMovingView(ref.view) === moving,
   );
   const stateIds =
     stateId === undefined

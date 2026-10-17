@@ -180,6 +180,7 @@ export async function importWorld(
         title: shot.title,
         beat: renameMentions(shot.beat, renamed),
         prompt: renameMentions(shot.prompt, renamed),
+        staging: renameMentions(shot.staging, renamed),
         framing: shot.framing,
         camera: shot.camera,
         durationSeconds: shot.durationSeconds,

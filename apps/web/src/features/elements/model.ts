@@ -10,9 +10,13 @@ import type {
   ReferenceView,
 } from "@open-cinema/contracts";
 import {
+  approvedMotionReferences,
   approvedReferences,
   generationRequestSchema,
+  isMovingView,
+  LOCATION_MOVES,
   toStateHandle,
+  type MovingView,
 } from "@open-cinema/contracts";
 import type {
   ImageAspectRatio,
@@ -29,6 +33,7 @@ export type {
   ReferenceView,
 } from "@open-cinema/contracts";
 export {
+  isMovingView,
   toElementHandle as toHandle,
   toStateHandle,
 } from "@open-cinema/contracts";
@@ -43,6 +48,8 @@ export interface GuidanceSlot {
   framing: string;
   /** Character views follow the sheet rules in sheet-prompt.ts instead. */
   shot?: CharacterShot;
+  /** A Location's moving reference: a short clip of the empty place. */
+  move?: MovingView;
   /** Approved views that guide this one; all approved views when unset. */
   guidedBy?: readonly ReferenceView[];
   aspectRatio?: ImageAspectRatio;
@@ -134,9 +141,33 @@ export const elementTypes: Record<ElementType, ElementTypeInfo> = {
     ],
     slots: [
       {
+        id: "push-in",
+        label: "Moving reference",
+        hint: "A few seconds of the empty place with the camera pushing in. It shows the space around the camera, so shots that move keep the same architecture. Make it first.",
+        required: true,
+        framing: "",
+        move: "push-in",
+      },
+      {
+        id: "drift",
+        label: "Lateral drift",
+        hint: "The camera slides sideways, so near and far features separate and the depth reads.",
+        required: false,
+        framing: "",
+        move: "drift",
+      },
+      {
+        id: "rise",
+        label: "Rising view",
+        hint: "The camera rises, showing how the place is laid out.",
+        required: false,
+        framing: "",
+        move: "rise",
+      },
+      {
         id: "establishing",
         label: "Establishing view",
-        hint: "The overall layout and scale of the place.",
+        hint: "The overall layout and scale of the place, as one still.",
         required: true,
         framing:
           "wide establishing shot showing the complete layout and scale, eye level, clear daylight",
@@ -160,8 +191,8 @@ export const elementTypes: Record<ElementType, ElementTypeInfo> = {
       {
         id: "alternate-angle",
         label: "Alternate viewpoint",
-        hint: "The same place from another side, so a camera can move.",
-        required: true,
+        hint: "The same place from the other side, for reverse angles.",
+        required: false,
         framing:
           "wide view of the same place from the opposite side, reverse angle, eye level, clear daylight",
       },
@@ -340,6 +371,15 @@ export function reviewSheet(
           `${s.approved.length} approved ${s.slot.label.toLowerCase()} references may disagree. Keep the clearest two so later generations do not drift.`,
         );
   }
+  if (element.type === "location") {
+    const stills = approved.filter((r) => !isMovingView(r.view)).length;
+    const moving = approved.length - stills;
+    const ownSheet = stateId === null;
+    if (stills > 0 && moving === 0 && (ownSheet || !hasBaseMove(element)))
+      warnings.push(
+        `Only still ${stills === 1 ? "frame" : "frames"} so far. A still shows one face of the place, so a shot whose camera moves has to invent the rest. Add a moving reference.`,
+      );
+  }
   const untagged = approved.filter((r) => r.view === null).length;
   if (untagged)
     warnings.push(
@@ -360,6 +400,10 @@ export function reviewSheet(
   };
 }
 
+function hasBaseMove(element: Element) {
+  return approvedMotionReferences(element).length > 0;
+}
+
 /** Prompt for a complementary reference view of the Element or one of its states. */
 export function viewPrompt(
   element: Element,
@@ -377,12 +421,37 @@ export function viewPrompt(
     element.description.trim() ||
     `${elementTypes[element.type].label} ${element.name}`;
   const stateText = state ? ` ${state.description.trim() || state.name}.` : "";
+  if (slot.move)
+    return locationMovePrompt(subject, stateText, slot.move, guided);
   return `${subject}.${stateText} ${slot.framing}. Reference sheet image, consistent identity, photorealistic.`
     .replace(/\.\./g, ".")
     .slice(0, 2000);
 }
 
+/**
+ * An empty-location clip. Nobody is in it, so the reference carries only the
+ * place; the move is said plainly, without lens or camera-gear words, which
+ * LTX draws as a frame artefact (see LTX_FRAME_ARTEFACT).
+ */
+export function locationMovePrompt(
+  subject: string,
+  stateText: string,
+  move: MovingView,
+  fromStill: boolean,
+): string {
+  const opening = fromStill
+    ? "The same place as the image, continuing from it."
+    : "";
+  return `${opening} ${subject}.${stateText} The place is completely empty: no people, no animals, nothing moving except light, weather and foliage. ${LOCATION_MOVES[move].prompt} One continuous, steady take with realistic scale and consistent architecture.`
+    .replace(/\.\./g, ".")
+    .trim()
+    .slice(0, 2000);
+}
+
 const viewHints: [RegExp, ReferenceView][] = [
+  [/push|dolly|walk-?in|forward/, "push-in"],
+  [/drift|slide|lateral|truck|pan/, "drift"],
+  [/rise|crane|jib|aerial|drone/, "rise"],
   [/sheet|turnaround|model-?sheet/, "sheet"],
   [/smil|laugh|grin/, "smile"],
   [/face|close-?up|portrait|headshot/, "face-closeup"],
@@ -403,12 +472,17 @@ const viewHints: [RegExp, ReferenceView][] = [
 export function guessView(
   type: ElementType,
   fileName: string,
+  kind: "image" | "video" = "image",
 ): ReferenceView | null {
   const name = fileName.toLowerCase().replace(/\.[a-z0-9]+$/, "");
-  const allowed = new Set(elementTypes[type].slots.map((s) => s.id));
+  const slots = elementTypes[type].slots.filter(
+    (s) => !!s.move === (kind === "video"),
+  );
+  const allowed = new Set(slots.map((s) => s.id));
   for (const [pattern, view] of viewHints)
     if (pattern.test(name) && allowed.has(view)) return view;
-  return null;
+  // A clip of a place is a moving reference even when its name says nothing.
+  return kind === "video" ? (slots[0]?.id ?? null) : null;
 }
 
 /** Views that show the clothing; a state never borrows them from the base. */
@@ -455,6 +529,7 @@ export function viewRequest(
   slot: GuidanceSlot,
   state: ElementState | null,
 ): GenerationRequest {
+  if (slot.move) return moveRequest(element, slot, state);
   const references = conditioningReferences(element, state, 6, slot);
   const guided = references.length > 0;
   const prompt = viewPrompt(element, slot, state, guided);
@@ -480,4 +555,40 @@ export function viewRequest(
         workflowKind: "image.flux",
         inputs: { prompt, ...size },
       });
+}
+
+/** Stills that can open a moving reference: the establishing view first. */
+const OPENING_VIEWS: readonly ReferenceView[] = [
+  "establishing",
+  "alternate-angle",
+  "landmark",
+];
+
+/**
+ * A moving reference is a 5 s, 720p clip with no sound, long and large enough
+ * for a reference video. With an approved still of the place it continues
+ * from that still (FLUX 3 Video, since Router's LTX reads text only);
+ * otherwise LTX 2.5 makes it from the description.
+ */
+function moveRequest(
+  element: Element,
+  slot: GuidanceSlot,
+  state: ElementState | null,
+): GenerationRequest {
+  const stills = approvedReferences(element, state?.id);
+  const opening = OPENING_VIEWS.map((view) =>
+    stills.find((r) => r.view === view),
+  ).find(Boolean);
+  return generationRequestSchema.parse({
+    workflowKind: "video.ltx",
+    inputs: {
+      prompt: viewPrompt(element, slot, state, !!opening),
+      durationSeconds: 5,
+      resolution: "1280x720",
+      fps: 24,
+      generateAudio: false,
+      quality: "fast",
+      ...(opening ? { firstFrame: opening.asset } : {}),
+    },
+  });
 }

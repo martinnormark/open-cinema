@@ -137,6 +137,7 @@ export const worldSequenceSchema = z.object({
       z.object({
         title: z.string().min(1).max(120),
         beat: z.string().max(2000).default(""),
+        staging: z.string().max(2000).default(""),
         prompt: z.string().max(2000).default(""),
         framing: shotFramingSchema.catch("medium"),
         camera: shotCameraSchema.catch("static"),

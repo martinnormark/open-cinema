@@ -52,7 +52,7 @@ export async function collectWorld(
   const mentioned = new Set(
     sequences.flatMap((s) =>
       s.shots.flatMap((shot) =>
-        parseMentionHandles(`${shot.prompt} ${shot.beat}`),
+        parseMentionHandles(`${shot.prompt} ${shot.staging} ${shot.beat}`),
       ),
     ),
   );
@@ -193,6 +193,7 @@ export async function collectWorld(
       shots.push({
         title: shot.title,
         beat: shot.beat,
+        staging: shot.staging,
         prompt: shot.prompt,
         framing: shot.framing,
         camera: shot.camera,

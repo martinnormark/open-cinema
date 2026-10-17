@@ -174,6 +174,17 @@ export function estimateGeneration(
         note: "Image-to-video runs on FLUX 3 Video; Router does not report its exact charge.",
       };
     }
+    case "video.reference": {
+      // Kling 3.0 Omni std text-to-video; billed like its std edit per output second.
+      const credits =
+        KLING_EDIT_CREDITS_PER_SECOND * request.inputs.durationSeconds;
+      return {
+        credits: round(credits * 0.9, credits * 1.2),
+        seconds: round(90, 1200),
+        basis: "heuristic",
+        note: "Runs Kling 3.0 Omni at 720p with your Elements' references.",
+      };
+    }
     case "video.background-replace":
       if (request.inputs.pipeline === "ltx-alpha")
         return cloudEstimate("alpha");

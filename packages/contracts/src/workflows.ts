@@ -76,6 +76,24 @@ export const ltxVideoInputsSchema = z.object({
 });
 export type LtxVideoInputs = z.infer<typeof ltxVideoInputsSchema>;
 
+/**
+ * Text-to-video from references: the mentioned Elements' approved references
+ * carry the picture (faces, wardrobe, the place) and the prompt carries
+ * everything else, including the geometry: who stands where, which side the
+ * camera is on, what the light does. A Location's moving reference goes in as
+ * a reference video, so the shot inherits the architecture around the camera
+ * rather than one frontal still. No first frame: the shot is composed from
+ * the words, not animated from a keyframe.
+ */
+export const referenceVideoInputsSchema = z.object({
+  prompt,
+  durationSeconds: z.literal([3, 4, 5, 6, 8, 10]).default(5),
+  aspectRatio: z.enum(["16:9", "9:16", "1:1"]).default("16:9"),
+  mentions,
+  direction,
+});
+export type ReferenceVideoInputs = z.infer<typeof referenceVideoInputsSchema>;
+
 export const backgroundPipelineSchema = z.enum(["kling", "ltx-alpha"]);
 export type BackgroundPipelineChoice = z.infer<typeof backgroundPipelineSchema>;
 
@@ -198,6 +216,7 @@ export const workflowInputsSchemas = {
   "image.flux": fluxImageInputsSchema,
   "image.flux-reference": fluxReferenceInputsSchema,
   "video.ltx": ltxVideoInputsSchema,
+  "video.reference": referenceVideoInputsSchema,
   "video.background-replace": backgroundReplaceInputsSchema,
   "video.character-replace": characterReplaceInputsSchema,
   "video.performance-transfer": performanceTransferInputsSchema,
@@ -223,6 +242,10 @@ export const generationRequestSchema = z.discriminatedUnion("workflowKind", [
   z.object({
     workflowKind: z.literal("video.ltx"),
     inputs: ltxVideoInputsSchema,
+  }),
+  z.object({
+    workflowKind: z.literal("video.reference"),
+    inputs: referenceVideoInputsSchema,
   }),
   z.object({
     workflowKind: z.literal("video.background-replace"),
@@ -271,6 +294,7 @@ export type WorkflowCommandInput = z.input<typeof workflowCommandSchema>;
 export function requestAssetRefs(request: GenerationRequest): AssetRef[] {
   switch (request.workflowKind) {
     case "image.flux":
+    case "video.reference":
       return [];
     case "video.ltx":
       return request.inputs.firstFrame ? [request.inputs.firstFrame] : [];
@@ -395,6 +419,12 @@ export const WORKFLOW_DESCRIPTORS = {
       "comfy-cloud/ltx-2-camera-lora",
     ],
   },
+  "video.reference": {
+    kind: "video.reference",
+    label: "Video from references",
+    output: "video",
+    models: ["kling/kling-v3-omni"],
+  },
   "video.background-replace": {
     kind: "video.background-replace",
     label: "Replace background",
@@ -468,6 +498,16 @@ export const resolvedMentionSchema = z.object({
       }),
     )
     .max(16),
+  /** Approved moving references (a Location's empty-location clips), best first. */
+  motion: z
+    .array(
+      z.object({
+        asset: assetRefSchema,
+        view: referenceViewSchema.nullable(),
+      }),
+    )
+    .max(3)
+    .default([]),
 });
 export type ResolvedMention = z.infer<typeof resolvedMentionSchema>;
 

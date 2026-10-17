@@ -5,6 +5,7 @@ export const workflowKindSchema = z.enum([
   "image.flux",
   "image.flux-reference",
   "video.ltx",
+  "video.reference",
   "video.background-replace",
   "video.character-replace",
   "video.performance-transfer",

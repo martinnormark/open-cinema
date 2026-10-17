@@ -20,6 +20,7 @@ const harbor: ResolvedMention = {
   stateName: "dusk",
   stateDescription: "Sodium lamps coming on under a deep blue sky.",
   states: [],
+  motion: [],
   references: [
     {
       asset: { type: "media-asset", assetId: "pier" },

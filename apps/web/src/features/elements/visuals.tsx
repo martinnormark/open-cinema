@@ -10,8 +10,8 @@ import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { startSession } from "./generate";
-import { assetUrl } from "@/lib/media-url";
-import type { Element, ElementType } from "./model";
+import { assetUrl, posterUrl } from "@/lib/media-url";
+import { isMovingView, type Element, type ElementType } from "./model";
 import "./elements.css";
 
 export const typeIcons: Record<ElementType, LucideIcon> = {
@@ -20,16 +20,27 @@ export const typeIcons: Record<ElementType, LucideIcon> = {
   thing: Box,
 };
 
-/** The approved close portrait, else the first approved identity reference,
+/** A Location's approved moving reference, if it has one. */
+export function coverMove(element: Element) {
+  return (
+    element.references.find(
+      (r) => r.status === "approved" && !r.stateId && isMovingView(r.view),
+    ) ?? null
+  );
+}
+
+/** The approved close portrait, else the first approved identity still,
  * else the newest exploration. */
 export function coverUrl(element: Element) {
   const approved = element.references.filter(
-    (r) => r.status === "approved" && !r.stateId,
+    (r) => r.status === "approved" && !r.stateId && !isMovingView(r.view),
   );
   const reference =
     approved.find((r) => r.view === "face-closeup") ??
     approved[0] ??
-    [...element.references].reverse().find((r) => r.status === "experiment");
+    [...element.references]
+      .reverse()
+      .find((r) => r.status === "experiment" && !isMovingView(r.view));
   return reference ? assetUrl(reference.asset) : null;
 }
 
@@ -41,10 +52,27 @@ export function ElementCover({
   className?: string;
 }) {
   const url = coverUrl(element);
+  const move = coverMove(element);
   const Icon = typeIcons[element.type];
   return (
     <div className={cn("overflow-hidden bg-surface", className)}>
-      {url ? (
+      {move ? (
+        <video
+          src={assetUrl(move.asset)}
+          poster={url ?? posterUrl(move.asset)}
+          muted
+          loop
+          playsInline
+          preload="none"
+          aria-hidden="true"
+          // Plays only under the pointer, so a grid of places decodes one clip.
+          onPointerEnter={(event) =>
+            void event.currentTarget.play().catch(() => {})
+          }
+          onPointerLeave={(event) => event.currentTarget.pause()}
+          className="size-full object-cover"
+        />
+      ) : url ? (
         <img
           src={url}
           alt=""

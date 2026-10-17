@@ -163,6 +163,45 @@ export function motionRequest(
   };
 }
 
+/** Kling's reference video takes 3 to 10 seconds. */
+const REFERENCE_DURATIONS = [3, 4, 5, 6, 8, 10] as const;
+
+/**
+ * Motion straight from the shot's words and its Elements' references, with no
+ * keyframe: the references carry the picture (a Location's moving reference
+ * carries the space around the camera), the frame, staging and camera fields
+ * carry everything else. Null when nothing mentioned has a reference.
+ */
+export function referenceMotionRequest(
+  shot: Shot,
+  elements: readonly Element[],
+  direction: string,
+): GenerationRequest | null {
+  const mentions = resolveMentions(`${shot.prompt} ${shot.staging}`, elements);
+  if (!mentions.some((m) => m.references.length || m.moves.length)) return null;
+  const payload = mentionPayload(mentions);
+  return {
+    workflowKind: "video.reference",
+    inputs: {
+      prompt: composeShotPrompt(shot, { role: "motion", direction }),
+      durationSeconds:
+        REFERENCE_DURATIONS.find((d) => d >= shot.durationSeconds) ?? 10,
+      aspectRatio: "16:9",
+      mentions: payload.mentions.slice(0, 8),
+    },
+  };
+}
+
+/** A mentioned Location with a moving reference makes references the default. */
+export function prefersReferenceMotion(
+  shot: Shot,
+  elements: readonly Element[],
+): boolean {
+  return resolveMentions(`${shot.prompt} ${shot.staging}`, elements).some(
+    (m) => m.moves.length > 0,
+  );
+}
+
 /** Problems worth saying before a creator spends on a shot. */
 export function shotWarnings(shot: Shot, elements: readonly Element[]) {
   const warnings: string[] = [];

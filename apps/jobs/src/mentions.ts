@@ -1,4 +1,5 @@
 import {
+  approvedMotionReferences,
   approvedReferences,
   combineStates,
   mentionStateIds,
@@ -18,6 +19,7 @@ import {
 
 const MAX_MENTIONS = 8;
 const MAX_REFERENCES_PER_MENTION = 8;
+const MAX_MOTION_PER_MENTION = 3;
 
 export class MentionError extends Error {}
 
@@ -53,6 +55,12 @@ function snapshot(element: Element, stateIds: string[]): ResolvedMention {
     )
       .slice(0, MAX_REFERENCES_PER_MENTION)
       .map((ref) => ({ asset: ref.asset, view: ref.view, roles: ref.roles })),
+    motion: approvedMotionReferences(
+      element,
+      states.map((s) => s.id),
+    )
+      .slice(0, MAX_MOTION_PER_MENTION)
+      .map((ref) => ({ asset: ref.asset, view: ref.view })),
   };
 }
 

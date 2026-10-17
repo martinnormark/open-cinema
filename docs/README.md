@@ -35,6 +35,7 @@ Primary entry points: [developer documentation](https://docs.comfy.org/developme
 - [Third-party IP](third-party-ip.md): every model and LoRA the app uses, its provider and licence, and what the no-borrowed-IP rule removed.
 - [Re-stage IC-LoRA](restage-ic-lora.md): the plan for training our own re-staging adapter on LTX 2.3: data, trainer, compute and reach.
 - [Reuse a performance](performance-transfer.md): the LTX 2.3 Union Control pose graph on Comfy Cloud, its limits and the live run.
+- [Location references and reference shots](location-references.md): empty-location moves as a Location's primary reference, the checklist that prefers them, and text-to-video from references with the staging in words.
 - [Sequences](sequences.md): planning shots from an idea, keyframe and motion approval per shot, continuing from the last frame, playback and the shot list.
 - [World bundles](world-bundles.md): saving Elements, recipes, a project's look and its sequences as one file, and bringing it into another studio.
 - [Media library and uploads](library.md): upload path, limits, the picker and how other features use uploads as sources and references.

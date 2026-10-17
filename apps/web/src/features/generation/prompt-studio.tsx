@@ -38,7 +38,13 @@ import {
 } from "@/features/direction/projects";
 import { acceptSnapshot, reconnectGeneration, useGeneration } from "./store";
 import { takeStudioDraft, type StudioDraft } from "./draft";
-import { studioDirection, studioRequest, type Medium } from "./request";
+import {
+  canUseReferences,
+  prefersReferences,
+  studioDirection,
+  studioRequest,
+  type Medium,
+} from "./request";
 import { JobList } from "./job-list";
 
 const prompts = [
@@ -87,6 +93,13 @@ export function PromptStudio({
   const [error, setError] = useState("");
   const [uncertain, setUncertain] = useState<WorkflowCommandInput | null>(null);
   const mentions = useMentions(prompt);
+  // Null follows the mentions: references once a Location brings a move.
+  const [source, setSource] = useState<"words" | "references" | null>(null);
+  const referencesOffered = medium === "video" && canUseReferences(mentions);
+  const fromReferences =
+    referencesOffered &&
+    (source ?? (prefersReferences(mentions) ? "references" : "words")) ===
+      "references";
   const direction = studioDirection(project, overrides, shot, recipe);
   const request = studioRequest(
     prompt,
@@ -94,8 +107,9 @@ export function PromptStudio({
     medium,
     aspect,
     direction,
-    camera,
+    fromReferences ? null : camera,
     draft?.durationSeconds as 4 | 5 | 6 | 8 | 10 | undefined,
+    fromReferences,
   );
   const preferences = useCostPreferences();
   const estimate = estimateGeneration(request);
@@ -184,7 +198,36 @@ export function PromptStudio({
           onClearRecipe={() => setRecipe(null)}
           disabled={!!uncertain}
         />
-        {medium === "video" && (
+        {referencesOffered && (
+          <fieldset className="mt-4">
+            <legend className="text-sm font-medium">Picture from</legend>
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              size="sm"
+              value={fromReferences ? "references" : "words"}
+              onValueChange={(value) =>
+                value && setSource(value as "words" | "references")
+              }
+              disabled={!!uncertain}
+              aria-label="Picture from"
+              className="mt-2"
+            >
+              <ToggleGroupItem value="references" className="px-3">
+                References
+              </ToggleGroupItem>
+              <ToggleGroupItem value="words" className="px-3">
+                Words only
+              </ToggleGroupItem>
+            </ToggleGroup>
+            <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
+              {fromReferences
+                ? "Your Elements' references show the faces and the place. Say the rest in the prompt: who stands where, which side the camera is on, what the light does."
+                : "LTX 2.5 reads only the words, so each mention is described in text."}
+            </p>
+          </fieldset>
+        )}
+        {medium === "video" && !fromReferences && (
           <CameraMoves
             value={camera}
             onChange={setCamera}
@@ -273,11 +316,13 @@ export function PromptStudio({
           className="tabular mt-3 text-xs leading-5 text-muted-foreground"
         >
           {WORKFLOW_DESCRIPTORS[request.workflowKind].label} ·{" "}
-          {request.workflowKind === "video.ltx"
-            ? request.inputs.camera
-              ? `LTX-2 with the ${CAMERA_MOVES[request.inputs.camera].label.toLowerCase()} camera LoRA · ${request.inputs.durationSeconds} s · 720p with sound · on Comfy Cloud`
-              : `LTX 2.5 Fast · ${request.inputs.durationSeconds} s · 720p with sound`
-            : `FLUX 3 · 1K ${aspect === "1:1" ? "square" : aspect}`}
+          {request.workflowKind === "video.reference"
+            ? `Kling 3.0 Omni · ${request.inputs.durationSeconds} s · 720p, no sound`
+            : request.workflowKind === "video.ltx"
+              ? request.inputs.camera
+                ? `LTX-2 with the ${CAMERA_MOVES[request.inputs.camera].label.toLowerCase()} camera LoRA · ${request.inputs.durationSeconds} s · 720p with sound · on Comfy Cloud`
+                : `LTX 2.5 Fast · ${request.inputs.durationSeconds} s · 720p with sound`
+              : `FLUX 3 · 1K ${aspect === "1:1" ? "square" : aspect}`}
           {project && ` · filed under ${project.name}`}
           {request.workflowKind === "image.flux-reference" &&
             ` · ${request.inputs.references.length} ${request.inputs.references.length === 1 ? "reference" : "references"} from your Elements`}

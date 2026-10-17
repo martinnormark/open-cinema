@@ -43,7 +43,7 @@ These are platform services the competition names ("Comfy API, Comfy Router"), n
 | `bfl/flux-3-image`                    | Image generation, character sheets, Location and Thing references           | Black Forest Labs |
 | `bfl/flux-3-video`                    | Image-to-video from a first frame                                           | Black Forest Labs |
 | `ltx/ltx-2-5-fast`, `ltx/ltx-2-5-pro` | Text-to-video                                                               | Lightricks        |
-| `kling/kling-v3-omni`                 | Recast, background replacement (Kling path)                                 | Kuaishou          |
+| `kling/kling-v3-omni`                 | Recast, background replacement (Kling path), reference shots                | Kuaishou          |
 | `bria/video-edit-remove-background`   | Matte for the as-shot background variant                                    | Bria              |
 | `beeble/switchx`                      | Background replacement, SwitchX path (measured in Phase 0, not the default) | Beeble            |
 | `anthropic/claude-sonnet-5-5`         | Sequences shot planning (`shot-planner.ts`), text only                      | Anthropic         |

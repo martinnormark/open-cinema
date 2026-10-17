@@ -25,6 +25,7 @@ const mara: ResolvedMention = {
   stateName: null,
   stateDescription: null,
   states: [],
+  motion: [],
   references: [
     {
       asset: { type: "media-asset", assetId: "mara-sheet" },

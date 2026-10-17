@@ -235,6 +235,8 @@ model Shot {
   title           String
   beat            String      @default("")
   prompt          String      @default("")
+  /// Who stands where, which side the camera is on, what the light does.
+  staging         String      @default("")
   framing         String
   camera          String
   durationSeconds Int

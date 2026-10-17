@@ -33,6 +33,12 @@ import {
 } from "./ltx-performance-transfer";
 import { ltxVideoModel, ltxVideoRequest } from "./ltx-video";
 import {
+  planReferences,
+  REFERENCE_VIDEO_MODEL,
+  referenceVideoPrompt,
+  referenceVideoRequest,
+} from "./reference-video";
+import {
   expandMentions,
   httpsUrl,
   mediaTypeFromUrl,
@@ -226,6 +232,34 @@ export const ltxVideoWorkflow: WorkflowDefinition<"video.ltx"> = {
     );
   },
   outputs: ltxVideoOutputs,
+};
+
+export const referenceVideoWorkflow: WorkflowDefinition<"video.reference"> = {
+  kind: "video.reference",
+  displayModel: "Kling 3.0 Omni",
+  deadlineMs: 45 * 60_000,
+  model: () => REFERENCE_VIDEO_MODEL,
+  async build(inputs, context) {
+    const plan = planReferences(context.mentions);
+    const [videoUrl, images] = await Promise.all([
+      plan.video
+        ? context.asset(plan.video.asset).then((a) => a.fetchableUrl())
+        : null,
+      Promise.all(
+        plan.images.map(async ({ asset }) => {
+          const resolved = await context.asset(asset);
+          // Kling takes bare base64 and rejects a data: URI.
+          return resolved.publicUrl ?? (await resolved.base64());
+        }),
+      ),
+    ]);
+    return referenceVideoRequest(
+      inputs,
+      referenceVideoPrompt(inputs, context.mentions, plan),
+      { videoUrl, images },
+    );
+  },
+  outputs: backgroundReplaceOutputs,
 };
 
 /**

@@ -24,6 +24,7 @@ export function exportShotList(sequence: Sequence, project: Project | null) {
       number: index + 1,
       title: shot.title,
       beat: shot.beat,
+      staging: shot.staging,
       prompt: shot.prompt,
       framing: shot.framing,
       camera: shot.camera,

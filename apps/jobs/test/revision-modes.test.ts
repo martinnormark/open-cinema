@@ -23,6 +23,7 @@ const lantern: ResolvedMention = {
   stateName: null,
   stateDescription: null,
   states: [],
+  motion: [],
   references: [
     {
       asset: { type: "media-asset", assetId: "lantern-detail" },

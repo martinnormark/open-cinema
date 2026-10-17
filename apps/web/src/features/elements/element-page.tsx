@@ -41,10 +41,11 @@ import {
   type JobView,
   type PendingView,
 } from "./generate";
-import { assetUrl } from "@/lib/media-url";
+import { assetUrl, posterUrl } from "@/lib/media-url";
 import {
   elementTypes,
   guessView,
+  isMovingView,
   reviewSheet,
   stateHandle,
   viewLabel,
@@ -71,6 +72,8 @@ import { ConfirmDelete } from "./confirm-delete";
 import { SessionRequired, typeIcons } from "./visuals";
 import { headlessSheet } from "./headless";
 import { CharacterLooks } from "./state-sheets";
+import { MovingReference } from "./moving-reference";
+import type { MediaItem } from "@/features/library";
 
 export function ElementPage({
   elementId,
@@ -802,9 +805,11 @@ function ReferenceSheet({
   const reviewCount = experiments.length + pending.length;
 
   const [picking, setPicking] = useState(false);
-  async function attach(items: { ref: AssetRef; title: string }[]) {
+  // A Location also takes clips: its moving references.
+  const takesClips = element.type === "location";
+  async function attach(items: Pick<MediaItem, "ref" | "title" | "kind">[]) {
     for (const item of items) {
-      const view = guessView(element.type, item.title);
+      const view = guessView(element.type, item.title, item.kind);
       await addReference({
         elementId: element.id,
         ...(stateId ? { stateId } : {}),
@@ -820,7 +825,11 @@ function ReferenceSheet({
   }
   async function upload(files: FileList | null) {
     if (!files?.length) return;
-    const list = Array.from(files).filter((f) => f.type.startsWith("image/"));
+    const list = Array.from(files).filter(
+      (f) =>
+        f.type.startsWith("image/") ||
+        (takesClips && f.type.startsWith("video/")),
+    );
     setUploading((n) => n + list.length);
     try {
       const items = await uploadFiles(list);
@@ -882,10 +891,18 @@ function ReferenceSheet({
             </Button>
             <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring">
               <ImagePlus aria-hidden="true" className="size-4" />
-              {uploading ? `Uploading ${uploading}…` : "Upload images"}
+              {uploading
+                ? `Uploading ${uploading}…`
+                : takesClips
+                  ? "Upload images or clips"
+                  : "Upload images"}
               <input
                 type="file"
-                accept="image/png,image/jpeg,image/webp"
+                accept={
+                  takesClips
+                    ? "image/png,image/jpeg,image/webp,video/mp4,video/quicktime,video/webm"
+                    : "image/png,image/jpeg,image/webp"
+                }
                 multiple
                 className="sr-only"
                 onChange={(event) => {
@@ -898,9 +915,13 @@ function ReferenceSheet({
           <MediaPicker
             open={picking}
             onOpenChange={setPicking}
-            kind="image"
+            kind={takesClips ? undefined : "image"}
             title={`Add to ${element.name}${state ? ` · ${state.name}` : ""}`}
-            description="Pick an image you uploaded or generated. It joins the explorations for you to review."
+            description={
+              takesClips
+                ? "Pick an image, or a clip of the empty place with the camera moving. It joins the explorations for you to review."
+                : "Pick an image you uploaded or generated. It joins the explorations for you to review."
+            }
             onSelect={(item) => void attach([item])}
           />
         </div>
@@ -928,8 +949,9 @@ function ReferenceSheet({
           </ul>
         ) : (
           <p className="mt-5 text-sm leading-6 text-muted-foreground">
-            Nothing to review. Upload images or generate a view from the
-            guidance.
+            Nothing to review. Upload{" "}
+            {takesClips ? "images or clips" : "images"} or generate a view from
+            the guidance.
           </p>
         )}
       </section>
@@ -970,7 +992,10 @@ function ViewSelect({
   onChange: (view: ReferenceView | null) => void;
   warn: boolean;
 }) {
-  const slots = elementTypes[element.type].slots;
+  // A clip is only ever a moving view, and a still never is.
+  const slots = elementTypes[element.type].slots.filter(
+    (slot) => !!slot.move === isMovingView(value),
+  );
   return (
     <>
       <label className="sr-only" htmlFor={id}>
@@ -1002,12 +1027,23 @@ function slotLabel(element: Element, view: ReferenceView | null) {
   return viewLabel(element.type, view);
 }
 
-/** A sheet is three panels wide, so it takes a whole row of the grid. */
+/**
+ * A sheet is three panels wide, so it takes a whole row of the grid; a moving
+ * reference is a 16:9 clip and takes two columns.
+ */
 function tileClass(view: ReferenceView | null) {
-  return view === "sheet" ? "col-span-full" : undefined;
+  return view === "sheet"
+    ? "col-span-full"
+    : isMovingView(view)
+      ? "col-span-2"
+      : undefined;
 }
 function frameClass(view: ReferenceView | null) {
-  return view === "sheet" ? "aspect-[21/9]" : "aspect-square";
+  return view === "sheet"
+    ? "aspect-[21/9]"
+    : isMovingView(view)
+      ? "aspect-video"
+      : "aspect-square";
 }
 
 function SavedReference({
@@ -1040,13 +1076,21 @@ function SavedReference({
           compact ? "aspect-square" : frameClass(reference.view),
         )}
       >
-        <img
-          src={assetUrl(reference.asset)}
-          alt={`${element.name}, ${label.toLowerCase()}`}
-          loading="lazy"
-          decoding="async"
-          className="reference-reveal size-full object-cover"
-        />
+        {isMovingView(reference.view) ? (
+          <MovingReference
+            src={assetUrl(reference.asset)}
+            poster={posterUrl(reference.asset)}
+            label={`${element.name}, ${label.toLowerCase()}`}
+          />
+        ) : (
+          <img
+            src={assetUrl(reference.asset)}
+            alt={`${element.name}, ${label.toLowerCase()}`}
+            loading="lazy"
+            decoding="async"
+            className="reference-reveal size-full object-cover"
+          />
+        )}
       </div>
       {!compact && (
         <figcaption className="mt-2">
@@ -1196,6 +1240,8 @@ function PendingReference({
             <Suspense fallback={<PendingBadge text="Removing heads" />}>
               <HeadlessImage sheet={sheet} alt={alt} />
             </Suspense>
+          ) : output.kind === "video" ? (
+            <MovingReference src={output.url} label={alt} />
           ) : (
             <img
               src={output.url}

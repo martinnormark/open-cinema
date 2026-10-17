@@ -35,7 +35,7 @@ export function MediaPicker({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelect: (item: MediaItem) => void;
-  kind?: MediaKind;
+  kind?: MediaKind | undefined;
   title?: string;
   description?: string;
 }) {

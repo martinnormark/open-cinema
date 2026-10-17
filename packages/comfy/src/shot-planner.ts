@@ -46,6 +46,11 @@ const TOOL = {
               description:
                 "What the frame shows: subjects, action, setting, light. Refer to Elements only as @Handle exactly as listed. No camera or lens words.",
             },
+            staging: {
+              type: "string",
+              description:
+                "The geometry in plain words: where each person stands relative to the others and the place, which side of them the camera is on, and where the light comes from. One or two sentences. No lens words.",
+            },
             framing: { type: "string", enum: shotFramingSchema.options },
             camera: { type: "string", enum: shotCameraSchema.options },
             durationSeconds: { type: "integer", enum: DURATIONS },
@@ -182,6 +187,7 @@ export function readPlan(
             .slice(0, 120) || "Shot",
         beat: clean(shot.beat),
         prompt: clean(shot.prompt),
+        staging: clean(shot.staging),
         framing: shotFramingSchema.safeParse(shot.framing).data ?? "medium",
         camera: shotCameraSchema.safeParse(shot.camera).data ?? "static",
         durationSeconds: DURATIONS.includes(shot.durationSeconds as never)

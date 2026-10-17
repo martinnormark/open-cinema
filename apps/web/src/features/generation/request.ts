@@ -11,6 +11,21 @@ import { mentionPayload, type useMentions } from "@/features/elements/mentions";
 
 export type Medium = "image" | "video";
 
+/** Whether a video can take its picture from the mentioned Elements' references. */
+export function canUseReferences(mentions: ReturnType<typeof useMentions>) {
+  return mentions.some(
+    (m) => m.element && (m.references.length > 0 || m.moves.length > 0),
+  );
+}
+
+/**
+ * A Location with a moving reference makes references the default: the clip
+ * shows the space around the camera, which no wording of LTX's can match.
+ */
+export function prefersReferences(mentions: ReturnType<typeof useMentions>) {
+  return mentions.some((m) => m.element && m.moves.length > 0);
+}
+
 /**
  * Video is LTX 2.5 text-to-video: a short, 720p clip keeps the first take cheap.
  * Mentions with approved references condition Flux; otherwise a plain image.
@@ -23,9 +38,22 @@ export function studioRequest(
   direction: DirectionSnapshot | undefined,
   camera: CameraMove | null = null,
   durationSeconds?: 4 | 5 | 6 | 8 | 10,
+  fromReferences = false,
 ): GenerationRequest {
   const payload = mentionPayload(mentions);
   const directed = direction ? { direction } : {};
+  // The references carry the picture; the prompt carries the staging.
+  if (medium === "video" && fromReferences)
+    return {
+      workflowKind: "video.reference",
+      inputs: {
+        prompt: prompt.trim(),
+        durationSeconds: durationSeconds ?? 5,
+        aspectRatio: "16:9",
+        mentions: payload.mentions.slice(0, 8),
+        ...directed,
+      },
+    };
   if (medium === "video")
     return {
       workflowKind: "video.ltx",

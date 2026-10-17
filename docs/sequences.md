@@ -28,7 +28,8 @@ Nothing is generated while planning; every field can be edited first.
 ## Shots
 
 A shot (`packages/contracts/src/sequences.ts`) has a title, beat, what the
-frame shows, framing, camera move, length (2–10 s) and continuity. Shots can be
+frame shows, staging (who stands where, which side the camera is on, where
+the light comes from), framing, camera move, length (2–10 s) and continuity. Shots can be
 inserted after any shot, moved earlier or later, and deleted.
 
 Each shot is made in two approved steps, each with its own takes:
@@ -39,6 +40,12 @@ Each shot is made in two approved steps, each with its own takes:
    project's look, which the server also applies from the project id.
 2. **Motion**: `video.ltx` from the approved keyframe as its first frame, with
    the camera phrase added.
+
+A shot that mentions Elements with references can skip the keyframe:
+**Shoot from references** makes the motion take with `video.reference`, where
+the references carry the picture and the shot's words carry the staging. It
+leads when a mentioned Location has a moving reference; continuing shots keep
+the keyframe path. See [location-references.md](location-references.md).
 
 A take is a candidate until approved or rejected; approving one demotes the
 other approved take of that role. Only a finished take can be approved, and a

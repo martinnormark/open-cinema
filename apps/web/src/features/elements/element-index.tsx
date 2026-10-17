@@ -12,7 +12,7 @@ import {
   type ElementType,
 } from "./model";
 import { useElements } from "./store";
-import { ElementCover, SessionRequired, typeIcons } from "./visuals";
+import { coverMove, ElementCover, SessionRequired, typeIcons } from "./visuals";
 import { CastBoard } from "./state-sheets";
 
 export function ElementIndex() {
@@ -182,6 +182,9 @@ function ElementTile({ element }: { element: Element }) {
         {complete
           ? "Reference sheet ready"
           : `${coverage.done} of ${coverage.total} essential views`}
+        {element.type === "location" && !coverMove(element)
+          ? " · no moving reference"
+          : ""}
         {element.states.length
           ? ` · ${element.states.length} ${element.states.length === 1 ? "state" : "states"}`
           : ""}

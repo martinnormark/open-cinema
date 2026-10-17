@@ -177,13 +177,15 @@ it("composes shot direction and plans from a model answer or the beat splitter",
       {
         prompt: "@Mara reads by the window.",
         beat: "",
+        staging:
+          "She sits on the left, we look past her shoulder, low sun behind her.",
         framing: "close",
         camera: "push-in",
       },
       { role: "motion", direction: "Teal and amber." },
     ),
   ).toBe(
-    "@Mara reads by the window. close-up on the face, shallow depth of field. slow push-in toward the subject. Look: Teal and amber.",
+    "@Mara reads by the window. She sits on the left, we look past her shoulder, low sun behind her. close-up on the face, shallow depth of field. slow push-in toward the subject. Look: Teal and amber.",
   );
   expect(
     composeShotPrompt(

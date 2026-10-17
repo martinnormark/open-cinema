@@ -6,6 +6,7 @@ import {
   fluxReferenceWorkflow,
   ltxVideoWorkflow,
   performanceTransferWorkflow,
+  referenceVideoWorkflow,
 } from "./definitions";
 import {
   objectSwapWorkflow,
@@ -69,6 +70,13 @@ export {
   describeTarget,
 } from "./character-replace";
 export {
+  planReferences,
+  REFERENCE_RULE,
+  REFERENCE_VIDEO_MODEL,
+  referenceVideoPrompt,
+  referenceVideoRequest,
+} from "./reference-video";
+export {
   BACKGROUND_MATTE_MODEL,
   BACKGROUND_REPLACE_MODEL,
   MATTE_STAGE,
@@ -109,6 +117,7 @@ const registry: Registry = {
   "image.flux": fluxImageWorkflow,
   "image.flux-reference": fluxReferenceWorkflow,
   "video.ltx": ltxVideoWorkflow,
+  "video.reference": referenceVideoWorkflow,
   "video.background-replace": backgroundReplaceWorkflow,
   "video.character-replace": characterReplaceWorkflow,
   "video.performance-transfer": performanceTransferWorkflow,

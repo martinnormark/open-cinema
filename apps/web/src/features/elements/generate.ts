@@ -31,8 +31,13 @@ export interface JobView {
   state: Job["state"];
   active: boolean;
   progress: number | null;
-  /** Set once the image is stored and can be added to a reference sheet. */
-  output: { jobId: string; outputId: string; url: string } | null;
+  /** Set once the image or clip is stored and can be added to a reference sheet. */
+  output: {
+    jobId: string;
+    outputId: string;
+    url: string;
+    kind: "image" | "video";
+  } | null;
   error: string | null;
 }
 
@@ -47,7 +52,10 @@ export function useJobViews(): {
     const views = new Map<string, JobView>();
     for (const job of snapshot?.jobs ?? []) {
       const output = job.outputs.find(
-        (o) => o.r2Key && o.mediaType.startsWith("image/"),
+        (o) =>
+          o.r2Key &&
+          (o.mediaType.startsWith("image/") ||
+            o.mediaType.startsWith("video/")),
       );
       views.set(job.id, {
         state: job.state,
@@ -63,6 +71,7 @@ export function useJobViews(): {
                   jobId: job.id,
                   outputId: output.id,
                 }),
+                kind: output.mediaType.startsWith("video/") ? "video" : "image",
               }
             : null,
         error: job.error,
@@ -213,7 +222,16 @@ export function describeViewRequest(
   preferences: CostPreferences,
   count = 1,
 ) {
-  const parts = ["FLUX 3 Image"];
+  const video = request.workflowKind === "video.ltx";
+  const parts =
+    request.workflowKind !== "video.ltx"
+      ? ["FLUX 3 Image"]
+      : request.inputs.firstFrame
+        ? ["FLUX 3 Video", "moving on from the establishing view"]
+        : [
+            "LTX 2.5",
+            `${request.inputs.durationSeconds} s from the description`,
+          ];
   if (request.workflowKind === "image.flux-reference") {
     const n = request.inputs.references.length;
     parts.push(
@@ -221,7 +239,10 @@ export function describeViewRequest(
     );
   }
   const estimate = estimateGeneration(request);
-  if (shouldShowEstimate(preferences, "image") && estimate.credits) {
+  if (
+    shouldShowEstimate(preferences, video ? "video" : "image") &&
+    estimate.credits
+  ) {
     const credits = {
       min: estimate.credits.min * count,
       max: estimate.credits.max * count,
