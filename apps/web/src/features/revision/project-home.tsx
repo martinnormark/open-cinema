@@ -30,6 +30,7 @@ import {
   posterUrl,
   phaseLabels,
   replacementKinds,
+  revisionKindOf,
   revisionPhase,
   revisionResult,
 } from "./model";
@@ -123,10 +124,7 @@ function Revisions({
             const job = jobs.find((j) => j.id === revision.jobId);
             const result = revisionResult(revision, job);
             const phase = revisionPhase(revision.status, job, !!result);
-            const kind =
-              revision.workflowKind === "video.character-replace"
-                ? "character"
-                : "background";
+            const kind = revisionKindOf(revision.workflowKind);
             return (
               <li key={revision.id}>
                 <Link

@@ -553,6 +553,7 @@ function UseRecipe({ view }: { view: RecipeView }) {
     spec.medium,
     spec.aspectRatio,
     direction,
+    null,
     spec.durationSeconds,
   );
   const estimate = estimateGeneration(request);

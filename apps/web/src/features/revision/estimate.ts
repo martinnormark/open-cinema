@@ -2,6 +2,8 @@ import type {
   BackgroundPipelineChoice,
   GenerationEstimate,
 } from "@open-cinema/contracts";
+import { cloudEstimate } from "@open-cinema/comfy/estimates";
+import type { ReplacementKind } from "./model";
 
 /**
  * Kling 3.0 Omni edits cost about 27 credits per source second (5.4 Kling
@@ -20,10 +22,13 @@ const RECAST_CREDITS_PER_SECOND = 35;
  * not receive; everything else comes from `@open-cinema/comfy/estimates`.
  */
 export function estimateReplacement(
-  kind: "background" | "character",
+  kind: ReplacementKind,
   sourceSeconds: number | null,
   pipeline: BackgroundPipelineChoice = "kling",
 ): GenerationEstimate {
+  if (kind === "object") return cloudEstimate("swap");
+  if (kind === "restyle") return cloudEstimate("restyle");
+  if (kind === "camera") return cloudEstimate("restage");
   if (kind === "background" && pipeline === "ltx-alpha")
     return {
       // Not yet measured: one 8-step pass of the 22B model on a Cloud GPU.

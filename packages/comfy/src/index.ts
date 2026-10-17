@@ -10,6 +10,7 @@ export * from "./workflows/flux-reference";
 export * from "./workflows/ltx-video";
 export * from "./workflows/ltx-alpha-background";
 export * from "./estimates";
+export { planSequence, readPlan, SHOT_PLANNER_MODEL } from "./shot-planner";
 export { uploadToComfyStorage } from "./storage";
 export { CloudMediaRejectedError, runCloudMedia } from "./cloud-media";
 export type { CloudMediaPart } from "./cloud-media";

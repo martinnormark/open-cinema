@@ -48,14 +48,13 @@ import {
   type ReplacementKind,
   type RevisionDecisions,
   type RevisionPhase,
+  revisionKindOf,
   variantLabels,
 } from "./model";
 import "./revision.css";
 
 const kindOf = (revision: Pick<Revision, "workflowKind">): ReplacementKind =>
-  revision.workflowKind === "video.character-replace"
-    ? "character"
-    : "background";
+  revisionKindOf(revision.workflowKind);
 
 function phaseVariant(phase: RevisionPhase) {
   switch (phase) {

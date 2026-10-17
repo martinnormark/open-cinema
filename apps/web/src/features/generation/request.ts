@@ -1,4 +1,5 @@
 import type {
+  CameraMove,
   DirectionSnapshot,
   GenerationRequest,
   ImageAspectRatio,
@@ -20,6 +21,7 @@ export function studioRequest(
   medium: Medium,
   aspectRatio: ImageAspectRatio,
   direction: DirectionSnapshot | undefined,
+  camera: CameraMove | null = null,
   durationSeconds?: 4 | 5 | 6 | 8 | 10,
 ): GenerationRequest {
   const payload = mentionPayload(mentions);
@@ -29,7 +31,10 @@ export function studioRequest(
       workflowKind: "video.ltx",
       inputs: {
         prompt: prompt.trim(),
-        durationSeconds: durationSeconds ?? 6,
+        // A camera move runs on a Cloud GPU billed by time; four seconds
+        // show the move and keep the run short.
+        durationSeconds: camera ? 4 : (durationSeconds ?? 6),
+        ...(camera ? { camera } : {}),
         resolution: "1280x720",
         fps: 25,
         generateAudio: true,
