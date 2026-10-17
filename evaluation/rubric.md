@@ -53,7 +53,7 @@ The rubric is mode-agnostic. Each mode names its _target_ (the region that may c
 
 - **G1 No change:** the target was not replaced (A1 = 0).
 - **G2 Identity loss:** a protected person is no longer recognisable at any moment (B1 ≤ 1).
-- **G3 Timing break:** duration or frame count differs from the source by more than one frame, or the action is retimed (B3 ≤ 1).
+- **G3 Timing break:** duration differs from the source by more than one source frame, or the action drifts or is retimed by more than one frame (B3 ≤ 1). A changed frame rate with matching duration and event timing is not a gate failure; score it under B3 (at most 3), because an editor must conform it.
 - **G4 Hallucinated content:** a person, limb, or prominent object appears or disappears in the protected set (B8 ≤ 1).
 - **G5 Policy or provider failure:** the run did not return a usable clip (rejection, error, timeout).
 
