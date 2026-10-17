@@ -24,7 +24,7 @@ import type {
   GuidanceSlot,
   ReferenceView,
 } from "./model";
-import { elementTypes, viewRequest } from "./model";
+import { viewRequest } from "./model";
 import { reloadElements } from "./store";
 
 export interface JobView {
@@ -204,51 +204,52 @@ export async function generateViews(
   return submitted;
 }
 
-/** The required slots still missing, else the optional ones. */
-export function nextSlots(
-  element: Element,
-  missing: GuidanceSlot[],
-  count: number,
-) {
-  const slots = missing.length
-    ? missing
-    : elementTypes[element.type].slots.filter((s) => !s.required);
-  return slots.slice(0, count);
+/** What one view request runs on, in words. */
+function requestModel(request: GenerationRequest) {
+  if (request.workflowKind !== "video.ltx") return "FLUX 3 Image";
+  return request.inputs.firstFrame
+    ? "FLUX 3 Video, continuing from the establishing view"
+    : `LTX 2.5, ${request.inputs.durationSeconds} s from the description`;
 }
 
-/** "FLUX 3 Image · 4 approved references · about 6 credits, 20–80 s" */
-export function describeViewRequest(
-  request: GenerationRequest,
+/**
+ * "FLUX 3 Image · guided by 4 approved references · about 12 credits,
+ * 20–80 s" for one or more view requests made together.
+ */
+export function describeViewRequests(
+  requests: readonly GenerationRequest[],
   preferences: CostPreferences,
-  count = 1,
 ) {
-  const video = request.workflowKind === "video.ltx";
-  const parts =
-    request.workflowKind !== "video.ltx"
-      ? ["FLUX 3 Image"]
-      : request.inputs.firstFrame
-        ? ["FLUX 3 Video", "continuing from the establishing view"]
-        : [
-            "LTX 2.5",
-            `${request.inputs.durationSeconds} s from the description`,
-          ];
-  if (request.workflowKind === "image.flux-reference") {
-    const n = request.inputs.references.length;
+  const parts = [...new Set(requests.map(requestModel))];
+  const guides = requests.flatMap((r) =>
+    r.workflowKind === "image.flux-reference"
+      ? [r.inputs.references.length]
+      : [],
+  );
+  if (guides.length) {
+    const n = Math.max(...guides);
     parts.push(
       `guided by ${n} approved ${n === 1 ? "reference" : "references"}`,
     );
   }
-  const estimate = estimateGeneration(request);
+  const video = requests.some((r) => r.workflowKind === "video.ltx");
+  const estimates = requests.map((r) => estimateGeneration(r));
   if (
     shouldShowEstimate(preferences, video ? "video" : "image") &&
-    estimate.credits
+    estimates.every((e) => e.credits)
   ) {
     const credits = {
-      min: estimate.credits.min * count,
-      max: estimate.credits.max * count,
+      min: estimates.reduce((n, e) => n + e.credits!.min, 0),
+      max: estimates.reduce((n, e) => n + e.credits!.max, 0),
+    };
+    // Side by side the wait is the longest view; queued one at a time
+    // (the default job limit) it is all of them.
+    const seconds = {
+      min: Math.max(...estimates.map((e) => e.seconds.min)),
+      max: estimates.reduce((n, e) => n + e.seconds.max, 0),
     };
     parts.push(
-      `about ${formatCost(credits, preferences.unit)}, ${Math.round(estimate.seconds.min)}–${Math.round(estimate.seconds.max)} s`,
+      `about ${formatCost(credits, preferences.unit)}, ${Math.round(seconds.min)}–${Math.round(seconds.max)} s`,
     );
   } else parts.push("uses your Comfy Router credits");
   return parts.join(" · ");

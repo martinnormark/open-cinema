@@ -36,6 +36,8 @@ export const referenceViewSchema = z.enum([
   "alternate-angle",
   "landmark",
   // Things
+  /** Three panels on one image: the object from the front, side and back. */
+  "turnaround",
   "side",
   "top",
   "detail",
@@ -100,15 +102,61 @@ export const REFERENCE_VIEWS_BY_TYPE = {
     "landmark",
     "detail",
   ],
-  thing: ["front", "side", "rear", "top", "three-quarter", "detail"],
+  thing: [
+    "three-quarter",
+    "turnaround",
+    "detail",
+    "front",
+    "side",
+    "rear",
+    "top",
+  ],
 } as const satisfies Record<ElementType, readonly ReferenceView[]>;
 
-/** Views a reference sheet should cover before it reads as complete. */
+/**
+ * Views a reference sheet should cover before it reads as complete, the
+ * anchor first: every other view is made to match it.
+ */
 export const RECOMMENDED_VIEWS_BY_TYPE = {
   character: ["face-closeup", "smile", "sheet"],
-  location: ["push-in", "establishing"],
-  thing: ["front", "side", "three-quarter", "detail"],
+  location: ["establishing", "push-in", "landmark"],
+  thing: ["three-quarter", "turnaround", "detail"],
 } as const satisfies Record<ElementType, readonly ReferenceView[]>;
+
+/**
+ * Which approved view leads when references are sent to a model: the one
+ * that says most about identity first (a Character's close portrait, a
+ * Thing's hero view, a Location's establishing view), details last. Models
+ * that take one image per Element get the first; when several Elements share
+ * a limit, each keeps its lead.
+ */
+export const LEAD_VIEW_ORDER: readonly ReferenceView[] = [
+  "face-closeup",
+  "three-quarter",
+  "establishing",
+  // Moving references only ever compete with each other.
+  "push-in",
+  "drift",
+  "rise",
+  "sheet",
+  "turnaround",
+  "smile",
+  "front",
+  "alternate-angle",
+  "landmark",
+  "full-body",
+  "profile",
+  "side",
+  "expression",
+  "rear",
+  "top",
+  "detail",
+];
+
+export function leadRank(view: ReferenceView | null): number {
+  const i = view ? LEAD_VIEW_ORDER.indexOf(view) : -1;
+  return i === -1 ? LEAD_VIEW_ORDER.length : i;
+}
 
 /** What a reference contributes when it conditions a generation. */
 export const referenceRoleSchema = z.enum([
@@ -460,12 +508,12 @@ function approvedOf(
         : stateId;
   // With combined states the first one that shows a view wins it: a wardrobe
   // state's sheet over a mood's, in the order the creator wrote them.
+  const byLead = (a: ElementReference, b: ElementReference) =>
+    leadRank(a.view) - leadRank(b.view) || a.sortOrder - b.sortOrder;
   const own: ElementReference[] = [];
   const overridden = new Set<string>();
   for (const id of stateIds) {
-    const refs = approved
-      .filter((ref) => ref.stateId === id)
-      .sort((a, b) => a.sortOrder - b.sortOrder);
+    const refs = approved.filter((ref) => ref.stateId === id).sort(byLead);
     const claimed: string[] = [];
     for (const ref of refs) {
       if (ref.view && overridden.has(ref.view)) continue;
@@ -477,9 +525,7 @@ function approvedOf(
   const base = approved.filter(
     (ref) => ref.stateId === null && !(ref.view && overridden.has(ref.view)),
   );
-  const bySortOrder = (a: ElementReference, b: ElementReference) =>
-    a.sortOrder - b.sortOrder;
-  return [...own, ...base.sort(bySortOrder)];
+  return [...own, ...base.sort(byLead)];
 }
 
 export function missingViews(

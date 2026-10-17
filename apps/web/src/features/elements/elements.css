@@ -62,11 +62,39 @@
   }
 }
 
+/* The next step changes as the sheet fills (text states swap): the new step
+   rises out of a soft blur. Only on a change, never on page load. */
+.elements-step {
+  animation: elements-step var(--duration-medium) var(--ease-smooth-out);
+}
+@keyframes elements-step {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+    transform: translateY(6px);
+  }
+}
+
+/* A view just approved settles into its checklist row (success check, scaled
+   to a 16px icon). */
+.slot-done {
+  animation: elements-check var(--duration-very-slow) var(--ease-smooth-out);
+}
+@keyframes elements-check {
+  from {
+    opacity: 0;
+    filter: blur(3px);
+    transform: translateY(4px) rotate(80deg);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .mention-list:not([hidden]),
   .reference-reveal,
   .reference-pending::before,
-  .elements-panel {
+  .elements-panel,
+  .elements-step,
+  .slot-done {
     animation: none;
   }
 }

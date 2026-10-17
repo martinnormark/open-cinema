@@ -31,9 +31,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useCostPreferences } from "@/features/settings/preferences";
 import {
-  describeViewRequest,
   generateViews,
-  nextSlots,
   retagPendingView,
   settlePendingView,
   useJobViews,
@@ -43,13 +41,15 @@ import {
 } from "./generate";
 import { assetUrl, posterUrl } from "@/lib/media-url";
 import {
+  defaultView,
   elementTypes,
   guessView,
   isMovingView,
+  nextStep,
+  replacedBy,
   reviewSheet,
   stateHandle,
   viewLabel,
-  viewRequest,
   type Element,
   type ElementReference,
   type ElementState,
@@ -57,8 +57,10 @@ import {
   type ReferenceView,
 } from "./model";
 import {
+  addApprovedReference,
   addReference,
   addState,
+  approveReference,
   deleteElement,
   removeReference,
   removeState,
@@ -73,6 +75,7 @@ import { SessionRequired, typeIcons } from "./visuals";
 import { headlessSheet } from "./headless";
 import { CharacterLooks } from "./state-sheets";
 import { MovingReference } from "./moving-reference";
+import { mentionOf, NextStepPanel, useInStudio } from "./next-step";
 import type { MediaItem } from "@/features/library";
 
 export function ElementPage({
@@ -89,7 +92,7 @@ export function ElementPage({
   if (status === "signed-out") return <SessionRequired />;
   if (!element)
     return (
-      <section className="mx-auto w-full max-w-3xl px-6 py-16 md:px-12">
+      <section className="mx-auto w-full max-w-6xl px-6 pt-8 pb-16 md:px-12 md:pt-12">
         <h1 className="text-2xl font-semibold">This Element is not here</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           It may have been deleted, or it belongs to another session.
@@ -157,10 +160,13 @@ function ElementWorkspace({
       setGenerating(null);
     }
   }
-  const complementary =
-    state && element.type !== "character"
-      ? info.slots.filter((s) => s.required).slice(0, 1)
-      : nextSlots(element, review.missingRequired, 1);
+  const waiting = new Map<ReferenceView, number>();
+  for (const { slot, exploring } of review.slots)
+    waiting.set(
+      slot.id,
+      exploring + pending.filter((p) => p.view === slot.id).length,
+    );
+  const step = nextStep(element, state?.id ?? null, waiting);
   const preferences = useCostPreferences();
 
   return (
@@ -176,6 +182,8 @@ function ElementWorkspace({
       </Link>
       <Identity
         element={element}
+        // When the sheet is ready, the next step offers it instead.
+        offerUse={state !== null || step.kind !== "ready"}
         icon={<Icon aria-hidden="true" className="size-4" />}
       />
       <SheetTabs element={element} state={state} />
@@ -207,89 +215,60 @@ function ElementWorkspace({
           aria-label="Reference guidance"
           className="lg:sticky lg:top-6 lg:self-start"
         >
-          <h2 className="text-base font-medium">
-            {state ? `${state.name} sheet` : "Reference guidance"}
+          <h2 className="sr-only">Next step</h2>
+          <NextStepPanel
+            element={element}
+            state={state}
+            step={step}
+            busy={!!generating}
+            preferences={preferences}
+            onGenerate={(slots) => void generate(slots, "next")}
+          />
+          <h2 className="mt-8 flex items-baseline justify-between gap-3 text-sm font-medium">
+            {state ? `${state.name} sheet` : "Reference sheet"}
+            <span className="tabular text-xs font-normal text-muted-foreground">
+              {state && element.type !== "character"
+                ? "Shows the change"
+                : `${review.coverage.done} of ${review.coverage.total} essential`}
+            </span>
           </h2>
-          {state && element.type === "character" ? (
-            <p className="mt-1 text-sm leading-6 text-muted-foreground">
-              {review.coverage.done} of {review.coverage.total} views approved.
-              This state is its own sheet: until it has its own close portrait,
-              the base portrait keeps the face. Mention it as{" "}
-              <span className="font-medium text-foreground">
-                @{element.handle}:{stateHandle(state)}
-              </span>
-              .
-            </p>
-          ) : state ? (
-            <p className="mt-1 text-sm leading-6 text-muted-foreground">
-              Show this state from the views where it matters. Identity
-              references still apply when you mention{" "}
-              <span className="font-medium text-foreground">
-                @{element.handle}:{stateHandle(state)}
-              </span>
-              .
-            </p>
-          ) : (
-            <p className="tabular mt-1 text-sm leading-6 text-muted-foreground">
-              {review.coverage.done === review.coverage.total
-                ? `All ${review.coverage.total} essential views approved.`
-                : `${review.coverage.done} of ${review.coverage.total} essential views approved.`}
-            </p>
-          )}
-          <ol className="mt-4">
-            {review.slots.map(({ slot, approved, exploring }) => {
-              const done = approved.length > 0;
-              const waiting =
-                exploring + pending.filter((p) => p.view === slot.id).length;
-              return (
-                <li key={slot.id} className="flex items-start gap-3 py-2">
-                  {done ? (
-                    <Check
-                      aria-hidden="true"
-                      className="mt-0.5 size-4 shrink-0 text-success"
-                    />
-                  ) : (
-                    <CircleDashed
-                      aria-hidden="true"
-                      className="mt-0.5 size-4 shrink-0 text-subtle-foreground"
-                    />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">
-                      {slot.label}
-                      <span className="sr-only">
-                        {done ? ", approved" : ", missing"}
-                      </span>
-                      {!slot.required && (
-                        <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                          Optional
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-xs leading-5 text-muted-foreground">
-                      {done
-                        ? `${approved.length} approved`
-                        : waiting
-                          ? `${waiting} to review`
-                          : slot.hint}
-                    </p>
-                  </div>
-                  {!done && (
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            {state && element.type === "character"
+              ? "This state is its own sheet. Until it has its own close portrait, the base portrait keeps the face."
+              : state
+                ? `Show ${state.name.toLowerCase()} in the views where it matters. Identity references fill in the rest when you mention ${mentionOf(element, state)}.`
+                : "Each view is made to match the ones already approved."}
+          </p>
+          {[true, false].map((required) => {
+            const rows = review.slots.filter(
+              (r) => r.slot.required === required,
+            );
+            if (!rows.length) return null;
+            return (
+              <div key={String(required)}>
+                {!required && (
+                  <h3 className="mt-5 text-xs font-medium text-muted-foreground">
+                    Optional views
+                  </h3>
+                )}
+                <ol className={required ? "mt-3" : "mt-1"}>
+                  {rows.map(({ slot, approved, exploring }) => (
+                    <SlotRow
+                      key={slot.id}
+                      slot={slot}
+                      approved={approved.length}
+                      waiting={
+                        exploring +
+                        pending.filter((p) => p.view === slot.id).length
+                      }
                       disabled={!!generating}
-                      aria-label={`Generate ${slot.label.toLowerCase()}`}
-                      title={`Generate ${slot.label.toLowerCase()}`}
-                      onClick={() => void generate([slot], slot.id)}
-                    >
-                      <Sparkles aria-hidden="true" />
-                    </Button>
-                  )}
-                </li>
-              );
-            })}
-          </ol>
+                      onGenerate={() => void generate([slot], slot.id)}
+                    />
+                  ))}
+                </ol>
+              </div>
+            );
+          })}
           {review.warnings.map((warning) => (
             <p
               key={warning}
@@ -302,21 +281,6 @@ function ElementWorkspace({
               {warning}
             </p>
           ))}
-          <Button
-            className="mt-6 w-full"
-            disabled={!!generating || !complementary.length}
-            onClick={() => void generate(complementary, "complementary")}
-          >
-            <Sparkles aria-hidden="true" />
-            {generating ? "Starting…" : "Generate a complementary view"}
-          </Button>
-          <p className="mt-2 text-xs leading-5 text-muted-foreground">
-            {complementary[0]
-              ? `Next: ${complementary[0].label.toLowerCase()}${state ? ` while ${state.name.toLowerCase()}` : ""}. `
-              : ""}
-            {complementary[0] &&
-              `${describeViewRequest(viewRequest(element, complementary[0], state), preferences)}.`}
-          </p>
         </aside>
       </div>
       {!state && <DeleteElement element={element} />}
@@ -324,7 +288,76 @@ function ElementWorkspace({
   );
 }
 
-function Identity({ element, icon }: { element: Element; icon: ReactNode }) {
+function SlotRow({
+  slot,
+  approved,
+  waiting,
+  disabled,
+  onGenerate,
+}: {
+  slot: GuidanceSlot;
+  approved: number;
+  waiting: number;
+  disabled: boolean;
+  onGenerate: () => void;
+}) {
+  const done = approved > 0;
+  // Celebrate an approval made here, not every view approved before.
+  const [doneOnArrival] = useState(done);
+  return (
+    <li className="flex items-start gap-3 py-2">
+      {done ? (
+        <Check
+          aria-hidden="true"
+          className={cn(
+            "mt-0.5 size-4 shrink-0 text-success",
+            !doneOnArrival && "slot-done",
+          )}
+        />
+      ) : (
+        <CircleDashed
+          aria-hidden="true"
+          className="mt-0.5 size-4 shrink-0 text-subtle-foreground"
+        />
+      )}
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium">
+          {slot.label}
+          <span className="sr-only">{done ? ", approved" : ", missing"}</span>
+        </p>
+        <p className="text-xs leading-5 text-muted-foreground">
+          {done
+            ? `${approved} approved`
+            : waiting
+              ? `${waiting} to review`
+              : slot.hint.replace(/ Make it first[^.]*\./, "")}
+        </p>
+      </div>
+      {!done && (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          disabled={disabled}
+          aria-label={`Generate ${slot.label.toLowerCase()}`}
+          title={`Generate ${slot.label.toLowerCase()}`}
+          onClick={onGenerate}
+        >
+          <Sparkles aria-hidden="true" />
+        </Button>
+      )}
+    </li>
+  );
+}
+
+function Identity({
+  element,
+  icon,
+  offerUse,
+}: {
+  element: Element;
+  icon: ReactNode;
+  offerUse: boolean;
+}) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(element.name);
   const [description, setDescription] = useState(element.description);
@@ -332,6 +365,12 @@ function Identity({ element, icon }: { element: Element; icon: ReactNode }) {
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const info = elementTypes[element.type];
+  const use = useInStudio(element, null);
+  const usable =
+    offerUse &&
+    element.references.some(
+      (r) => r.status === "approved" && r.stateId === null,
+    );
 
   if (editing)
     return (
@@ -428,6 +467,15 @@ function Identity({ element, icon }: { element: Element; icon: ReactNode }) {
             {copied ? "Mention copied" : "Copy mention"}
           </span>
         </button>
+        {usable && (
+          <button
+            type="button"
+            className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+            onClick={use}
+          >
+            Use in Studio
+          </button>
+        )}
         <button
           type="button"
           className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
@@ -808,8 +856,13 @@ function ReferenceSheet({
   // A Location also takes clips: its moving references.
   const takesClips = element.type === "location";
   async function attach(items: Pick<MediaItem, "ref" | "title" | "kind">[]) {
+    // A file whose name says nothing takes the view the sheet still needs.
+    const taken = new Set<ReferenceView>();
     for (const item of items) {
-      const view = guessView(element.type, item.title, item.kind);
+      const view =
+        guessView(element.type, item.title, item.kind) ??
+        defaultView(element, stateId, item.kind, taken);
+      if (view) taken.add(view);
       await addReference({
         elementId: element.id,
         ...(stateId ? { stateId } : {}),
@@ -843,119 +896,124 @@ function ReferenceSheet({
     }
   }
 
-  return (
-    <div className="space-y-12">
-      <section aria-labelledby="approved-heading">
-        <h2 id="approved-heading" className="text-base font-medium">
-          Approved references
+  const approvedSection = (
+    <section aria-labelledby="approved-heading">
+      <h2 id="approved-heading" className="text-base font-medium">
+        Approved references
+        <span className="tabular ml-2 text-sm font-normal text-muted-foreground">
+          {approved.length}
+        </span>
+      </h2>
+      <p className="mt-1 text-sm leading-6 text-muted-foreground">
+        {state
+          ? `These define ${element.name} when ${state.name.toLowerCase()}.`
+          : `These define ${element.name} wherever it is mentioned.`}
+      </p>
+      {approved.length ? (
+        <ul className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
+          {approved.map((reference) => (
+            <li key={reference.id} className={tileClass(reference.view)}>
+              <SavedReference element={element} reference={reference} />
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-5 rounded-xl border border-dashed border-border px-5 py-8 text-center text-sm leading-6 text-muted-foreground">
+          Approve explorations that look right and they collect here.
+        </p>
+      )}
+    </section>
+  );
+  const explorationsSection = (
+    <section aria-labelledby="explorations-heading">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <h2 id="explorations-heading" className="text-base font-medium">
+          Explorations
           <span className="tabular ml-2 text-sm font-normal text-muted-foreground">
-            {approved.length}
+            {reviewCount}
           </span>
         </h2>
-        <p className="mt-1 text-sm leading-6 text-muted-foreground">
-          {state
-            ? `These define ${element.name} when ${state.name.toLowerCase()}.`
-            : `These define ${element.name} wherever it is mentioned.`}
-        </p>
-        {approved.length ? (
-          <ul className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
-            {approved.map((reference) => (
-              <li key={reference.id} className={tileClass(reference.view)}>
-                <SavedReference element={element} reference={reference} />
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="mt-5 rounded-xl border border-dashed border-border px-5 py-8 text-center text-sm leading-6 text-muted-foreground">
-            Approve explorations that look right and they collect here.
-          </p>
-        )}
-      </section>
-
-      <section aria-labelledby="explorations-heading">
-        <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <h2 id="explorations-heading" className="text-base font-medium">
-            Explorations
-            <span className="tabular ml-2 text-sm font-normal text-muted-foreground">
-              {reviewCount}
-            </span>
-          </h2>
-          <div className="flex flex-wrap gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground"
-              onClick={() => setPicking(true)}
-            >
-              <Images aria-hidden="true" /> From Library
-            </Button>
-            <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring">
-              <ImagePlus aria-hidden="true" className="size-4" />
-              {uploading
-                ? `Uploading ${uploading}…`
-                : takesClips
-                  ? "Upload images or clips"
-                  : "Upload images"}
-              <input
-                type="file"
-                accept={
-                  takesClips
-                    ? "image/png,image/jpeg,image/webp,video/mp4,video/quicktime,video/webm"
-                    : "image/png,image/jpeg,image/webp"
-                }
-                multiple
-                className="sr-only"
-                onChange={(event) => {
-                  void upload(event.target.files);
-                  event.target.value = "";
-                }}
-              />
-            </label>
-          </div>
-          <MediaPicker
-            open={picking}
-            onOpenChange={setPicking}
-            kind={takesClips ? undefined : "image"}
-            title={`Add to ${element.name}${state ? ` · ${state.name}` : ""}`}
-            description={
-              takesClips
-                ? "Pick an image, or a clip of the empty place with the camera moving. It joins the explorations for you to review."
-                : "Pick an image you uploaded or generated. It joins the explorations for you to review."
-            }
-            onSelect={(item) => void attach([item])}
-          />
+        <div className="flex flex-wrap gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground"
+            onClick={() => setPicking(true)}
+          >
+            <Images aria-hidden="true" /> From Library
+          </Button>
+          <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring">
+            <ImagePlus aria-hidden="true" className="size-4" />
+            {uploading
+              ? `Uploading ${uploading}…`
+              : takesClips
+                ? "Upload images or clips"
+                : "Upload images"}
+            <input
+              type="file"
+              accept={
+                takesClips
+                  ? "image/png,image/jpeg,image/webp,video/mp4,video/quicktime,video/webm"
+                  : "image/png,image/jpeg,image/webp"
+              }
+              multiple
+              className="sr-only"
+              onChange={(event) => {
+                void upload(event.target.files);
+                event.target.value = "";
+              }}
+            />
+          </label>
         </div>
-        <p className="mt-1 text-sm leading-6 text-muted-foreground">
-          Candidates to approve or reject. They never shape a generation until
-          approved.
+        <MediaPicker
+          open={picking}
+          onOpenChange={setPicking}
+          kind={takesClips ? undefined : "image"}
+          title={`Add to ${element.name}${state ? ` · ${state.name}` : ""}`}
+          description={
+            takesClips
+              ? "Pick an image, or a clip of the empty place with the camera moving. It joins the explorations for you to review."
+              : "Pick an image you uploaded or generated. It joins the explorations for you to review."
+          }
+          onSelect={(item) => void attach([item])}
+        />
+      </div>
+      <p className="mt-1 text-sm leading-6 text-muted-foreground">
+        Candidates to approve or reject. They never shape a generation until
+        approved.
+      </p>
+      {reviewCount ? (
+        <ul className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
+          {pending.map((view) => (
+            <li key={view.jobId} className={tileClass(view.view)}>
+              <PendingReference
+                element={element}
+                view={view}
+                job={jobs.get(view.jobId) ?? null}
+                onError={onError}
+              />
+            </li>
+          ))}
+          {experiments.map((reference) => (
+            <li key={reference.id} className={tileClass(reference.view)}>
+              <SavedReference element={element} reference={reference} />
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-5 text-sm leading-6 text-muted-foreground">
+          Nothing to review. Upload {takesClips ? "images or clips" : "images"}{" "}
+          or generate a view from the guidance.
         </p>
-        {reviewCount ? (
-          <ul className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
-            {pending.map((view) => (
-              <li key={view.jobId} className={tileClass(view.view)}>
-                <PendingReference
-                  element={element}
-                  view={view}
-                  job={jobs.get(view.jobId) ?? null}
-                  onError={onError}
-                />
-              </li>
-            ))}
-            {experiments.map((reference) => (
-              <li key={reference.id} className={tileClass(reference.view)}>
-                <SavedReference element={element} reference={reference} />
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="mt-5 text-sm leading-6 text-muted-foreground">
-            Nothing to review. Upload{" "}
-            {takesClips ? "images or clips" : "images"} or generate a view from
-            the guidance.
-          </p>
-        )}
-      </section>
+      )}
+    </section>
+  );
 
+  return (
+    <div className="space-y-12">
+      {/* Until something is approved, the work is in the explorations. */}
+      {approved.length ? approvedSection : explorationsSection}
+      {approved.length ? explorationsSection : approvedSection}
       {rejected.length > 0 && (
         <details>
           <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
@@ -1028,20 +1086,26 @@ function slotLabel(element: Element, view: ReferenceView | null) {
 }
 
 /**
- * A sheet is three panels wide, so it takes a whole row of the grid; a moving
+ * A sheet or turnaround is three panels wide, so it takes a whole row of the grid; a moving
  * reference is a 16:9 clip and takes two columns.
  */
 function tileClass(view: ReferenceView | null) {
-  return view === "sheet"
+  return view === "sheet" || view === "turnaround"
     ? "col-span-full"
-    : isMovingView(view)
+    : isMovingView(view) || (view && WIDE_STILLS.has(view))
       ? "col-span-2"
       : undefined;
 }
+/** A Location's wide stills are made 16:9, like the shots that use them. */
+const WIDE_STILLS: ReadonlySet<ReferenceView> = new Set([
+  "establishing",
+  "landmark",
+  "alternate-angle",
+]);
 function frameClass(view: ReferenceView | null) {
-  return view === "sheet"
+  return view === "sheet" || view === "turnaround"
     ? "aspect-[21/9]"
-    : isMovingView(view)
+    : isMovingView(view) || (view && WIDE_STILLS.has(view))
       ? "aspect-video"
       : "aspect-square";
 }
@@ -1067,6 +1131,12 @@ function SavedReference({
     status?: ElementReference["status"];
     view?: ReferenceView | null;
   }) => run(() => updateReference({ id: reference.id, ...patch }));
+  const replaces = replacedBy(
+    element,
+    reference.stateId,
+    reference.view,
+    reference.id,
+  );
 
   return (
     <figure aria-busy={busy}>
@@ -1112,10 +1182,16 @@ function SavedReference({
             <Button
               size="xs"
               disabled={busy}
-              onClick={() => set({ status: "approved" })}
-              aria-label={`Approve ${label.toLowerCase()}`}
+              onClick={() => run(() => approveReference(reference.id))}
+              aria-label={`${replaces ? "Use instead of the approved" : "Approve"} ${label.toLowerCase()}`}
+              title={
+                replaces
+                  ? "Replaces the approved one, which returns to the explorations"
+                  : undefined
+              }
             >
-              <Check aria-hidden="true" /> Approve
+              <Check aria-hidden="true" />{" "}
+              {replaces ? "Use instead" : "Approve"}
             </Button>
             <Button
               size="xs"
@@ -1190,9 +1266,10 @@ function PendingReference({
   const label = slotLabel(element, view.view);
   const output = job?.output ?? null;
   const failed = !!job && !job.active && !output;
+  const replaces = replacedBy(element, view.stateId, view.view);
   // A generated sheet still has its heads; the headless copy is what is kept.
   const sheet =
-    output && view.view === "sheet"
+    output && view.view === "sheet" && element.type === "character"
       ? headlessSheet(output.url, `${element.name} character sheet`)
       : null;
 
@@ -1212,13 +1289,15 @@ function PendingReference({
         if (!stored) throw new Error("The headless sheet could not be saved.");
         asset = stored.ref;
       }
-      await addReference({
+      const input = {
         elementId: element.id,
         ...(view.stateId ? { stateId: view.stateId } : {}),
         asset,
-        status,
         view: view.view,
-      });
+      };
+      await (status === "approved"
+        ? addApprovedReference(input)
+        : addReference({ ...input, status }));
       settlePendingView(view.jobId);
     } catch (e) {
       onError(e instanceof Error ? e.message : "Could not save this view.");
@@ -1306,9 +1385,15 @@ function PendingReference({
               size="xs"
               disabled={!output || busy}
               onClick={() => void decide("approved")}
-              aria-label={`Approve ${label.toLowerCase()}`}
+              aria-label={`${replaces ? "Use instead of the approved" : "Approve"} ${label.toLowerCase()}`}
+              title={
+                replaces
+                  ? "Replaces the approved one, which returns to the explorations"
+                  : undefined
+              }
             >
-              <Check aria-hidden="true" /> Approve
+              <Check aria-hidden="true" />{" "}
+              {replaces ? "Use instead" : "Approve"}
             </Button>
             <Button
               size="xs"

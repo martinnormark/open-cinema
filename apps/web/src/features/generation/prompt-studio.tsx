@@ -188,6 +188,8 @@ export function PromptStudio({
             id="generation-prompt"
             value={prompt}
             onValueChange={setPrompt}
+            // Opened from an Element or a recipe: keep writing after it.
+            focusAtEnd={!!draft}
             disabled={!!uncertain}
             maxLength={2000}
             minLength={3}

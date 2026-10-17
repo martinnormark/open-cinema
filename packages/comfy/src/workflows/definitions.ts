@@ -96,11 +96,26 @@ export function ltxVideoOutputs(data: unknown): ProviderOutput[] {
   return ltx.length ? ltx : singleOutput("sample", "video", "video/mp4")(data);
 }
 
-/** Each mention's approved references, a Character's close portrait first. */
+/** One mention's approved references, a Character's close portrait first. */
+function referencesOf(mention: BuildContext["mentions"][number]) {
+  return mention.type === "character"
+    ? characterReferences(mention)
+    : mention.references;
+}
+
+/**
+ * Every mention's approved references, taken in turns: each Element's lead
+ * view, then each one's second, and so on. With the image limit shared, a
+ * Thing mentioned last still brings its hero view instead of losing every
+ * slot to the Elements written before it.
+ */
 function mentionReferences(context: BuildContext) {
-  return context.mentions.flatMap((m) =>
-    m.type === "character" ? characterReferences(m) : m.references,
-  );
+  const lists = context.mentions.map(referencesOf);
+  const longest = Math.max(0, ...lists.map((l) => l.length));
+  const out: ReturnType<typeof referencesOf> = [];
+  for (let i = 0; i < longest; i++)
+    for (const list of lists) if (list[i]) out.push(list[i]!);
+  return out;
 }
 
 /**

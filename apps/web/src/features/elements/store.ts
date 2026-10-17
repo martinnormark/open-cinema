@@ -18,7 +18,7 @@ import {
   updateMyElementReference,
   updateMyElementState,
 } from "@/server/elements";
-import { toHandle } from "./model";
+import { replacedBy, toHandle } from "./model";
 
 export interface ElementsState {
   status: "loading" | "ready" | "signed-out" | "error";
@@ -138,6 +138,32 @@ export function updateReference(input: UpdateElementReferenceInput) {
     () => updateMyElementReference({ data: input }),
     "The reference could not be updated.",
   );
+}
+/**
+ * Approves a reference, retiring the one it replaces (see `replacedBy`) to
+ * the explorations, where it can be restored.
+ */
+export async function approveReference(id: string) {
+  return retireReplaced(await updateReference({ id, status: "approved" }), id);
+}
+/** Adds a result straight to the sheet as approved, replacing as above. */
+export async function addApprovedReference(input: AddElementReferenceInput) {
+  const before = new Set(
+    state.elements
+      .find((e) => e.id === input.elementId)
+      ?.references.map((r) => r.id),
+  );
+  const updated = await addReference({ ...input, status: "approved" });
+  const added = updated.references.find((r) => !before.has(r.id));
+  return added ? retireReplaced(updated, added.id) : updated;
+}
+async function retireReplaced(element: Element, keepId: string) {
+  const kept = element.references.find((r) => r.id === keepId);
+  const previous =
+    kept && replacedBy(element, kept.stateId, kept.view, kept.id);
+  return previous
+    ? updateReference({ id: previous.id, status: "experiment" })
+    : element;
 }
 export function removeReference(id: string) {
   return write(

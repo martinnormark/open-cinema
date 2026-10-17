@@ -178,10 +178,10 @@ test("a state's sheet is guided by the face, never the base outfit", () => {
     "changed for this state: soaked to the skin",
   );
   expect(request.inputs.prompt).not.toContain("grey jacket");
-  // The base sheet guides a new base sheet.
+  // The base sheet guides a new base sheet, after the face.
   expect(assetIds(viewRequest(cal, slot("sheet"), null))).toEqual([
-    "base-sheet",
     "base-portrait",
+    "base-sheet",
   ]);
 });
 

@@ -50,6 +50,12 @@ export interface GuidanceSlot {
   shot?: CharacterShot;
   /** A Location's moving reference: a short clip of the empty place. */
   move?: MovingView;
+  /**
+   * A crop of the Element, not all of it. The framing leads the prompt:
+   * after the description and the reference images, FLUX drew the whole
+   * object again.
+   */
+  closeUp?: boolean;
   /** Approved views that guide this one; all approved views when unset. */
   guidedBy?: readonly ReferenceView[];
   aspectRatio?: ImageAspectRatio;
@@ -67,6 +73,22 @@ export interface ElementTypeInfo {
   stateExamples: { name: string; kind: StateKind }[];
   slots: GuidanceSlot[];
 }
+
+/** A Thing is shown alone, so nothing in its views can be mistaken for part of it. */
+const THING_BACKDROP =
+  "isolated on a plain light grey background, soft even light, no studio, no equipment";
+
+/**
+ * A Thing's turnaround: three views made in one image, so the side and back
+ * share one design with the front, as a Character's sheet does.
+ */
+const THING_TURNAROUND = [
+  "Object reference sheet: one wide image made of three equal panels side by side, the same plain light grey background in every panel",
+  "Left panel: the whole object straight from the front",
+  "Middle panel: the whole object from the side",
+  "Right panel: the whole object from the back",
+  "Same object, same scale, same materials and colors in all three panels, each centered with space around it, soft even light, no studio, no equipment, no text, no labels",
+].join(". ");
 
 export const elementTypes: Record<ElementType, ElementTypeInfo> = {
   character: {
@@ -141,12 +163,41 @@ export const elementTypes: Record<ElementType, ElementTypeInfo> = {
     ],
     slots: [
       {
+        id: "establishing",
+        label: "Establishing view",
+        hint: "The whole place as one still: its layout and scale. Make it first; the moving reference continues from it.",
+        required: true,
+        framing:
+          "wide establishing shot showing the complete layout and scale, eye level, clear daylight",
+        // Widescreen like the shots and moves made from it: the moving
+        // reference opens on this frame.
+        aspectRatio: "16:9",
+      },
+      {
         id: "push-in",
         label: "Moving reference",
-        hint: "A few seconds of the empty place with the camera pushing in. It shows the space around the camera, so shots that move keep the same architecture. Make it first.",
+        hint: "A few seconds of the empty place with the camera pushing in from the establishing view. It shows the space around the camera, so shots that move keep the same architecture.",
         required: true,
         framing: "",
         move: "push-in",
+      },
+      {
+        id: "landmark",
+        label: "Landmarks",
+        hint: "The features that make this place recognizable.",
+        required: true,
+        framing:
+          "medium shot centered on the most distinctive landmark, clear daylight, sharp architectural detail",
+        aspectRatio: "16:9",
+      },
+      {
+        id: "detail",
+        label: "Atmosphere and materials",
+        hint: "Surfaces, textures, light and mood up close.",
+        required: false,
+        framing:
+          "Close detail: one small area of its surfaces fills the whole frame, its materials, texture, light and mood in sharp focus, natural light; the whole place is never in frame",
+        closeUp: true,
       },
       {
         id: "drift",
@@ -165,36 +216,13 @@ export const elementTypes: Record<ElementType, ElementTypeInfo> = {
         move: "rise",
       },
       {
-        id: "establishing",
-        label: "Establishing view",
-        hint: "The overall layout and scale of the place, as one still.",
-        required: true,
-        framing:
-          "wide establishing shot showing the complete layout and scale, eye level, clear daylight",
-      },
-      {
-        id: "landmark",
-        label: "Landmarks",
-        hint: "The features that make this place recognizable.",
-        required: true,
-        framing:
-          "medium shot centered on the most distinctive landmark, clear daylight, sharp architectural detail",
-      },
-      {
-        id: "detail",
-        label: "Atmosphere and materials",
-        hint: "Surfaces, textures, light and mood up close.",
-        required: true,
-        framing:
-          "close detail of surfaces and materials, natural light, rich texture",
-      },
-      {
         id: "alternate-angle",
         label: "Alternate viewpoint",
         hint: "The same place from the other side, for reverse angles.",
         required: false,
         framing:
           "wide view of the same place from the opposite side, reverse angle, eye level, clear daylight",
+        aspectRatio: "16:9",
       },
     ],
   },
@@ -218,26 +246,20 @@ export const elementTypes: Record<ElementType, ElementTypeInfo> = {
       {
         id: "three-quarter",
         label: "Hero view",
-        hint: "The overall shape and proportions in one clear image.",
+        hint: "The overall shape and proportions in one clear image. Make it first; every other view is made to match it.",
         required: true,
-        framing:
-          "product photograph, front three-quarter view, isolated on a plain light grey background, soft even light, no studio, no equipment",
+        framing: `product photograph, front three-quarter view, ${THING_BACKDROP}`,
+        aspectRatio: "1:1",
       },
       {
-        id: "front",
-        label: "Front",
-        hint: "The face it shows the camera, square on.",
+        id: "turnaround",
+        label: "Turnaround sheet",
+        hint: "Front, side and back on one image, made together so all three show the same object.",
         required: true,
-        framing:
-          "product photograph, straight-on front view, isolated on a plain light grey background, soft even light, no studio, no equipment",
-      },
-      {
-        id: "side",
-        label: "Side",
-        hint: "The silhouette and depth from the side.",
-        required: true,
-        framing:
-          "product photograph, side view, isolated on a plain light grey background, soft even light, no studio, no equipment",
+        framing: THING_TURNAROUND,
+        guidedBy: ["three-quarter"],
+        aspectRatio: "21:9",
+        resolution: "1.5k",
       },
       {
         id: "detail",
@@ -245,26 +267,46 @@ export const elementTypes: Record<ElementType, ElementTypeInfo> = {
         hint: "Surface finish, marks, hardware and construction up close.",
         required: true,
         framing:
-          "macro close-up of the materials, surface texture and most distinctive details, soft raking light",
+          "Extreme macro close-up: one small part of it fills the whole frame edge to edge, its materials, surface texture, wear and most distinctive detail in sharp focus, soft raking light, shallow depth of field; the whole object is never in frame",
+        closeUp: true,
+      },
+      {
+        id: "front",
+        label: "Front",
+        hint: "The face it shows the camera, square on.",
+        required: false,
+        framing: `product photograph, straight-on front view, ${THING_BACKDROP}`,
+      },
+      {
+        id: "side",
+        label: "Side",
+        hint: "The silhouette and depth from the side.",
+        required: false,
+        framing: `product photograph, side view, ${THING_BACKDROP}`,
       },
       {
         id: "rear",
         label: "Back",
         hint: "What the camera sees from behind.",
         required: false,
-        framing:
-          "product photograph, rear view, isolated on a plain light grey background, soft even light, no studio, no equipment",
+        framing: `product photograph, rear view, ${THING_BACKDROP}`,
       },
       {
         id: "top",
         label: "Top",
         hint: "Its footprint seen from above.",
         required: false,
-        framing:
-          "product photograph, top-down view from directly above, plain light grey background, soft even light, no studio, no equipment",
+        framing: `product photograph, top-down view from directly above, ${THING_BACKDROP}`,
       },
     ],
   },
+};
+
+/** What an Element of each type is, in plain words: "the same object". */
+export const SUBJECT_NOUN: Record<ElementType, string> = {
+  character: "person",
+  location: "place",
+  thing: "object",
 };
 
 export const elementTypeOrder: ElementType[] = [
@@ -423,7 +465,17 @@ export function viewPrompt(
   const stateText = state ? ` ${state.description.trim() || state.name}.` : "";
   if (slot.move)
     return locationMovePrompt(subject, stateText, slot.move, guided);
-  return `${subject}.${stateText} ${slot.framing}. Reference sheet image, consistent identity, photorealistic.`
+  // "Reference sheet" alone made FLUX tile a single view into a collage of
+  // crops (a Thing's details came back as a grid of nine), so only the
+  // panel views ask for panels.
+  const frame = PANEL_VIEWS.has(slot.id)
+    ? "Reference sheet image"
+    : "One single photograph filling the frame, no panels, no grid, no collage, no text";
+  if (slot.closeUp)
+    return `${slot.framing}. Of this: ${subject}.${stateText} ${frame}, photorealistic.`
+      .replace(/\.\./g, ".")
+      .slice(0, 2000);
+  return `${subject}.${stateText} ${slot.framing}. ${frame}, consistent identity, photorealistic.`
     .replace(/\.\./g, ".")
     .slice(0, 2000);
 }
@@ -543,10 +595,15 @@ export function viewRequest(
         inputs: {
           prompt: slot.shot
             ? prompt
-            : `Same ${elementTypes[element.type].label.toLowerCase()} as the reference images. ${prompt}`.slice(
-                0,
-                2000,
-              ),
+            : slot.closeUp
+              ? `${prompt} The materials and finish match the ${SUBJECT_NOUN[element.type]} in the reference images.`.slice(
+                  0,
+                  2000,
+                )
+              : `Same ${SUBJECT_NOUN[element.type]} as the reference images. ${prompt}`.slice(
+                  0,
+                  2000,
+                ),
           ...size,
           references,
         },
@@ -591,4 +648,130 @@ function moveRequest(
       ...(opening ? { firstFrame: opening.asset } : {}),
     },
   });
+}
+
+/** Multi-panel views are made as one image; a single photo is never one. */
+const PANEL_VIEWS: ReadonlySet<ReferenceView> = new Set([
+  "sheet",
+  "turnaround",
+]);
+
+/**
+ * What a new image or clip most likely shows when its name says nothing:
+ * the first still view the sheet still needs (a Character's close portrait,
+ * a Thing's hero view, a Location's establishing view), skipping views that
+ * are never one photo. A clip of a place is its first missing move. The
+ * creator sees the tag and can change it.
+ */
+export function defaultView(
+  element: Pick<Element, "type" | "references">,
+  stateId: string | null,
+  kind: "image" | "video",
+  taken: ReadonlySet<ReferenceView> = new Set(),
+): ReferenceView | null {
+  const covered = new Set(
+    element.references
+      .filter((r) => r.stateId === stateId && r.status !== "rejected")
+      .map((r) => r.view),
+  );
+  const slots = elementTypes[element.type].slots.filter(
+    (s) =>
+      !!s.move === (kind === "video") &&
+      !PANEL_VIEWS.has(s.id) &&
+      s.id !== "smile",
+  );
+  const open = slots.filter((s) => !covered.has(s.id) && !taken.has(s.id));
+  return (
+    open.find((s) => s.required)?.id ??
+    (kind === "video" ? (open[0]?.id ?? slots[0]?.id ?? null) : null)
+  );
+}
+
+/**
+ * The one thing to do next on a reference sheet. Every type works the same
+ * way: make the anchor view and approve it, then make the rest of the sheet
+ * in one go, guided by the anchor so every view shows the same face, place
+ * or object.
+ */
+export type NextStep =
+  | { kind: "start"; slot: GuidanceSlot }
+  | { kind: "review"; slot: GuidanceSlot; waiting: number }
+  | { kind: "finish"; slots: GuidanceSlot[] }
+  | { kind: "reviewing"; waiting: number }
+  | { kind: "ready"; optional: GuidanceSlot[] };
+
+export function nextStep(
+  element: Element,
+  stateId: string | null,
+  /** Results per view still waiting for a decision, generated or added. */
+  waiting: ReadonlyMap<ReferenceView, number>,
+): NextStep {
+  const { slots } = elementTypes[element.type];
+  const approved = new Set(
+    element.references
+      .filter((r) => r.status === "approved" && r.stateId === stateId)
+      .map((r) => r.view),
+  );
+  const required = slots.filter((s) => s.required);
+  // A Character's state is a full sheet of its own; another type's state
+  // shows the change in its anchor view and borrows the rest from identity.
+  const needed =
+    stateId === null || element.type === "character"
+      ? required
+      : required.slice(0, 1);
+  const anchor = needed[0]!;
+  const count = (slot: GuidanceSlot) => waiting.get(slot.id) ?? 0;
+  if (!approved.has(anchor.id))
+    return count(anchor)
+      ? { kind: "review", slot: anchor, waiting: count(anchor) }
+      : { kind: "start", slot: anchor };
+  const missing = needed.filter((s) => !approved.has(s.id));
+  const unstarted = missing.filter((s) => !count(s));
+  if (unstarted.length) return { kind: "finish", slots: unstarted };
+  if (missing.length)
+    return {
+      kind: "reviewing",
+      waiting: missing.reduce((n, s) => n + count(s), 0),
+    };
+  return {
+    kind: "ready",
+    optional: slots.filter((s) => !s.required && !approved.has(s.id)),
+  };
+}
+
+/**
+ * Views a sheet holds exactly one of: approving another replaces it, and the
+ * earlier one returns to the explorations. Two close portraits or two
+ * turnarounds disagree and the model averages them; landmarks and details
+ * can sit side by side.
+ */
+const SINGLE_VIEWS: ReadonlySet<ReferenceView> = new Set([
+  "face-closeup",
+  "smile",
+  "sheet",
+  "three-quarter",
+  "turnaround",
+  "establishing",
+  "push-in",
+  "drift",
+  "rise",
+]);
+
+/** The approved reference a new approval for this view would replace. */
+export function replacedBy(
+  element: Pick<Element, "references">,
+  stateId: string | null,
+  view: ReferenceView | null,
+  exceptId?: string,
+): ElementReference | null {
+  if (!view || !SINGLE_VIEWS.has(view)) return null;
+  return (
+    element.references.find(
+      (r) =>
+        r.id !== exceptId &&
+        r.status === "approved" &&
+        r.stateId === stateId &&
+        r.view === view,
+    ) ?? null
+  );
 }

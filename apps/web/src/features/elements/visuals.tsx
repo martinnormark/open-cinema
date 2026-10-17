@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { startSession } from "./generate";
 import { assetUrl, posterUrl } from "@/lib/media-url";
+import { leadRank } from "@open-cinema/contracts";
 import { isMovingView, type Element, type ElementType } from "./model";
 import "./elements.css";
 
@@ -30,14 +31,15 @@ export function coverMove(element: Element) {
   );
 }
 
-/** The approved close portrait, else the first approved identity still,
- * else the newest exploration. */
+/** The approved view that leads its mentions (a close portrait, hero view or
+ * establishing view), else the newest exploration. */
 export function coverUrl(element: Element) {
-  const approved = element.references.filter(
-    (r) => r.status === "approved" && !r.stateId && !isMovingView(r.view),
-  );
+  const approved = element.references
+    .filter(
+      (r) => r.status === "approved" && !r.stateId && !isMovingView(r.view),
+    )
+    .sort((a, b) => leadRank(a.view) - leadRank(b.view));
   const reference =
-    approved.find((r) => r.view === "face-closeup") ??
     approved[0] ??
     [...element.references]
       .reverse()

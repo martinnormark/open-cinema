@@ -67,6 +67,7 @@ async function sourceVideo(context: BuildContext, ref: AssetRef) {
 /** A Thing's sheet: views that show its whole design come first. */
 const THING_VIEWS: readonly ReferenceView[] = [
   "three-quarter",
+  "turnaround",
   "front",
   "side",
   "detail",

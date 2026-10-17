@@ -22,8 +22,10 @@ A Location's sheet has three moving views (`LOCATION_MOVES` in
 | `drift`   | Lateral drift    | Slides sideways, so near and far separate       |
 | `rise`    | Rising view      | Rises, showing the layout from above            |
 
-`push-in` is required and comes first in the guidance; the other two are
-optional. The establishing view is still required, as a still.
+The establishing view (a 16:9 still) is the anchor and is made first;
+`push-in` and the landmark view follow it in one step, so the move continues
+from the approved still and shows the same place. `drift` and `rise` are
+optional. The shared path is in [elements.md](elements.md).
 
 **Generate** makes a 5 s, 1280×720 clip with no sound
 (`moveRequest` in `apps/web/src/features/elements/model.ts`):

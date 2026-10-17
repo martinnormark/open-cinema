@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useId,
   useMemo,
   useRef,
@@ -294,14 +295,27 @@ export function MentionTextarea({
   className,
   onKeyDown,
   onBlur,
+  focusAtEnd = false,
   ...props
 }: TextareaProps & {
   value: string;
   onValueChange: (value: string) => void;
+  /** Focus with the caret after the text, to keep writing after a mention. */
+  focusAtEnd?: boolean;
 }) {
   const { elements } = useElements();
   const listId = useId();
   const textarea = useRef<HTMLTextAreaElement | null>(null);
+  // Stable, so it runs when the textarea mounts, not on every keystroke.
+  const attach = useCallback(
+    (node: HTMLTextAreaElement | null) => {
+      textarea.current = node;
+      if (!node || !focusAtEnd) return;
+      node.focus({ preventScroll: true });
+      node.setSelectionRange(node.value.length, node.value.length);
+    },
+    [focusAtEnd],
+  );
   const [caret, setCaret] = useState<number | null>(null);
   const [dismissedAt, setDismissedAt] = useState<number | null>(null);
   const [highlight, setHighlight] = useState(0);
@@ -366,7 +380,7 @@ export function MentionTextarea({
     <div className="relative">
       <textarea
         {...props}
-        ref={textarea}
+        ref={attach}
         value={value}
         role="combobox"
         aria-expanded={open}
