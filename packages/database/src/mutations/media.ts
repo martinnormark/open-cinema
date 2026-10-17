@@ -40,6 +40,8 @@ export async function createPendingMediaAsset(
       height: data.height ?? null,
       durationMs: data.durationMs ?? null,
       fps: data.fps ?? null,
+      pixelAspect: data.pixelAspect ?? null,
+      hasAudio: data.hasAudio ?? null,
     },
   });
   return toMediaAsset(row);

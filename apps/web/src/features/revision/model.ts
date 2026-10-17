@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { formatCost, type CostUnit } from "@/features/settings/preferences";
 import {
+  backgroundPipelineSchema,
   preservedAspectSchema,
   resultOutputs,
   type AssetRef,
@@ -114,6 +115,23 @@ export const revisionDecisionsSchema = z.object({
   estimate: z
     .object({ cost: z.string(), time: z.string(), basis: z.string() })
     .nullable(),
+  /** The studio's exact choices, so "Try again" reopens it as it was. */
+  draft: z
+    .object({
+      stateId: z.string().nullable(),
+      targetNote: z.string().max(300),
+      targetPoint: z
+        .object({
+          x: z.number().min(0).max(1),
+          y: z.number().min(0).max(1),
+          timeMs: z.number().nonnegative(),
+        })
+        .nullable(),
+      pipeline: backgroundPipelineSchema,
+      /** `assetRefKey` of the chosen plate, for the alpha composite. */
+      plate: z.string().max(400).nullable(),
+    })
+    .optional(),
 });
 export type RevisionDecisions = z.infer<typeof revisionDecisionsSchema>;
 
@@ -235,7 +253,9 @@ export function formatEstimate(estimate: GenerationEstimate, unit: CostUnit) {
   return {
     cost: estimate.credits
       ? formatCost(estimate.credits, unit)
-      : "Price not published",
+      : estimate.basis === "observed"
+        ? "Depends on the clip length"
+        : "Price not published",
     time,
     basis:
       estimate.basis === "published-pricing"
@@ -245,4 +265,64 @@ export function formatEstimate(estimate: GenerationEstimate, unit: CostUnit) {
           : "Rough estimate",
     note: estimate.note ?? null,
   };
+}
+
+/**
+ * Kling 3.0 Omni's video edit envelope (docs/phase0-background.md and
+ * docs/phase0-recast.md). Outside it Kling answers with a bare provider_error
+ * after the run is queued, so the studio refuses first and says why.
+ */
+export const KLING_SOURCE_LIMITS = {
+  minSeconds: 3,
+  maxSeconds: 10,
+  minShortSidePx: 720,
+  minFps: 23.9,
+  maxFps: 60.5,
+} as const;
+
+export interface SourceFacts {
+  seconds: number | null;
+  /** Display size, as a player shows it. */
+  width: number | null;
+  height: number | null;
+  fps: number | null;
+  pixelAspect: number | null;
+}
+
+/**
+ * What stops a clip from going to Kling (`problems`), and what the job changes
+ * on the way without asking (`notes`). Unknown facts are not held against it.
+ */
+export function checkKlingSource(source: SourceFacts) {
+  const problems: string[] = [];
+  const notes: string[] = [];
+  const { seconds, width, height, fps, pixelAspect } = source;
+  if (seconds !== null && seconds < KLING_SOURCE_LIMITS.minSeconds - 0.05)
+    problems.push(
+      `Kling needs a clip of at least ${KLING_SOURCE_LIMITS.minSeconds} seconds; this one is ${seconds.toFixed(1)} s.`,
+    );
+  if (seconds !== null && seconds > KLING_SOURCE_LIMITS.maxSeconds + 0.05)
+    problems.push(
+      `Kling edits up to ${KLING_SOURCE_LIMITS.maxSeconds} seconds; this clip is ${seconds.toFixed(1)} s. Trim it and upload it again.`,
+    );
+  if (
+    width !== null &&
+    height !== null &&
+    Math.min(width, height) < KLING_SOURCE_LIMITS.minShortSidePx
+  )
+    problems.push(
+      `Kling needs at least ${KLING_SOURCE_LIMITS.minShortSidePx} pixels on the short side; this clip is ${width}×${height}.`,
+    );
+  if (
+    fps !== null &&
+    (fps < KLING_SOURCE_LIMITS.minFps || fps > KLING_SOURCE_LIMITS.maxFps)
+  )
+    problems.push(
+      `Kling takes 24 to 60 frames per second; this clip is ${Math.round(fps * 100) / 100} fps.`,
+    );
+  if (pixelAspect !== null && Math.abs(pixelAspect - 1) > 0.001)
+    notes.push(
+      "This clip has non-square pixels, which Kling cannot read. It is converted to square pixels first, keeping the shot's shape.",
+    );
+  return { problems, notes };
 }

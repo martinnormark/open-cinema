@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { parseAssetRefKey } from "@/features/library";
 import { ReplacementStudio } from "@/features/revision/replacement-studio";
-import { getProjectHome } from "@/server/revisions";
+import { getProjectHome, getRevisionView } from "@/server/revisions";
 
 export const Route = createFileRoute("/revisions/new")({
   validateSearch: z.object({
@@ -12,20 +12,31 @@ export const Route = createFileRoute("/revisions/new")({
     kind: z.enum(["background", "character"]).optional(),
     project: z.string().max(100).optional(),
     parent: z.string().max(100).optional(),
+    /** A failed revision whose choices "Try again" starts from. */
+    retry: z.string().max(100).optional(),
   }),
-  loaderDeps: ({ search }) => ({ project: search.project }),
+  loaderDeps: ({ search }) => ({
+    project: search.project,
+    retry: search.retry,
+  }),
   loader: async ({ deps }) => {
-    const home = deps.project
-      ? await getProjectHome({ data: { projectId: deps.project } })
-      : null;
-    return { project: home?.signedIn ? (home.project ?? null) : null };
+    const [home, retry] = await Promise.all([
+      deps.project
+        ? getProjectHome({ data: { projectId: deps.project } })
+        : null,
+      deps.retry ? getRevisionView({ data: { revisionId: deps.retry } }) : null,
+    ]);
+    return {
+      project: home?.signedIn ? (home.project ?? null) : null,
+      draft: retry?.signedIn && retry.revision ? retry.decisions : null,
+    };
   },
   head: () => ({ meta: [{ title: "New revision · Open Cinema" }] }),
   component: NewRevision,
 });
 
 function NewRevision() {
-  const { project } = Route.useLoaderData();
+  const { project, draft } = Route.useLoaderData();
   const search = Route.useSearch();
   return (
     <section
@@ -47,11 +58,12 @@ function NewRevision() {
       />
       <div className="mt-8">
         <ReplacementStudio
-          key={`${search.source ?? ""}-${search.kind ?? ""}`}
+          key={`${search.source ?? ""}-${search.kind ?? ""}-${search.retry ?? ""}`}
           initialSource={search.source ? parseAssetRefKey(search.source) : null}
           initialKind={search.kind}
           projectId={project?.id}
           parentRevisionId={search.parent}
+          draft={draft}
         />
       </div>
     </section>

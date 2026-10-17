@@ -17,7 +17,6 @@ import {
   commandResultSchema,
   createProjectInputSchema,
   generationRequestSchema,
-  requestPrompt,
   revisionSchema,
   setRevisionStatusInputSchema,
   workflowCommandSchema,
@@ -238,7 +237,7 @@ export const submitRevision = createServerFn({ method: "POST" })
       result.jobId
         ? j.id === result.jobId
         : j.workflowKind === command.request.workflowKind &&
-          j.prompt === (requestPrompt(command.request) || data.intent),
+          j.prompt === data.intent,
     );
     if (!job)
       return {

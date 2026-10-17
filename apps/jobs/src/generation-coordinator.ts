@@ -47,6 +47,7 @@ import {
   AssetUnavailableError,
   createAssetResolver,
   storedAsset,
+  type UploadCache,
 } from "./asset-resolver";
 import { MediaRejectedError, renderMedia } from "./media";
 import { MentionError, resolveMentions } from "./mentions";
@@ -59,6 +60,8 @@ const DEADLINE_MS = 30 * 60_000;
 const LINK_GRACE_MS = 60 * 60_000;
 /** Router's shared queue can hold a job for hours; past this, ask the creator. */
 const MAX_QUEUE_WAIT_MS = 6 * 60 * 60_000;
+/** Comfy storage links last about 24 h; reuse one only while it has hours left. */
+const UPLOAD_REUSE_MS = 16 * 60 * 60_000;
 type Execution = CoordinatorRecord["executions"][string];
 /**
  * When signed media links expire. They must outlive the whole watch window,
@@ -266,8 +269,10 @@ export class GenerationCoordinator
           providerJobId: null,
           createdAt: now,
           updatedAt: now,
+          // A revision reads as the creator's stated change; its prompt is
+          // only the extra direction (a recast's may be a wardrobe note).
           prompt:
-            requestPrompt(command.request) || command.revision?.intent || "",
+            command.revision?.intent || requestPrompt(command.request) || "",
           model:
             typeof definition.displayModel === "function"
               ? definition.displayModel(command.request.inputs as never)
@@ -298,6 +303,7 @@ export class GenerationCoordinator
           assetsPending: false,
           workflow: { model },
           submissionKey: crypto.randomUUID(),
+          uploads: {},
           stage: 0,
           nextAttemptAt: Date.now(),
           deadline: Date.now() + definition.deadlineMs,
@@ -451,11 +457,20 @@ export class GenerationCoordinator
     ) as WorkflowDefinition | null;
     if (!definition) throw new AssetUnavailableError(request.workflowKind);
     const stage = stageOf(execution);
-    const context = this.stageContext(ownerId, job, execution);
+    const created = new Map<string, string>();
+    const context = this.stageContext(ownerId, job, execution, created);
     const built =
       stage?.kind === "router"
         ? await stage.build(request.inputs as never, context)
         : await definition.build(request.inputs as never, context);
+    // Saved before submitting, so a restart mid-submit rebuilds the same request.
+    if (created.size)
+      await mutateCoordinator(this.ctx.storage, { ownerId }, (record) => {
+        const current = record.executions[job.id];
+        if (!current) return;
+        for (const [key, url] of created)
+          current.uploads[key] = { url, at: Date.now() };
+      });
     return { model: built.model, input: built.input };
   }
 
@@ -464,8 +479,20 @@ export class GenerationCoordinator
     ownerId: string,
     job: Job,
     execution: Execution,
+    /** Collects storage links created while building, for the caller to save. */
+    created?: Map<string, string>,
   ): StageContext {
     const saved = job.outputs.filter((o) => o.r2Key);
+    const now = Date.now();
+    const uploads: UploadCache = {
+      get(key) {
+        const upload = execution.uploads[key];
+        return upload && now - upload.at < UPLOAD_REUSE_MS
+          ? upload.url
+          : undefined;
+      },
+      set: (key, url) => created?.set(key, url),
+    };
     return {
       mentions: execution.mentions,
       asset: createAssetResolver(
@@ -473,6 +500,7 @@ export class GenerationCoordinator
         { ownerId },
         mediaLinkExpiry(job.createdAt, execution.deadline),
         saved,
+        uploads,
       ),
       saved: saved.map((o) => o.providerAssetId),
       output(providerAssetId): AssetRef | null {

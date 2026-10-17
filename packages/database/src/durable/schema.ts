@@ -40,6 +40,14 @@ export const executionSchema = z.object({
   workflow: workflowGraphSchema,
   submissionKey: z.string(),
   /**
+   * Comfy storage links this job created for media a provider fetches by URL,
+   * by asset key, so a request rebuilt after a lost receipt is identical.
+   * Signed for about 24 hours; `at` is when the link was created.
+   */
+  uploads: z
+    .record(z.string(), z.object({ url: z.string(), at: z.number() }))
+    .default({}),
+  /**
    * 0 is the definition's own request; n > 0 runs the definition's `stages[n-1]`
    * (a further Router request or media container work) once earlier outputs are saved.
    */

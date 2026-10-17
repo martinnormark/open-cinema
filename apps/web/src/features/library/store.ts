@@ -221,6 +221,11 @@ async function run(entry: UploadEntry) {
     if (probe.height) headers["X-Media-Height"] = String(probe.height);
     if (probe.durationSeconds)
       headers["X-Media-Duration"] = String(probe.durationSeconds);
+    if (probe.fps) headers["X-Media-Fps"] = String(probe.fps);
+    if (probe.pixelAspect)
+      headers["X-Media-Pixel-Aspect"] = String(probe.pixelAspect);
+    if (probe.hasAudio !== null)
+      headers["X-Media-Audio"] = probe.hasAudio ? "1" : "0";
     const response = await send(entry.key, entry.file, headers);
     if (response.status !== 201) {
       const message =

@@ -7,8 +7,12 @@ import {
 } from "@open-cinema/contracts";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { formatDuration } from "@/features/library/model";
-import { Thumbnail, useLibrary, type MediaItem } from "@/features/library";
+import {
+  DurationBadge,
+  Thumbnail,
+  useLibrary,
+  type MediaItem,
+} from "@/features/library";
 import { useGeneration } from "@/features/generation/store";
 import { useElements } from "@/features/elements/store";
 import {
@@ -185,13 +189,10 @@ function Sources({
                 <Thumbnail
                   src={item.thumbnailUrl}
                   kind="video"
+                  videoSrc={item.url}
                   className="aspect-video"
                 />
-                {item.durationSeconds && (
-                  <span className="tabular absolute right-1.5 bottom-1.5 rounded bg-black/70 px-1 text-[0.6875rem] text-white">
-                    {formatDuration(item.durationSeconds)}
-                  </span>
-                )}
+                <DurationBadge item={item} className="right-1.5 bottom-1.5" />
               </span>
               <span className="mt-1.5 flex items-center justify-between gap-2">
                 <span className="truncate text-xs text-muted-foreground">

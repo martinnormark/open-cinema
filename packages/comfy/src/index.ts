@@ -40,9 +40,13 @@ function failureMessage(errorType: string) {
     case "content_policy_violation":
       return "Comfy could not generate this prompt under its content policy. Try a different prompt.";
     case "invalid_input":
-      return "Comfy rejected the model inputs. Check the Router model schema.";
+      return "The model rejected these inputs. Check the clip and references, then try again.";
+    // The provider (Kling, BFL, LTX) refused or failed on the inputs. Seen live
+    // for a clip with non-square pixels; it says nothing about the account.
+    case "provider_error":
+      return "The model could not process these inputs. For a video, check that it is 3 to 10 seconds, at least 720 pixels on its short side and 24 to 60 fps, then try again.";
     default:
-      return "Comfy Router could not complete this generation. Check your account and try again.";
+      return "The model did not finish this generation. Try again; if it fails again, try different inputs.";
   }
 }
 export function submissionFailure(error: unknown, provider = "router") {

@@ -145,24 +145,27 @@ model ElementReference {
 }
 
 model MediaAsset {
-  id         String   @id
-  ownerId    String
-  owner      User     @relation(fields: [ownerId], references: [id])
-  projectId  String?
-  project    Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  kind       String
-  status     String
-  mediaType  String
-  filename   String
-  r2Key      String   @unique
-  sizeBytes  Int?
-  etag       String?
-  width      Int?
-  height     Int?
-  durationMs Int?
-  fps        Float?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id          String   @id
+  ownerId     String
+  owner       User     @relation(fields: [ownerId], references: [id])
+  projectId   String?
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  kind        String
+  status      String
+  mediaType   String
+  filename    String
+  r2Key       String   @unique
+  sizeBytes   Int?
+  etag        String?
+  width       Int?
+  height      Int?
+  durationMs  Int?
+  fps         Float?
+  /// Sample aspect ratio measured at upload; 1 is square pixels.
+  pixelAspect Float?
+  hasAudio    Boolean?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@index([ownerId, kind, createdAt])
 }

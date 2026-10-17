@@ -20,6 +20,10 @@ export const mediaItemSchema = z.object({
   width: z.number().int().positive().nullable(),
   height: z.number().int().positive().nullable(),
   durationSeconds: z.number().positive().nullable(),
+  /** Container facts measured at upload; null for generated media or unknown. */
+  fps: z.number().positive().nullable().default(null),
+  pixelAspect: z.number().positive().nullable().default(null),
+  hasAudio: z.boolean().nullable().default(null),
   createdAt: z.string(),
   url: z.string(),
   thumbnailUrl: z.string().nullable(),

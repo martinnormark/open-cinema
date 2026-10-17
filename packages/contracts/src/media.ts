@@ -43,6 +43,10 @@ export const mediaAssetSchema = z.object({
   height: z.number().int().positive().nullable().default(null),
   durationMs: z.number().int().nonnegative().nullable().default(null),
   fps: z.number().positive().nullable().default(null),
+  /** Sample (pixel) aspect ratio measured at upload; 1 is square pixels. */
+  pixelAspect: z.number().positive().nullable().default(null),
+  /** Whether the clip has a sound track; null when it was not measured. */
+  hasAudio: z.boolean().nullable().default(null),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -80,6 +84,8 @@ export const createMediaAssetInputSchema = z.object({
   height: z.number().int().positive().optional(),
   durationMs: z.number().int().nonnegative().optional(),
   fps: z.number().positive().optional(),
+  pixelAspect: z.number().positive().optional(),
+  hasAudio: z.boolean().optional(),
 });
 export type CreateMediaAssetInput = z.infer<typeof createMediaAssetInputSchema>;
 

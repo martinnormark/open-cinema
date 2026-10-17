@@ -12,6 +12,7 @@ import {
 } from "@open-cinema/comfy";
 import { createDatabase } from "@open-cinema/database";
 import { resolveAssetRef } from "@open-cinema/database/queries";
+import { renderMedia } from "./media";
 
 /** Optional deployment settings for provider-fetchable upload links. */
 interface MediaLinkEnv {
@@ -23,6 +24,24 @@ interface MediaLinkEnv {
 
 /** The request referenced media the owner cannot use (deleted, foreign, or unsaved). */
 export class AssetUnavailableError extends Error {}
+
+/**
+ * A clip whose pixels are not square (e.g. a 639:640 sample aspect). Kling
+ * answers those with a bare provider_error, so they are conformed first.
+ */
+export function needsSquarePixels(pixelAspect: number | null | undefined) {
+  return pixelAspect != null && Math.abs(pixelAspect - 1) > 0.001;
+}
+
+/**
+ * Comfy storage links this job already created, by asset key. A request
+ * rebuilt after a lost receipt must reuse them: a new link changes the request,
+ * and Router answers a changed request under the same idempotency key with 409.
+ */
+export interface UploadCache {
+  get(key: string): string | undefined;
+  set(key: string, url: string): void;
+}
 
 /** Where a ref's bytes are: this job's checkpoint first, then D1. */
 export async function storedAsset(
@@ -55,6 +74,7 @@ export function createAssetResolver(
   linkExpiresAt: number,
   /** This job's saved outputs, read from the checkpoint before D1 has them. */
   ownOutputs: readonly JobOutput[] = [],
+  uploads?: UploadCache,
 ) {
   const db = createDatabase(env.DB);
   const cache = new Map<string, Promise<ResolvedAsset>>();
@@ -63,7 +83,11 @@ export function createAssetResolver(
     if (!stored) throw new AssetUnavailableError(assetRefKey(ref));
     let publicUrl: string | null = null;
     const origin = env.MEDIA_PUBLIC_ORIGIN?.replace(/\/+$/, "");
+    const square =
+      stored.mediaType.startsWith("video/") &&
+      needsSquarePixels(stored.pixelAspect);
     if (
+      !square &&
       ref.type === "media-asset" &&
       origin?.startsWith("https://") &&
       env.MEDIA_SIGNING_SECRET
@@ -83,22 +107,43 @@ export function createAssetResolver(
     let uploaded: Promise<string> | null = null;
     const fetchableUrl = () => {
       if (publicUrl) return Promise.resolve(publicUrl);
+      const cached = uploads?.get(assetRefKey(ref));
+      if (cached) return Promise.resolve(cached);
       uploaded ??= (async () => {
-        const object = await env.GENERATED_ASSETS.get(stored.r2Key);
-        if (!object) throw new AssetUnavailableError(assetRefKey(ref));
-        // Signed upload URLs need a known length; R2 knows it exactly.
-        const { readable, writable } = new FixedLengthStream(object.size);
-        void object.body.pipeTo(writable);
-        const extension = stored.mediaType.split("/")[1]?.split(";")[0];
-        return uploadToComfyStorage({
+        const signal = AbortSignal.timeout(10 * 60_000);
+        let body: ReadableStream<Uint8Array>;
+        let size: number;
+        let contentType = stored.mediaType;
+        if (square) {
+          // Resampled to its display size with square pixels; see media/server.mjs.
+          ({ body, size } = await renderMedia(
+            env,
+            "square",
+            [{ name: "source", r2Key: stored.r2Key }],
+            signal,
+          ));
+          contentType = "video/mp4";
+        } else {
+          const object = await env.GENERATED_ASSETS.get(stored.r2Key);
+          if (!object) throw new AssetUnavailableError(assetRefKey(ref));
+          // Signed upload URLs need a known length; R2 knows it exactly.
+          const { readable, writable } = new FixedLengthStream(object.size);
+          void object.body.pipeTo(writable);
+          body = readable;
+          size = object.size;
+        }
+        const extension = contentType.split("/")[1]?.split(";")[0];
+        const url = await uploadToComfyStorage({
           apiKey: env.COMFY_API_KEY ?? "",
           baseUrl: routerBaseUrl(env.COMFY_BASE_URL),
           fileName: `${crypto.randomUUID()}${extension ? `.${extension}` : ""}`,
-          contentType: stored.mediaType,
-          sizeBytes: object.size,
-          body: readable,
-          signal: AbortSignal.timeout(10 * 60_000),
+          contentType,
+          sizeBytes: size,
+          body,
+          signal,
         });
+        uploads?.set(assetRefKey(ref), url);
+        return url;
       })();
       return uploaded;
     };

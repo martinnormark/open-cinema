@@ -10,20 +10,30 @@ import {
   useLibrary,
   type UploadEntry,
 } from "./store";
+import {
+  loadWhenVisible,
+  recordVideoDuration,
+  useVideoDuration,
+} from "./video-meta";
 
 /** Marks cached images loaded at attach time; `onLoad` covers the rest. */
 function revealWhenLoaded(img: HTMLImageElement | null) {
   if (img?.complete && img.naturalWidth) img.dataset.loaded = "true";
 }
 
-/** Fades in over a placeholder icon; a failed load leaves the icon visible. */
+/**
+ * Fades in over a placeholder icon; a failed load leaves the icon visible. A
+ * video with no poster image shows its own first frame instead (`videoSrc`).
+ */
 export function Thumbnail({
   src,
   kind,
+  videoSrc,
   className,
 }: {
   src: string | null;
   kind: MediaItem["kind"];
+  videoSrc?: string | null | undefined;
   className?: string;
 }) {
   const Icon = kind === "video" ? Film : ImageIcon;
@@ -46,7 +56,57 @@ export function Thumbnail({
           className="library-thumb absolute inset-0 size-full object-cover"
         />
       )}
+      {!src && kind === "video" && videoSrc && (
+        <video
+          ref={loadWhenVisible}
+          // A frame slightly in avoids a black first frame.
+          data-src={`${videoSrc}#t=0.1`}
+          muted
+          playsInline
+          preload="metadata"
+          tabIndex={-1}
+          aria-hidden="true"
+          disablePictureInPicture
+          onLoadedMetadata={(event) =>
+            recordVideoDuration(videoSrc, event.currentTarget.duration)
+          }
+          onLoadedData={(event) =>
+            (event.currentTarget.dataset.loaded = "true")
+          }
+          className="library-thumb pointer-events-none absolute inset-0 size-full object-cover"
+        />
+      )}
     </div>
+  );
+}
+
+/** The clip's length: measured at upload, or read from its poster frame. */
+export function useItemDuration(item: MediaItem) {
+  const measured = useVideoDuration(
+    item.kind === "video" && item.durationSeconds === null ? item.url : null,
+  );
+  return item.durationSeconds ?? measured;
+}
+
+/** A clip's length over its thumbnail; nothing until the length is known. */
+export function DurationBadge({
+  item,
+  className,
+}: {
+  item: MediaItem;
+  className?: string;
+}) {
+  const seconds = useItemDuration(item);
+  if (!seconds) return null;
+  return (
+    <span
+      className={cn(
+        "tabular absolute rounded bg-black/70 px-1 text-[0.6875rem] text-white",
+        className,
+      )}
+    >
+      {formatDuration(seconds)}
+    </span>
   );
 }
 
@@ -71,6 +131,7 @@ export const MediaTile = memo(function MediaTile({
   selected?: boolean | undefined;
   hidden?: boolean | undefined;
 }) {
+  const seconds = useItemDuration(item);
   return (
     <li className="library-tile" hidden={hidden}>
       <button
@@ -83,6 +144,7 @@ export const MediaTile = memo(function MediaTile({
           <Thumbnail
             src={item.thumbnailUrl}
             kind={item.kind}
+            videoSrc={item.url}
             className={cn(
               "aspect-square rounded-lg",
               selected && "ring-2 ring-tungsten",
@@ -91,7 +153,7 @@ export const MediaTile = memo(function MediaTile({
           {item.kind === "video" && (
             <span className="tabular absolute right-2 bottom-2 flex items-center gap-1 rounded-sm bg-background/90 px-1.5 py-0.5 text-xs font-medium">
               <Film aria-hidden="true" className="size-3" />
-              {formatDuration(item.durationSeconds) || "Video"}
+              {formatDuration(seconds) || "Video"}
             </span>
           )}
         </div>

@@ -27,8 +27,9 @@ function json(body: unknown, status = 200) {
 
 /**
  * Raw-body upload: the file is the request body, so it streams straight into
- * R2 without buffering a multipart form. Browser-measured dimensions and
- * duration travel in headers and are advisory; size and type are verified.
+ * R2 without buffering a multipart form. Browser-measured dimensions,
+ * duration, frame rate, pixel aspect and sound travel in headers and are
+ * advisory; size and type are verified.
  */
 async function upload(request: Request) {
   requireSameOrigin();
@@ -68,6 +69,17 @@ async function upload(request: Request) {
       { error: `Videos can be up to ${MAX_VIDEO_SECONDS / 60} minutes.` },
       422,
     );
+  const video = mediaType.startsWith("video/");
+  const fps = Number(request.headers.get("X-Media-Fps"));
+  const aspect = Number(request.headers.get("X-Media-Pixel-Aspect"));
+  const audio = request.headers.get("X-Media-Audio");
+  const facts = {
+    ...(video && fps > 0 && fps <= 240 ? { fps } : {}),
+    ...(video && aspect >= 0.25 && aspect <= 4 ? { pixelAspect: aspect } : {}),
+    ...(video && (audio === "1" || audio === "0")
+      ? { hasAudio: audio === "1" }
+      : {}),
+  };
   const id = crypto.randomUUID();
   const db = createDatabase(env.DB);
   let pending = false;
@@ -83,6 +95,7 @@ async function upload(request: Request) {
       ...(width ? { width } : {}),
       ...(height ? { height } : {}),
       ...(durationMs !== undefined ? { durationMs } : {}),
+      ...facts,
     });
     pending = true;
     const stored = await storeUpload(

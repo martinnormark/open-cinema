@@ -43,7 +43,7 @@ export interface StageContext extends BuildContext {
 }
 
 /** Steps a media container performs; see apps/jobs/media/server.mjs. */
-export type MediaOperation = "lock" | "conform";
+export type MediaOperation = "lock" | "conform" | "square";
 /** One container call that produces one output from named media parts. */
 export interface MediaTask {
   /** Stored as `{stage id}:{output}`. */

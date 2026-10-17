@@ -395,6 +395,7 @@ function PendingStage({
                 source: assetRefKey(revision.source),
                 kind,
                 project: revision.projectId ?? undefined,
+                retry: revision.id,
               }}
             >
               <RotateCcw aria-hidden="true" /> Try again

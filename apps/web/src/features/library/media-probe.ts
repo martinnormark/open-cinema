@@ -1,11 +1,22 @@
-import { readContainerMeta } from "./mp4-meta";
+import { readContainerMeta, type ContainerMeta } from "./mp4-meta";
 
 export interface MediaProbe {
   width: number | null;
   height: number | null;
   durationSeconds: number | null;
+  /** Video only, from the MP4/MOV container; null when unknown (WebM). */
+  fps: number | null;
+  /** Sample aspect ratio; 1 means square pixels. */
+  pixelAspect: number | null;
+  hasAudio: boolean | null;
   poster: Blob | null;
 }
+
+const noVideoMeta = { fps: null, pixelAspect: null, hasAudio: null };
+const containerMeta = (file: File): Promise<ContainerMeta | null> =>
+  file.type === "video/mp4" || file.type === "video/quicktime"
+    ? readContainerMeta(file).catch(() => null)
+    : Promise.resolve(null);
 
 const POSTER_EDGE = 640;
 
@@ -39,6 +50,7 @@ async function probeImage(file: File): Promise<MediaProbe> {
       width: bitmap.width,
       height: bitmap.height,
       durationSeconds: null,
+      ...noVideoMeta,
       poster,
     };
   } finally {
@@ -72,6 +84,7 @@ function once(target: HTMLVideoElement, event: string, timeoutMs = 15_000) {
 }
 
 async function probeVideo(file: File): Promise<MediaProbe> {
+  const meta = containerMeta(file);
   const url = URL.createObjectURL(file);
   const video = document.createElement("video");
   video.muted = true;
@@ -86,10 +99,15 @@ async function probeVideo(file: File): Promise<MediaProbe> {
     // A frame slightly in avoids black fade-in frames.
     video.currentTime = Math.min(1, (duration ?? 0) * 0.1);
     await seeked;
+    const container = await meta;
     return {
+      // Browsers report the display size, already corrected for pixel aspect.
       width: video.videoWidth || null,
       height: video.videoHeight || null,
       durationSeconds: duration,
+      fps: container?.fps ?? null,
+      pixelAspect: container?.pixelAspect ?? null,
+      hasAudio: container?.hasAudio ?? null,
       poster: video.videoWidth
         ? await drawPoster(video, video.videoWidth, video.videoHeight)
         : null,
@@ -109,14 +127,14 @@ export async function probeMedia(file: File): Promise<MediaProbe> {
       : await probeImage(file);
   } catch {
     // Undecodable codec: the container still knows duration and frame size.
-    const meta =
-      file.type === "video/mp4" || file.type === "video/quicktime"
-        ? await readContainerMeta(file).catch(() => null)
-        : null;
+    const meta = await containerMeta(file);
     return {
       width: meta?.width || null,
       height: meta?.height || null,
       durationSeconds: meta?.durationSeconds || null,
+      fps: meta?.fps ?? null,
+      pixelAspect: meta?.pixelAspect ?? null,
+      hasAudio: meta?.hasAudio ?? null,
       poster: null,
     };
   }

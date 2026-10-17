@@ -25,6 +25,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { formatDuration } from "@/features/library/model";
 import {
+  DurationBadge,
   MediaPicker,
   Thumbnail,
   useLibrary,
@@ -43,6 +44,7 @@ import { submitRevision } from "@/server/revisions";
 import { useCostPreferences } from "@/features/settings/preferences";
 import { estimateReplacement } from "./estimate";
 import {
+  checkKlingSource,
   formatEstimate,
   formatTimecode,
   preservedLabels,
@@ -53,6 +55,13 @@ import {
   type WardrobeIntent,
 } from "./model";
 import "./revision.css";
+
+/** What the player learns once the clip's metadata loads. */
+interface ClipMetadata {
+  seconds: number | null;
+  width: number | null;
+  height: number | null;
+}
 
 interface Target {
   x: number;
@@ -93,11 +102,14 @@ export function ReplacementStudio({
   initialKind = "background",
   projectId,
   parentRevisionId,
+  draft,
 }: {
   initialSource?: AssetRef | null;
   initialKind?: ReplacementKind | undefined;
   projectId?: string | undefined;
   parentRevisionId?: string | undefined;
+  /** A failed revision's choices, for "Try again". Read once, at mount. */
+  draft?: RevisionDecisions | null | undefined;
 }) {
   const navigate = useNavigate();
   const { snapshot } = useGeneration();
@@ -116,27 +128,53 @@ export function ReplacementStudio({
     sourceKey === null
       ? (videos[0] ?? null)
       : (videos.find((v) => assetRefKey(v.ref) === sourceKey) ?? null);
-  const [kind, setKind] = useState<ReplacementKind>(initialKind);
-  const [elementId, setElementId] = useState<string | null>(null);
-  const [stateId, setStateId] = useState<string | null>(null);
-  const [direction, setDirection] = useState("");
-  const [target, setTarget] = useState<Target | null>(null);
-  const [targetNote, setTargetNote] = useState("");
-  const [wardrobe, setWardrobe] = useState<WardrobeIntent>("character");
-  const [wardrobeNote, setWardrobeNote] = useState("");
+  const [kind, setKind] = useState<ReplacementKind>(draft?.kind ?? initialKind);
+  const [elementId, setElementId] = useState<string | null>(
+    draft?.element?.id ?? null,
+  );
+  const [stateId, setStateId] = useState<string | null>(
+    draft?.draft?.stateId ?? null,
+  );
+  const [direction, setDirection] = useState(draft?.direction ?? "");
+  const [target, setTarget] = useState<Target | null>(
+    draft?.draft?.targetPoint ?? null,
+  );
+  const [targetNote, setTargetNote] = useState(draft?.draft?.targetNote ?? "");
+  const [wardrobe, setWardrobe] = useState<WardrobeIntent>(
+    draft?.wardrobe ?? "character",
+  );
+  const [wardrobeNote, setWardrobeNote] = useState(draft?.wardrobeNote ?? "");
   const [preserve, setPreserve] = useState<
     Record<ReplacementKind, Set<PreservedAspect>>
   >(() => ({
-    background: new Set(DEFAULT_PRESERVATION.background.preserve),
-    character: new Set(DEFAULT_PRESERVATION.character.preserve),
+    background: new Set(
+      draft?.kind === "background"
+        ? draft.preserve
+        : DEFAULT_PRESERVATION.background.preserve,
+    ),
+    character: new Set(
+      draft?.kind === "character"
+        ? draft.preserve
+        : DEFAULT_PRESERVATION.character.preserve,
+    ),
   }));
-  const [allowIntegration, setAllowIntegration] = useState(true);
+  const [allowIntegration, setAllowIntegration] = useState(
+    draft?.allowIntegration ?? true,
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [pendingKey, setPendingKey] = useState<string | null>(null);
-  const [duration, setDuration] = useState<number | null>(null);
-  const [pipeline, setPipeline] = useState<BackgroundPipelineChoice>("kling");
-  const [plate, setPlate] = useState<MediaItem | null>(null);
+  const [measured, setMeasured] = useState<ClipMetadata | null>(null);
+  const [pipeline, setPipeline] = useState<BackgroundPipelineChoice>(
+    draft?.draft?.pipeline ?? "kling",
+  );
+  const [plateKey, setPlateKey] = useState<string | null>(
+    draft?.draft?.plate ?? null,
+  );
+  const plate =
+    plateKey === null
+      ? null
+      : (items.find((item) => assetRefKey(item.ref) === plateKey) ?? null);
 
   const elementType = kind === "background" ? "location" : "character";
   const candidates = elements.filter((e) => e.type === elementType);
@@ -144,12 +182,28 @@ export function ReplacementStudio({
   const state = element?.states.find((s) => s.id === stateId) ?? null;
   const references = element ? approvedReferences(element, state?.id) : [];
   const preserved = preserve[kind];
-  const clipSeconds = source?.durationSeconds ?? duration;
+  const clipSeconds = source?.durationSeconds ?? measured?.seconds ?? null;
   const alpha = kind === "background" && pipeline === "ltx-alpha";
   // A composite never relights the matted people.
   const locked: readonly PreservedAspect[] = alpha
     ? [...LOCKED.background, "lighting"]
     : LOCKED[kind];
+  // A silent clip has no original sound to keep.
+  const unavailable: readonly PreservedAspect[] =
+    source?.hasAudio === false ? ["audio"] : [];
+  const kept = [...new Set([...locked, ...preserved])].filter(
+    (a) => !unavailable.includes(a),
+  );
+  const sourceCheck =
+    source && !alpha
+      ? checkKlingSource({
+          seconds: clipSeconds,
+          width: source.width ?? measured?.width ?? null,
+          height: source.height ?? measured?.height ?? null,
+          fps: source.fps,
+          pixelAspect: source.pixelAspect,
+        })
+      : { problems: [], notes: [] };
 
   const { unit } = useCostPreferences();
   const estimate = formatEstimate(
@@ -159,6 +213,8 @@ export function ReplacementStudio({
 
   const problems: string[] = [];
   if (!source) problems.push("Choose a clip to revise.");
+  // What is wrong with the clip itself comes before any other choice.
+  problems.push(...sourceCheck.problems);
   if (alpha && !plate && !element)
     problems.push("Choose a Location or a plate to put behind the take.");
   if (
@@ -196,11 +252,11 @@ export function ReplacementStudio({
   function chooseSource(item: MediaItem) {
     setSourceKey(assetRefKey(item.ref));
     setTarget(null);
-    setDuration(null);
+    setMeasured(null);
     setPendingKey(null);
   }
   function togglePreserved(aspect: PreservedAspect) {
-    if (locked.includes(aspect)) return;
+    if (locked.includes(aspect) || unavailable.includes(aspect)) return;
     setPreserve((current) => {
       const next = new Set(current[kind]);
       if (next.has(aspect)) next.delete(aspect);
@@ -251,7 +307,7 @@ export function ReplacementStudio({
     try {
       if (!snapshot) await startSession();
       const preservation = {
-        preserve: [...new Set([...locked, ...preserved])].filter(
+        preserve: kept.filter(
           (a) => OFFERED[kind].includes(a) || a === "wardrobe",
         ),
         allowIntegration,
@@ -299,12 +355,12 @@ export function ReplacementStudio({
                     ? { description: targetNote.trim() }
                     : {}),
                 },
+                // Keeping the source wardrobe or the Character's own look is
+                // already worded by the request builder from `preservation`.
                 prompt: [
-                  wardrobe === "keep"
-                    ? "Keep the original person’s wardrobe exactly."
-                    : wardrobe === "describe"
-                      ? `Wardrobe for this shot: ${wardrobeNote.trim()}.`
-                      : "Dress the new character as in the reference images.",
+                  wardrobe === "describe"
+                    ? `Wardrobe for this shot: ${wardrobeNote.trim()}.`
+                    : "",
                   direction.trim(),
                 ]
                   .filter(Boolean)
@@ -360,6 +416,13 @@ export function ReplacementStudio({
           time: estimate.time,
           basis: estimate.basis,
         },
+        draft: {
+          stateId: state?.id ?? null,
+          targetNote: targetNote.trim().slice(0, 300),
+          targetPoint: kind === "character" ? target : null,
+          pipeline,
+          plate: alpha ? plateKey : null,
+        },
       };
       const result = await submitRevision({
         data: {
@@ -404,7 +467,7 @@ export function ReplacementStudio({
             setTarget(next);
             setPendingKey(null);
           }}
-          onDuration={setDuration}
+          onMetadata={setMeasured}
         />
         <ClipStrip
           videos={videos}
@@ -488,7 +551,7 @@ export function ReplacementStudio({
             }}
             plate={plate}
             onPlate={(next) => {
-              setPlate(next);
+              setPlateKey(next ? assetRefKey(next.ref) : null);
               setPendingKey(null);
             }}
             locationName={element?.name ?? null}
@@ -599,17 +662,20 @@ export function ReplacementStudio({
           <ul className="mt-2 flex flex-wrap gap-1.5">
             {OFFERED[kind].map((aspect) => {
               const fixed = locked.includes(aspect);
-              const on = preserved.has(aspect) || fixed;
+              const absent = unavailable.includes(aspect);
+              const on = !absent && (preserved.has(aspect) || fixed);
               return (
                 <li key={aspect}>
                   <button
                     type="button"
                     aria-pressed={on}
-                    aria-disabled={fixed}
+                    aria-disabled={fixed || absent}
                     title={
                       fixed
                         ? "Always kept for this kind of revision"
-                        : undefined
+                        : absent
+                          ? "This clip has no sound to keep"
+                          : undefined
                     }
                     onClick={() => togglePreserved(aspect)}
                     className={cn(
@@ -617,7 +683,8 @@ export function ReplacementStudio({
                       on
                         ? "border-transparent bg-secondary text-foreground"
                         : "border-dashed border-border text-muted-foreground hover:text-foreground",
-                      fixed && "cursor-default",
+                      (fixed || absent) && "cursor-default",
+                      absent && "line-through hover:text-muted-foreground",
                     )}
                   >
                     {fixed ? (
@@ -666,7 +733,7 @@ export function ReplacementStudio({
             </dd>
             <dt className="text-muted-foreground">Keeps</dt>
             <dd>
-              {[...new Set([...locked, ...preserved])]
+              {kept
                 .filter((a) => OFFERED[kind].includes(a))
                 .map((a) =>
                   preservedLabels[a].toLowerCase().replace("things", "Things"),
@@ -685,6 +752,11 @@ export function ReplacementStudio({
               {estimate.note}
             </p>
           )}
+          {sourceCheck.notes.map((note) => (
+            <p key={note} className="mt-2 text-xs leading-5 text-foreground">
+              {note}
+            </p>
+          ))}
           <p className="mt-3 text-xs leading-5 text-muted-foreground">
             The original stays untouched. You compare the result against it and
             decide whether to keep it.
@@ -709,11 +781,18 @@ export function ReplacementStudio({
                 : replacementKinds[kind].label}
             <ArrowRight aria-hidden="true" />
           </Button>
-          {problems.length > 0 && (
-            <p className="text-xs leading-5 text-muted-foreground">
-              {problems[0]}
+          {/* Everything wrong with the clip at once, so it is re-exported once. */}
+          {(sourceCheck.problems.length
+            ? sourceCheck.problems
+            : problems.slice(0, 1)
+          ).map((problem) => (
+            <p
+              key={problem}
+              className="text-xs leading-5 text-muted-foreground"
+            >
+              {problem}
             </p>
-          )}
+          ))}
         </div>
       </form>
     </div>
@@ -726,13 +805,13 @@ function SourceStage({
   markTarget,
   target,
   onTarget,
-  onDuration,
+  onMetadata,
 }: {
   source: MediaItem | null;
   markTarget: boolean;
   target: Target | null;
   onTarget: (target: Target) => void;
-  onDuration: (seconds: number) => void;
+  onMetadata: (metadata: ClipMetadata) => void;
 }) {
   const video = useRef<HTMLVideoElement | null>(null);
   const [frameRatio, setFrameRatio] = useState(16 / 9);
@@ -791,7 +870,11 @@ function SourceStage({
           className="absolute inset-0 size-full object-contain"
           onLoadedMetadata={(event) => {
             const v = event.currentTarget;
-            onDuration(v.duration);
+            onMetadata({
+              seconds: Number.isFinite(v.duration) ? v.duration : null,
+              width: v.videoWidth || null,
+              height: v.videoHeight || null,
+            });
             if (v.videoWidth) setFrameRatio(v.videoWidth / v.videoHeight);
           }}
           onClick={markTarget ? (event) => event.preventDefault() : undefined}
@@ -919,13 +1002,10 @@ function ClipStrip({
                   <Thumbnail
                     src={item.thumbnailUrl}
                     kind="video"
+                    videoSrc={item.url}
                     className="aspect-video"
                   />
-                  {item.durationSeconds && (
-                    <span className="tabular absolute right-1 bottom-1 rounded bg-black/70 px-1 text-[0.6875rem] text-white">
-                      {formatDuration(item.durationSeconds)}
-                    </span>
-                  )}
+                  <DurationBadge item={item} className="right-1 bottom-1" />
                 </span>
                 <span className="mt-1 block truncate text-xs text-muted-foreground group-hover:text-foreground">
                   {item.title}
@@ -1009,6 +1089,7 @@ function BackgroundMethod({
             <Thumbnail
               src={plate.thumbnailUrl}
               kind={plate.kind}
+              videoSrc={plate.url}
               className="aspect-video w-20 shrink-0 rounded-md"
             />
           ) : (

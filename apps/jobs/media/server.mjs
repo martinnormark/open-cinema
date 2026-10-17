@@ -2,13 +2,14 @@
 //
 //   POST /lock     parts source, edit, matte -> the source foreground over the edit
 //   POST /conform  parts source, edit        -> the edit on the source's frame grid
+//   POST /square   parts source              -> the source with square pixels
 //
-// Both return an MP4 on the source's exact frame rate and frame count, carrying
-// the source's audio. The request body is the parts concatenated in the order
+// All return an MP4 on the source's exact frame rate and frame count, at its
+// display size with square pixels, carrying the source's audio. The request body is the parts concatenated in the order
 // the `x-media-parts` header lists them (`source=123,edit=456`), so the Worker
 // can stream R2 objects in without buffering.
 //
-// Offline: node server.mjs lock|conform <out.mp4> <source> <edit> [matte]
+// Offline: node server.mjs lock|conform|square <out.mp4> <source> [edit] [matte]
 import { spawn } from "node:child_process";
 import { createReadStream, createWriteStream } from "node:fs";
 import { mkdtemp, rm, stat } from "node:fs/promises";
@@ -20,6 +21,7 @@ import { pipeline } from "node:stream/promises";
 const OPERATIONS = {
   lock: ["source", "edit", "matte"],
   conform: ["source", "edit"],
+  square: ["source"],
 };
 const MAX_PART_BYTES = 512 * 1024 * 1024;
 
@@ -53,9 +55,18 @@ async function probe(path) {
   const video = streams.find((s) => s.codec_type === "video");
   if (!video) throw new Error(`${path} has no video stream`);
   const audio = streams.find((s) => s.codec_type === "audio") ?? null;
+  // A non-square sample aspect (e.g. 639:640) displays wider or narrower than
+  // it is stored. Providers misread such clips, so every output is resampled
+  // to its display size (what a player shows) with square pixels, even-sized.
+  const [sarW, sarH] = String(video.sample_aspect_ratio ?? "1:1")
+    .split(":")
+    .map(Number);
+  const sar = sarW > 0 && sarH > 0 ? sarW / sarH : 1;
+  const even = (n) => Math.max(2, Math.round(n / 2) * 2);
   return {
-    width: video.width,
-    height: video.height,
+    width: even(video.width * sar),
+    height: even(video.height),
+    sar,
     // r_frame_rate is the container's nominal grid, e.g. 30000/1001.
     fps: video.r_frame_rate,
     frames: Number(video.nb_read_packets),
@@ -88,8 +99,17 @@ export async function render(
 ) {
   const source = await probe(sourcePath);
   if (!source.frames) throw new Error("The source has no frames");
-  const inputs = ["-i", sourcePath, "-i", editPath];
-  let graph = `[1:v]${onSourceGrid(source)}`;
+  const square = operation === "square";
+  const inputs = square
+    ? ["-i", sourcePath]
+    : ["-i", sourcePath, "-i", editPath];
+  // The source's own pixels, resampled to square pixels at its display size.
+  const sourcePixels =
+    `setpts=PTS-STARTPTS,` +
+    `scale=${source.width}:${source.height}:flags=bicubic,setsar=1`;
+  let graph = square
+    ? `[0:v]${sourcePixels},format=yuv420p[v]`
+    : `[1:v]${onSourceGrid(source)}`;
   if (operation === "lock") {
     const matte = await probe(mattePath);
     // ffmpeg's native VP9 decoder drops the alpha plane; libvpx keeps it.
@@ -97,10 +117,10 @@ export async function render(
       inputs.push("-c:v", matte.codec === "vp9" ? "libvpx-vp9" : "libvpx");
     inputs.push("-i", mattePath);
     graph +=
-      `,format=gbrp[bg];[0:v]setpts=PTS-STARTPTS,setsar=1,format=gbrp[fg];` +
+      `,format=gbrp[bg];[0:v]${sourcePixels},format=gbrp[fg];` +
       `[2:v]${matteFilter(source, matte)}[m];` +
       `[bg][fg][m]maskedmerge,format=yuv420p[v]`;
-  } else {
+  } else if (!square) {
     graph += `,format=yuv420p[v]`;
   }
   const audio = source.audio
@@ -138,7 +158,12 @@ export async function render(
     "+faststart",
     out,
   ]);
-  return { fps: source.fps, frames: source.frames };
+  return {
+    fps: source.fps,
+    frames: source.frames,
+    width: source.width,
+    height: source.height,
+  };
 }
 
 /** Splits the body into the named parts, written to files in `dir`. */
