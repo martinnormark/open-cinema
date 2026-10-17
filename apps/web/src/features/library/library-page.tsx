@@ -197,7 +197,11 @@ export function LibraryPage({
             className="mt-8 max-w-full overflow-x-auto"
           >
             {filters.map((f) => (
-              <ToggleGroupItem key={f.value} value={f.value} className="px-3">
+              <ToggleGroupItem
+                key={f.value}
+                value={f.value}
+                className="flex-none px-3"
+              >
                 {f.label}
                 <span className="tabular text-xs text-muted-foreground">
                   {counts[f.value]}

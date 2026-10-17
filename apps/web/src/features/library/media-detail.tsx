@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Download, Layers, Trash2, Wand2 } from "lucide-react";
+import { Download, Layers, Trash2, Wand2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
+  SheetClose,
   SheetContent,
   SheetDescription,
   SheetHeader,
@@ -38,7 +39,10 @@ export function MediaDetailSheet({
 }) {
   return (
     <Sheet open={!!item} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="w-full gap-0 overflow-y-auto bg-elevated sm:max-w-md md:max-w-lg">
+      <SheetContent
+        showCloseButton={false}
+        className="w-full gap-0 overflow-y-auto bg-elevated sm:max-w-md md:max-w-lg"
+      >
         {item && <Detail key={item.id} item={item} onClose={onClose} />}
       </SheetContent>
     </Sheet>
@@ -65,7 +69,12 @@ function Detail({ item, onClose }: { item: MediaItem; onClose: () => void }) {
   ]);
   return (
     <>
-      <div className="flex min-h-56 items-center justify-center bg-background">
+      <div className="relative flex min-h-56 items-center justify-center bg-background">
+        {/* Sits over the media, so it carries its own backdrop. */}
+        <SheetClose className="absolute top-3 right-3 z-10 flex size-8 items-center justify-center rounded-md bg-background/80 text-foreground hover:bg-elevated focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
+          <X aria-hidden="true" className="size-4" />
+          <span className="sr-only">Close</span>
+        </SheetClose>
         {item.kind === "video" ? (
           <video
             src={item.url}

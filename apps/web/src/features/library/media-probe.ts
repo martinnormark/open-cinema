@@ -1,3 +1,5 @@
+import { readContainerMeta } from "./mp4-meta";
+
 export interface MediaProbe {
   width: number | null;
   height: number | null;
@@ -106,6 +108,16 @@ export async function probeMedia(file: File): Promise<MediaProbe> {
       ? await probeVideo(file)
       : await probeImage(file);
   } catch {
-    return { width: null, height: null, durationSeconds: null, poster: null };
+    // Undecodable codec: the container still knows duration and frame size.
+    const meta =
+      file.type === "video/mp4" || file.type === "video/quicktime"
+        ? await readContainerMeta(file).catch(() => null)
+        : null;
+    return {
+      width: meta?.width || null,
+      height: meta?.height || null,
+      durationSeconds: meta?.durationSeconds || null,
+      poster: null,
+    };
   }
 }
