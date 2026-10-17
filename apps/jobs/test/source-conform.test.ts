@@ -186,3 +186,11 @@ it("rebuilds a request whose receipt was lost with the same storage link", async
   );
   expect(record!.jobs[0]!.providerJobId).toBe("kling-1");
 });
+
+it("reads the concurrent job limit from MAX_ACTIVE_JOBS, one by default", async () => {
+  const { maxActiveJobs } = await import("../src/generation-coordinator");
+  expect([undefined, "", "0", "abc", "1.5"].map(maxActiveJobs)).toEqual([
+    1, 1, 1, 1, 1,
+  ]);
+  expect([maxActiveJobs("2"), maxActiveJobs("9")]).toEqual([2, 4]);
+});

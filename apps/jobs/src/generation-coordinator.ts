@@ -60,6 +60,15 @@ const DEADLINE_MS = 30 * 60_000;
 const LINK_GRACE_MS = 60 * 60_000;
 /** Router's shared queue can hold a job for hours; past this, ask the creator. */
 const MAX_QUEUE_WAIT_MS = 6 * 60 * 60_000;
+/**
+ * How many jobs one creator may have running at Router or Comfy Cloud at once.
+ * `MAX_ACTIVE_JOBS` raises it; unset or invalid means one. Capped at the four
+ * active jobs a creator's queue holds.
+ */
+export function maxActiveJobs(value: string | undefined) {
+  const n = Number(value);
+  return Number.isInteger(n) && n >= 1 ? Math.min(n, 4) : 1;
+}
 /** Comfy storage links last about 24 h; reuse one only while it has hours left. */
 const UPLOAD_REUSE_MS = 16 * 60 * 60_000;
 type Execution = CoordinatorRecord["executions"][string];
@@ -741,8 +750,10 @@ export class GenerationCoordinator
     let record = await readCoordinator(this.ctx.storage);
     if (!record) return;
     const now = Date.now();
-    // One provider execution at a time per owner; a suspended job keeps the queue paused.
-    const active = record.jobs.find(
+    // Up to MAX_ACTIVE_JOBS provider executions per owner (one by default);
+    // a suspended job keeps the queue paused.
+    const limit = maxActiveJobs(this.env.MAX_ACTIVE_JOBS);
+    const active = record.jobs.filter(
       (j) =>
         j.state === "submitting" ||
         j.state === "running" ||
@@ -750,12 +761,16 @@ export class GenerationCoordinator
         j.state === "cancelling" ||
         (j.state === "queued" && j.providerJobId),
     );
-    const job =
-      active ??
-      (!record.jobs.some((j) => j.state === "needs_attention")
-        ? [...record.jobs].reverse().find((j) => j.state === "queued")
-        : undefined);
-    if (job && record.executions[job.id]!.nextAttemptAt <= now) {
+    const waiting = record.jobs.some((j) => j.state === "needs_attention")
+      ? []
+      : [...record.jobs]
+          .reverse()
+          .filter((j) => j.state === "queued" && !j.providerJobId);
+    const due = [
+      ...active,
+      ...waiting.slice(0, Math.max(0, limit - active.length)),
+    ].filter((j) => record!.executions[j.id]!.nextAttemptAt <= now);
+    for (const job of due) {
       const execution = record.executions[job.id]!;
       if (now > execution.deadline) {
         await this.change(record.ownerId, job.id, (j) => {

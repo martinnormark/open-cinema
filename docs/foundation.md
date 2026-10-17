@@ -6,14 +6,15 @@ How the shared pieces fit together, and where new work goes. Written 2026-10-17.
 
 Everything is a Zod schema with an inferred type, and `src/index.ts` re-exports all of it.
 
-| File | What it defines |
-| --- | --- |
-| `media.ts` | `AssetRef`, which is either `{ type: "media-asset", assetId }` for an upload or `{ type: "job-output", jobId, outputId }` for a generated result. Also `MediaAsset` (an upload, `pending → ready / failed`), the allowed upload types and limits, and `Project` with its persistent `direction`. |
-| `elements.ts` | `Element`, which is a `character`, `location` or `thing`. It has a unique `@handle` per owner, an identity `description` and a `version`. Each Element has `ElementReference`s (approved, experiment or rejected, with a `view` tag and `roles`) and named `ElementState`s. Also input schemas, `toElementHandle`, `parseMentionHandles`, `approvedReferences(element, stateId?)` and `missingViews`. |
-| `replacement.ts` | `TargetSelection` (background, a person by point or box, or a mask), `PreservationIntent` with `DEFAULT_PRESERVATION`, and `Revision`: a source, an optional result, an intent, and a status of `pending → proposed → kept / rejected` or `failed`. |
+| File                                | What it defines                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `media.ts`                          | `AssetRef`, which is either `{ type: "media-asset", assetId }` for an upload or `{ type: "job-output", jobId, outputId }` for a generated result. Also `MediaAsset` (an upload, `pending → ready / failed`), the allowed upload types and limits, and `Project` with its persistent `direction`.                                                                                                                         |
+| `elements.ts`                       | `Element`, which is a `character`, `location` or `thing`. It has a unique `@handle` per owner, an identity `description` and a `version`. Each Element has `ElementReference`s (approved, experiment or rejected, with a `view` tag and `roles`) and named `ElementState`s. Also input schemas, `toElementHandle`, `parseMentionHandles`, `approvedReferences(element, stateId?)` and `missingViews`.                    |
+| `replacement.ts`                    | `TargetSelection` (background, a person by point or box, or a mask), `PreservationIntent` with `DEFAULT_PRESERVATION`, and `Revision`: a source, an optional result, an intent, and a status of `pending → proposed → kept / rejected` or `failed`.                                                                                                                                                                      |
 | `workflow-kinds.ts`, `workflows.ts` | `WorkflowKind` and the typed inputs for each kind (`workflowInputsSchemas`). Also `GenerationRequest` (a discriminated union on `workflowKind`) and `WorkflowCommand` (an idempotency key, the request, and an optional `projectId` and `revision`). Plus `ResolvedMention`, `GenerationEstimate`, `WORKFLOW_DESCRIPTORS`, and the helpers `requestAssetRefs`, `requestMentions`, `requestPrompt` and `promptToRequest`. |
 
 Rules that keep this consistent:
+
 - An Element's `version` increments whenever its identity description or its set of approved references changes. Only references with the `approved` status condition generations.
 - A reference with a `stateId` applies only when that state is mentioned. A reference without one is part of the base sheet.
 - Asset refs never carry bytes or URLs. They are resolved at the moment of use.
@@ -24,12 +25,12 @@ Migration `0005_elements_media.sql` adds `Project`, `Element`, `ElementState`, `
 
 Asset refs are stored as typed columns (`assetType`, `mediaAssetId`, `jobId`, `outputId`), not as foreign keys, because job outputs reach D1 asynchronously. Every query and mutation takes an `OwnerScope` and filters on it. `resolveAssetRef(db, scope, ref)` is the single ownership check for any media ref: an upload must be owned and `ready`, and a job output must belong to a job the caller owns and have an `r2Key`.
 
-| Domain | Queries | Mutations |
-| --- | --- | --- |
-| Projects | `listProjects`, `getProject` | `createProject`, `updateProject` |
-| Media | `listMediaAssets` (ready only), `getMediaAsset`, `resolveAssetRef` | `createPendingMediaAsset`, `markMediaAssetReady`, `markMediaAssetFailed`, `updateMediaAssetMetadata` |
-| Elements | `listElements`, `getElement`, `getElementsByHandles`, `getElementsByIds` | `createElement` (suffixes the handle on collision), `updateElement`, `deleteElement`, `addElementReference` (images only, owner-checked), `updateElementReference`, `removeElementReference`, `createElementState`, `deleteElementState` |
-| Revisions | `listRevisions` (by source or project), `getRevision`, `getRevisionForJob` | `createRevision`, `settleRevisionForJob`, `setRevisionStatus` (only after a result exists) |
+| Domain    | Queries                                                                    | Mutations                                                                                                                                                                                                                                |
+| --------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Projects  | `listProjects`, `getProject`                                               | `createProject`, `updateProject`                                                                                                                                                                                                         |
+| Media     | `listMediaAssets` (ready only), `getMediaAsset`, `resolveAssetRef`         | `createPendingMediaAsset`, `markMediaAssetReady`, `markMediaAssetFailed`, `updateMediaAssetMetadata`                                                                                                                                     |
+| Elements  | `listElements`, `getElement`, `getElementsByHandles`, `getElementsByIds`   | `createElement` (suffixes the handle on collision), `updateElement`, `deleteElement`, `addElementReference` (images only, owner-checked), `updateElementReference`, `removeElementReference`, `createElementState`, `deleteElementState` |
+| Revisions | `listRevisions` (by source or project), `getRevision`, `getRevisionForJob` | `createRevision`, `settleRevisionForJob`, `setRevisionStatus` (only after a result exists)                                                                                                                                               |
 
 A revision made through `WorkflowCommand.revision` has the same ID as its job. `applyJobSnapshot` creates it on the job's first D1 projection and settles it to `proposed`, with the first saved output, or to `failed`. It only ever moves forward from `pending`.
 
@@ -74,6 +75,8 @@ workerd connects directly, not through `HTTPS_PROXY`. In an environment whose pr
 2. In `apps/jobs/.dev.vars`, set `COMFY_BASE_URL="http://127.0.0.1:8790"` and set `COMFY_API_KEY` to any non-empty placeholder.
 
 `apps/jobs/wrangler.jsonc` declares `COMFY_BASE_URL` and `MEDIA_PUBLIC_ORIGIN` as empty `vars`. When `secrets.required` is set, Wrangler loads only declared keys from `.dev.vars`, so without that declaration both `wrangler dev` and `bun run dev` silently drop the override. `MEDIA_SIGNING_SECRET` is not declared. It is a production secret (`wrangler secret put`), and local development has no public origin for it to sign links for anyway.
+
+`MAX_ACTIVE_JOBS` (also a declared var) sets how many jobs one creator may run at Router or Comfy Cloud at once, from 1 to 4. Unset or invalid means one, so a recast waits behind a background job; the rest stay queued in order. Raising it spends credits faster. Set it in `.dev.vars` locally, or as a Worker variable in production.
 
 `loopbackRelay` (used for both Router and Cloud uploads) ignores any override that is not plain http on loopback, so a deployed Worker always sends its own secret to Router directly. I verified on 2026-10-17 that a queued FLUX 3 Image submission and its status polling succeed through the relay with a placeholder key.
 

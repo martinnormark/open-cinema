@@ -63,6 +63,9 @@
     "COMFY_BASE_URL": "",
     "MEDIA_PUBLIC_ORIGIN": "",
     "MEDIA_ORIGIN": "",
+    // Jobs one creator may run at Router or Comfy Cloud at once (1 to 4).
+    // Empty means one: a second job waits until the first finishes.
+    "MAX_ACTIVE_JOBS": "",
   },
   // `wrangler dev` would otherwise need Docker; locally the media server runs
   // on its own and MEDIA_ORIGIN points at it (docs/background-job.md).
