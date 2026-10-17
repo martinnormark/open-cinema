@@ -199,7 +199,7 @@ export function ProjectShots({
                     <Link
                       to="/recipes/new"
                       search={{ job: shot.jobId }}
-                      className="inline-flex items-center gap-1"
+                      className="inline-flex items-center gap-1 text-muted-foreground no-underline hover:text-foreground"
                     >
                       <BookmarkPlus aria-hidden="true" className="size-3.5" />
                       Save as recipe

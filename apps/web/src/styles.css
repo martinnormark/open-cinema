@@ -131,6 +131,17 @@
   a {
     text-underline-offset: 0.2em;
   }
+  /* A link inside running text must read as one. Element selectors keep
+     this below any utility class, so styled links and buttons are unchanged. */
+  p a {
+    color: var(--foreground);
+    text-decoration-line: underline;
+    text-decoration-color: var(--subtle-foreground);
+    transition: text-decoration-color var(--duration-quick) ease-out;
+  }
+  p a:hover {
+    text-decoration-color: var(--foreground);
+  }
   * {
     scrollbar-width: thin;
     scrollbar-color: var(--input) transparent;
