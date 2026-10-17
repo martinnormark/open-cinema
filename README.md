@@ -6,11 +6,15 @@ Open Cinema is an early preview and our entry to Comfy's [Open Source Higgsfield
 
 ## What you can do today
 
-- **Generate images** from a written idea with FLUX 3 through Comfy Router, with live progress that survives reloads, closed tabs and dropped connections.
+- **Generate images and video** from a written idea: FLUX 3 images, LTX 2.5 text-to-video and FLUX 3 image-to-video through Comfy Router, and LTX-2 camera moves on Comfy Cloud. Live progress survives reloads, closed tabs and dropped connections.
+- **Build Elements**: Characters, Locations and Things with approved references, Character sheets, and states such as `@Cal:wet` that a prompt can mention.
+- **Keep a media library** of uploads and results, all copied into your own R2 storage before a job is marked ready.
+- **Revise a take** in the revision studio: replace its background, recast a person as a Character, swap an object (Object Swap), restyle it, or re-stage the camera, then compare original and result before keeping it.
+- **Direct a project** with a persistent look and per-shot direction, and save what works as **Recipes**.
+- **Plan Sequences** of shots from a rough idea, and move Elements, Recipes, a project's look and Sequences between projects or installations as a **World** bundle.
 - **Follow every job** in Activity or from the floating Orb, cancel work in flight and recover jobs that need attention.
-- **Keep everything**: generated media is copied into your own R2 storage before a job is marked ready.
 
-Elements authoring, the media library, LTX video and selective video revision (background replacement and character recasting) are being built on `main`; see the roadmap for status.
+Performance transfer runs as a graph but has no composer in the studio yet; see the roadmap for status.
 
 ## Example outputs
 
@@ -49,7 +53,7 @@ Every result below is a real Comfy generation from this repository's workflows, 
 You need:
 
 - [Bun](https://bun.sh) **1.4.2** and [Node.js](https://nodejs.org) **24+** (Node runs the dev tooling; production runs on Cloudflare Workers).
-- A **Comfy API key** with Router credits from [platform.comfy.org](https://platform.comfy.org). Router bills per request in credits (211 credits = $1); no subscription is needed.
+- A **Comfy API key** from [platform.comfy.org](https://platform.comfy.org) with Router credits and Comfy Cloud access. Router bills per request in credits (211 credits = $1). The LTX graphs (Alpha Gen background replacement, camera moves, Object Swap, Restyle, Re-stage) and media steps run on Comfy Cloud, so those need Cloud access too.
 - No Cloudflare account. D1, R2 and Durable Objects are emulated locally.
 
 ```sh
@@ -109,12 +113,16 @@ Open Cinema runs as two Workers: `open-cinema-web` (UI, server functions, sign-i
    bunx wrangler secret put LOCAL_SESSION_SECRET --name open-cinema-web   # any random value; unused with Access
    ```
 
+   Optional, on the jobs Worker: set the `MEDIA_PUBLIC_ORIGIN` variable to the studio's https origin and `MEDIA_SIGNING_SECRET` (a secret equal to the web Worker's `LOCAL_SESSION_SECRET`) so providers can fetch uploads through signed links ([docs/foundation.md](docs/foundation.md)). Set the `MAX_ACTIVE_JOBS` variable (1 to 4, default 1) to let one creator run more jobs at once.
+
 4. **Apply migrations and build**:
 
    ```sh
    bunx wrangler d1 migrations apply open-cinema --remote --config apps/jobs/wrangler.jsonc
    bun run build
    ```
+
+   `bun run dev` and `bun run build` first run `bun run models`, which downloads the on-device face and pose models the revision studio's checks use, so they need network access. A failed download only disables those checks.
 
 5. **Deploy jobs first, then web**, using the configs Vite generates so the RSC environment and client assets are included:
 

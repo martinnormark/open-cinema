@@ -25,6 +25,10 @@ Primary entry points: [developer documentation](https://docs.comfy.org/developme
 ## Project internals
 
 - [Foundation](foundation.md): contracts, persistence, workflow dispatch, and how to add a workflow kind.
+- [Generation MVP](generation-mvp.md): the first image pipeline, its job lifecycle, consistency rules and local verification.
+- [Sign-in and public deployment](auth.md): the `AUTH_MODE` options and how to put a deployment behind Cloudflare Access.
+- [Design system](design.md): tokens, typography, colour and motion rules for the studio.
+- [Project direction, combined states and recipes](project-direction.md): the project look, per-shot direction, state kinds and recipes.
 - [Character sheets](character-sheets.md): the three-panel sheet, close portraits with and without a smile, states as sheets of their own, and how heads are removed from the full-body panels.
 - [Character recast on LTX 2.5](recast-ltx.md): an all-Lightricks open-weights recast graph, its live comparison with Kling, and the proposal for our own recast IC-LoRA.
 - [Camera moves, Object Swap, Restyle and re-staging](revision-modes.md): the FLUX and LTX graphs on Comfy Cloud, their guardrails, check runs and limits.
@@ -35,5 +39,8 @@ Primary entry points: [developer documentation](https://docs.comfy.org/developme
 - [World bundles](world-bundles.md): saving Elements, recipes, a project's look and its sequences as one file, and bringing it into another studio.
 - [Media library and uploads](library.md): upload path, limits, the picker and how other features use uploads as sources and references.
 - [Phase 0: background replacement](phase0-background.md): evaluation results, supported envelope, turnaround, cost and the MVP release-bar call.
+- [Phase 0: character recast](phase0-recast.md): evaluation of Kling recasting against the shared rubric.
 - [Background replacement job](background-job.md): the staged job (Kling edit, matte, foreground lock and conform as Comfy Cloud graphs), its variants, and how to check the graphs locally.
 - [Router model catalog](comfy-router-catalog.md): every Router model and the inputs of those our workflows use.
+- [Comfy capabilities](comfy-capabilities.md): a historical record of the first Router checks for image and short video (2026-10-16).
+- [Scaffold verification](scaffold-verification.md): the checks run on the initial scaffold (2026-10-17).

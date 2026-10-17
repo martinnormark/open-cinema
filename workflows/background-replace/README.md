@@ -1,6 +1,8 @@
 # Background replacement workflow
 
-ComfyUI API-format graphs behind Open Cinema's `video.background-replace` workflow kind, and the `comfy-build.yaml` that packages them for the Comfy developer platform. The evaluation that chose them is in [docs/phase0-background.md](../../docs/phase0-background.md).
+ComfyUI API-format graphs for the edit step of Open Cinema's `video.background-replace` workflow kind, and the `comfy-build.yaml` that packages them for the Comfy developer platform. The evaluation that chose them is in [docs/phase0-background.md](../../docs/phase0-background.md).
+
+This folder holds only the edit graphs. The rest of the studio's job (the Bria matte through Router, the foreground lock and conform graphs on Comfy Cloud, and the LTX Alpha Gen path) is built in `packages/comfy/src/workflows/` and described in [docs/background-job.md](../../docs/background-job.md).
 
 | File                                  | Graph                                                                                                                                                                     |
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

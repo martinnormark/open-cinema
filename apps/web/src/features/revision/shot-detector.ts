@@ -12,7 +12,7 @@ import {
  * Detection for the recast checks with Human (MIT; models:
  * BlazeFace, FaceMesh, FaceRes descriptors, MoveNet MultiPose). Runs where an
  * OffscreenCanvas exists: the checks worker, or a page in the offline harness.
- * Models are served from the app (scripts/copy-human-models.ts), never a CDN.
+ * Models are served from the app (scripts/human-models.ts), never a CDN.
  */
 export const MODEL_BASE = "/models/human/";
 

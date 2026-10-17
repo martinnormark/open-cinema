@@ -1,5 +1,7 @@
 # Comfy capabilities for image and short video
 
+> **Historical record from 2026-10-16.** The builder names and routes below have since changed, and many more workflow kinds run on Comfy Cloud. For the current dispatch see [foundation.md](foundation.md#dispatch-appsjobs-and-packagescomfy); for the revision modes see [revision-modes.md](revision-modes.md).
+
 Verified **2026-10-16** against `https://api.comfy.org` with the project key, through the Router queue API (`POST /v2/models/{id}/requests`, then poll `…/status` and fetch `…/requests/{id}`). Each row ran once. Prices come from the [Router pricing page](https://docs.comfy.org/development/comfy-router/pricing) (211 credits = $1). The full model list and schemas are in [comfy-router-catalog.md](comfy-router-catalog.md).
 
 ## What each workflow kind runs on
