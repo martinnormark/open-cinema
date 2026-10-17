@@ -49,7 +49,7 @@ export interface ProviderOutput {
 export interface WorkflowDefinition<K extends WorkflowKind = WorkflowKind> {
   kind: K;
   /** Creator-facing model name shown on the job. */
-  displayModel: string;
+  displayModel: string | ((inputs: WorkflowInputs<K>) => string);
   /** Monitoring deadline from acceptance to a terminal provider state. */
   deadlineMs: number;
   /** Router model id for these inputs. Must be deterministic. */

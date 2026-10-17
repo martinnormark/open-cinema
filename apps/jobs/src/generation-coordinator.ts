@@ -196,7 +196,10 @@ export class GenerationCoordinator
           updatedAt: now,
           prompt:
             requestPrompt(command.request) || command.revision?.intent || "",
-          model: definition.displayModel,
+          model:
+            typeof definition.displayModel === "function"
+              ? definition.displayModel(command.request.inputs as never)
+              : definition.displayModel,
           workflowKind: command.request.workflowKind,
           projectId: command.projectId ?? null,
           seed: null,

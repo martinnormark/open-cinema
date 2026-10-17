@@ -109,7 +109,7 @@ export const fluxReferenceWorkflow: WorkflowDefinition<"image.flux-reference"> =
 
 export const ltxVideoWorkflow: WorkflowDefinition<"video.ltx"> = {
   kind: "video.ltx",
-  displayModel: "LTX 2.5",
+  displayModel: (inputs) => (inputs.firstFrame ? "FLUX 3 Video" : "LTX 2.5"),
   deadlineMs: 45 * 60_000,
   model: ltxVideoModel,
   async build(inputs, context) {
