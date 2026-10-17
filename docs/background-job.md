@@ -41,6 +41,8 @@ Verified offline in a local ComfyUI 0.41 with VideoHelperSuite (`artifacts/backg
 
 A 4 s, 25 fps, 1280×720 take with an AAC track ran through the revision studio on the local stack (relay to Router, media server in Docker). Kling returned 24 fps and 97 frames; the matte came back at 25 fps and 100 frames; both variants came out at exactly 25 fps, 100 frames and 4.00 s with the source audio, and the revision was proposed with the locked output. A second, 3 s run was recorded in the browser through review: the As shot / Relit switch, side by side, and keeping the relit version. Evidence is in `artifacts/background-job/e2e/`.
 
+A third run (3 s, 25 fps, 1280×720 with AAC) checked the Comfy Cloud lock through the app on the local stack. Kling and the Bria matte ran on Router; the jobs Worker then streamed the take, edit and matte into Cloud, ran the lock and conform graphs, and saved both variants at exactly 25 fps, 75 frames and 3.00 s with the source audio. The locked variant keeps the performers as shot over Kling's seaside café; the relit one is Kling's own. Evidence is in `artifacts/background-job/cloud/e2e/`.
+
 ## Cost and time for a 6 s take
 
 Kling $0.76, Bria matte about $0.30 (it ran in 33 s on 2026-10-17), and two short Comfy Cloud runs billed as GPU time (about 6 s each for a 720p, 4 s clip, plus queue). Against Phase 0's lock with a SwitchX matte (about $1.50), this is cheaper and keeps everything on Comfy. Where Bria's matte misses a prop (Phase 0 saw it drop a lamp and a bicycle wheel when it composited over a still), the lock shows Kling's own version of the prop instead, which Kling keeps.
