@@ -123,8 +123,20 @@ export function RevisionView({
 
   /** Post-run checks start when the result loads, unless already stored. */
   function checkResult() {
-    if (kind !== "character" || checks || !result || !decisions?.targetPoint)
+    if (checks || !result) return;
+    if (kind === "object" || kind === "restyle") {
+      requestResultChecks({
+        revisionId: revision.id,
+        sourceUrl: assetUrl(revision.source),
+        resultUrl: assetUrl(result),
+        save: (next) =>
+          saveRevisionChecks({
+            data: { revisionId: revision.id, checks: next },
+          }),
+      });
       return;
+    }
+    if (kind !== "character" || !decisions?.targetPoint) return;
     const state = character?.states.find(
       (s) => s.name === decisions.element?.stateName,
     );
@@ -282,6 +294,16 @@ export function RevisionView({
               phase={phase}
               connected={!!snapshot}
               estimate={decisions?.estimate?.time ?? null}
+            />
+          )}
+
+          {result && (kind === "object" || kind === "restyle") && (
+            <ResultChecksPanel
+              revisionId={revision.id}
+              stored={checks}
+              characterName={null}
+              canCheck
+              preflight={null}
             />
           )}
 
