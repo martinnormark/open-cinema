@@ -87,7 +87,11 @@ export const fluxReferenceWorkflow: WorkflowDefinition<"image.flux-reference"> =
       if (!refs.length)
         throw new Error("Add at least one reference image or Element");
       const images = await Promise.all(
-        refs.map(async (ref) => (await context.asset(ref)).base64()),
+        refs.map(async (ref) => {
+          // A signed link keeps the body small; local development has none and inlines.
+          const asset = await context.asset(ref);
+          return asset.publicUrl ?? asset.base64();
+        }),
       );
       return {
         model: FLUX_IMAGE_MODEL,
