@@ -3,7 +3,11 @@ import { reset } from "cloudflare:test";
 import { beforeAll, afterAll, beforeEach, afterEach, expect, it } from "vitest";
 import { setupNetwork } from "@msw/cloudflare";
 import { http, HttpResponse } from "msw";
-import { archiveOutput, serveStoredOutput } from "@open-cinema/assets";
+import {
+  archiveOutput,
+  imageSize,
+  serveStoredOutput,
+} from "@open-cinema/assets";
 import { jobOutputSchema } from "@open-cinema/contracts";
 const network = setupNetwork();
 beforeAll(() => network.enable());
@@ -144,4 +148,66 @@ it("archives Kling's delivered video, the only output of the replacement kinds",
     async () => kling,
   );
   expect(saved).toMatchObject({ mediaType: "video/mp4", sizeBytes: 4 });
+});
+
+/** A PNG signature and IHDR chunk for a 16:9 image, then filler. */
+function pngHeader(width: number, height: number, length: number) {
+  const bytes = new Uint8Array(length);
+  bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13]);
+  bytes.set(new TextEncoder().encode("IHDR"), 12);
+  const view = new DataView(bytes.buffer);
+  view.setUint32(16, width);
+  view.setUint32(20, height);
+  return bytes;
+}
+
+it("records a generated image's pixel size while copying it, including on a repeated copy", async () => {
+  const bytes = pngHeader(1344, 768, 4096);
+  network.use(
+    http.get(
+      url,
+      () =>
+        new HttpResponse(
+          new ReadableStream({
+            start(controller) {
+              // The header arrives split across chunks.
+              controller.enqueue(bytes.subarray(0, 10));
+              controller.enqueue(bytes.subarray(10));
+              controller.close();
+            },
+          }),
+          { headers: { "Content-Type": "image/png" } },
+        ),
+    ),
+  );
+  const candidate = output();
+  const first = await archiveOutput(
+    env.GENERATED_ASSETS,
+    "asset-owner",
+    candidate,
+    async () => url,
+  );
+  expect([first.width, first.height]).toEqual([1344, 768]);
+  const again = await archiveOutput(
+    env.GENERATED_ASSETS,
+    "asset-owner",
+    candidate,
+    async () => null,
+  );
+  expect([again.width, again.height]).toEqual([1344, 768]);
+});
+
+it("reads the size of JPEG and WebP headers and ignores other bytes", () => {
+  // SOI, an APP0 segment, then a baseline frame of 1920×1080.
+  const jpeg = new Uint8Array([
+    0xff, 0xd8, 0xff, 0xe0, 0x00, 0x04, 0x00, 0x00, 0xff, 0xc0, 0x00, 0x11,
+    0x08, 0x04, 0x38, 0x07, 0x80, 0x03,
+  ]);
+  expect(imageSize(jpeg)).toEqual({ width: 1920, height: 1080 });
+  const webp = new Uint8Array(30);
+  webp.set(new TextEncoder().encode("RIFF"), 0);
+  webp.set(new TextEncoder().encode("WEBPVP8X"), 8);
+  webp.set([0x3f, 0x05, 0x00, 0xff, 0x02, 0x00], 24);
+  expect(imageSize(webp)).toEqual({ width: 1344, height: 768 });
+  expect(imageSize(new Uint8Array([0, 1, 2, 3]))).toBeNull();
 });

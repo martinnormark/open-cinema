@@ -140,3 +140,24 @@ export async function recordPoster(
     data: { posterKey: poster.posterKey, ...measured },
   });
 }
+
+/**
+ * Fills in a generated image's pixel size for outputs saved before sizes were
+ * read on copy. Never overwrites a size that is already known.
+ */
+export async function recordImageSize(
+  db: DatabaseContext,
+  scope: OwnerScope,
+  ref: { jobId: string; outputId: string },
+  size: { width: number; height: number },
+): Promise<void> {
+  await getClient(db).jobOutput.updateMany({
+    where: {
+      id: ref.outputId,
+      jobId: ref.jobId,
+      job: { ownerId: scope.ownerId },
+      width: null,
+    },
+    data: size,
+  });
+}

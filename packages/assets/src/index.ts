@@ -1,4 +1,7 @@
 import type { JobOutput } from "@open-cinema/contracts";
+import { IMAGE_HEADER_BYTES, imageSize } from "./image-size";
+
+export { IMAGE_HEADER_BYTES, imageSize, type ImageSize } from "./image-size";
 
 const PART_BYTES = 5 * 1024 * 1024;
 const MAX_BYTES = 512 * 1024 * 1024;
@@ -21,6 +24,9 @@ type StoredMetadata = {
   sizeBytes: number;
   etag: string;
   mediaType: string;
+  /** An image's pixel size, read from its header while it is copied. */
+  width?: number;
+  height?: number;
 };
 function metadata(object: R2Object): StoredMetadata {
   return {
@@ -130,6 +136,15 @@ export async function storeProducedOutput(
   return metadata(object);
 }
 
+/** The pixel size of a stored image, read from its first bytes, or null. */
+export async function measureStoredImage(bucket: R2Bucket, key: string) {
+  const object = await bucket.get(key, {
+    range: { offset: 0, length: IMAGE_HEADER_BYTES },
+  });
+  if (!object) return null;
+  return imageSize(new Uint8Array(await object.arrayBuffer()));
+}
+
 /** Idempotent copy. Multipart keeps memory bounded even for chunked responses. */
 export async function archiveOutput(
   bucket: R2Bucket,
@@ -139,7 +154,10 @@ export async function archiveOutput(
 ): Promise<StoredMetadata> {
   const key = await outputKey(ownerId, output);
   const existing = await existingOutput(bucket, key, ownerId, output);
-  if (existing) return existing;
+  if (existing)
+    return existing.mediaType.startsWith("image/")
+      ? { ...existing, ...(await measureStoredImage(bucket, key)) }
+      : existing;
   const url = await resolveUrl();
   if (!url) throw new Error("Provider image is no longer available");
   const controller = new AbortController();
@@ -185,9 +203,13 @@ export async function archiveOutput(
     let part = new Uint8Array(PART_BYTES);
     let filled = 0;
     let total = 0;
+    // The first bytes of an image, kept to read its pixel size.
+    const head = new Uint8Array(IMAGE_HEADER_BYTES);
     for (;;) {
       const { value, done } = await reader.read();
       if (done) break;
+      if (total < head.length)
+        head.set(value.subarray(0, head.length - total), total);
       total += value.byteLength;
       if (total > MAX_BYTES)
         throw new Error("Asset exceeds the transfer size limit");
@@ -212,7 +234,10 @@ export async function archiveOutput(
       );
     const object = await upload.complete(parts);
     upload = undefined;
-    return metadata(object);
+    const measured = contentType.startsWith("image/")
+      ? imageSize(head.subarray(0, Math.min(total, head.length)))
+      : null;
+    return { ...metadata(object), ...measured };
   } finally {
     clearTimeout(timer);
     controller.abort();

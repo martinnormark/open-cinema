@@ -50,7 +50,7 @@ export async function applyJobSnapshot(
   });
   // Output IDs are immutable provider asset IDs scoped to this job. Repeated writes are safe.
   for (const output of job.outputs) {
-    // Poster facts are written by recordPoster alone, never by a projection.
+    // Poster facts are written by recordPoster alone; an image's size only with its copy below.
     const { posterKey, width, height, durationMs, ...stored } = output;
     await client.jobOutput.upsert({
       where: { id: output.id },
@@ -67,6 +67,12 @@ export async function applyJobSnapshot(
           sizeBytes: output.sizeBytes,
           etag: output.etag,
           mediaType: output.mediaType,
+          // An image's size is read while it is copied; a video's comes with its poster.
+          ...(output.mediaType.startsWith("image/") &&
+          output.width &&
+          output.height
+            ? { width: output.width, height: output.height }
+            : {}),
         },
       });
   }

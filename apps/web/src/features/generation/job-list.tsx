@@ -69,10 +69,11 @@ function JobRow({ job }: { job: Job }) {
               <img
                 src={`/api/jobs/output?job=${encodeURIComponent(job.id)}&output=${encodeURIComponent(output.id)}`}
                 alt={job.prompt}
-                width={1024}
-                height={1024}
+                // Older results without a recorded size keep their natural shape.
+                width={output.width ?? undefined}
+                height={output.height ?? undefined}
                 loading="lazy"
-                className="aspect-square w-full rounded-lg object-contain"
+                className="h-auto max-h-[36rem] w-auto max-w-full rounded-lg"
                 onError={(event) => {
                   event.currentTarget.hidden = true;
                   event.currentTarget.nextElementSibling?.removeAttribute(

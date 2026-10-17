@@ -2,8 +2,12 @@ import "@tanstack/react-start/server-only";
 import { env } from "cloudflare:workers";
 import { createDatabase, type DatabaseContext } from "@open-cinema/database";
 import { listJobs, listMediaAssets } from "@open-cinema/database/queries";
-import { recordPoster } from "@open-cinema/database/mutations";
-import { storePoster, UploadError } from "@open-cinema/assets";
+import { recordImageSize, recordPoster } from "@open-cinema/database/mutations";
+import {
+  measureStoredImage,
+  storePoster,
+  UploadError,
+} from "@open-cinema/assets";
 import {
   resultOutputs,
   type AssetRef,
@@ -66,9 +70,9 @@ function generatedItems(jobs: readonly Job[]): MediaItem[] {
           mediaType: output.mediaType,
           title: job.prompt || "Generated image",
           sizeBytes: output.sizeBytes,
-          // Measured with the poster; the MVP Router image workflow renders 1K squares.
-          width: output.width ?? (kind === "image" ? 1024 : null),
-          height: output.height ?? (kind === "image" ? 1024 : null),
+          // An image's size is read on copy; a video's with its poster.
+          width: output.width ?? null,
+          height: output.height ?? null,
           durationSeconds: output.durationMs ? output.durationMs / 1000 : null,
           fps: null,
           pixelAspect: null,
@@ -82,12 +86,52 @@ function generatedItems(jobs: readonly Job[]): MediaItem[] {
   );
 }
 
+/** Most images measured per listing, so a large old library catches up gradually. */
+const BACKFILL_PER_LISTING = 24;
+
+/**
+ * Images saved before their size was read on copy: read each one's header
+ * from R2 and record it, so the next listing already knows.
+ */
+async function backfillImageSizes(
+  db: DatabaseContext,
+  scope: OwnerScope,
+  jobs: readonly Job[],
+) {
+  const missing = jobs
+    .flatMap((job) => resultOutputs(job.outputs))
+    .filter(
+      (output) =>
+        output.r2Key &&
+        output.mediaType.startsWith("image/") &&
+        !(output.width && output.height),
+    )
+    .slice(0, BACKFILL_PER_LISTING);
+  await Promise.all(
+    missing.map(async (output) => {
+      const size = await measureStoredImage(
+        env.GENERATED_ASSETS,
+        output.r2Key!,
+      ).catch(() => null);
+      if (!size) return;
+      Object.assign(output, size);
+      await recordImageSize(
+        db,
+        scope,
+        { jobId: output.jobId, outputId: output.id },
+        size,
+      );
+    }),
+  );
+}
+
 export async function listForOwner(ownerId: string) {
   const db = createDatabase(env.DB);
   const [uploads, jobs] = await Promise.all([
     listMediaAssets(db, { ownerId }),
     listJobs(db, { ownerId }),
   ]);
+  await backfillImageSizes(db, { ownerId }, jobs);
   return [...uploads.map(assetToItem), ...generatedItems(jobs)].sort((a, b) =>
     b.createdAt.localeCompare(a.createdAt),
   );
