@@ -4,11 +4,21 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { ProjectHome } from "@/features/revision/project-home";
 import { getProjectHome } from "@/server/revisions";
+import { getProjectShots } from "@/server/projects";
 
 export const Route = createFileRoute("/projects/$projectId")({
-  loader: async ({ params }) => ({
-    home: await getProjectHome({ data: { projectId: params.projectId } }),
-  }),
+  loader: async ({ params }) => {
+    const home = await getProjectHome({
+      data: { projectId: params.projectId },
+    });
+    return {
+      home,
+      shots:
+        home.signedIn && home.project
+          ? await getProjectShots({ data: { projectId: params.projectId } })
+          : [],
+    };
+  },
   head: ({ loaderData }) => ({
     meta: [
       {
@@ -20,7 +30,7 @@ export const Route = createFileRoute("/projects/$projectId")({
 });
 
 function Project() {
-  const { home } = Route.useLoaderData();
+  const { home, shots } = Route.useLoaderData();
   if (!home.signedIn || !home.project)
     return (
       <section className="mx-auto w-full max-w-6xl px-6 py-10 md:px-12 md:py-14">
@@ -48,6 +58,7 @@ function Project() {
       key={home.project.id}
       project={home.project}
       revisions={home.revisions}
+      shots={shots}
     />
   );
 }

@@ -15,6 +15,19 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  STATE_KIND_LABELS,
+  STATE_KINDS_BY_TYPE,
+  stateKindSchema,
+  type StateKind,
+} from "@open-cinema/contracts";
 import { cn } from "@/lib/utils";
 import { useCostPreferences } from "@/features/settings/preferences";
 import {
@@ -48,6 +61,7 @@ import {
   deleteElement,
   removeReference,
   removeState,
+  updateState,
   updateIdentity,
   updateReference,
   useElement,
@@ -500,6 +514,9 @@ function StateForm({
 }) {
   const navigate = useNavigate();
   const [name, setName] = useState("");
+  const [kind, setKind] = useState<StateKind>(
+    STATE_KINDS_BY_TYPE[element.type][0].kind,
+  );
   const [description, setDescription] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -512,7 +529,7 @@ function StateForm({
         setError("");
         setSaving(true);
         const trimmed = name.trim();
-        addState({ elementId: element.id, name: trimmed, description })
+        addState({ elementId: element.id, name: trimmed, description, kind })
           .then(() => {
             onDone();
             return navigate({
@@ -538,19 +555,30 @@ function StateForm({
       </div>
       <div className="flex flex-wrap gap-2">
         {info.stateExamples
-          .filter((example) => !element.states.some((s) => s.name === example))
+          .filter(
+            (example) => !element.states.some((s) => s.name === example.name),
+          )
           .map((example) => (
             <button
-              key={example}
+              key={example.name}
               type="button"
-              aria-pressed={name === example}
-              onClick={() => setName(example)}
+              aria-pressed={name === example.name}
+              onClick={() => {
+                setName(example.name);
+                setKind(example.kind);
+              }}
               className="rounded-full border border-border px-3 py-1 text-xs transition-colors duration-150 outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring aria-pressed:border-foreground"
             >
-              {example}
+              {example.name}
             </button>
           ))}
       </div>
+      <StateKindField
+        element={element}
+        value={kind}
+        onChange={setKind}
+        id="state-kind"
+      />
       <div>
         <label htmlFor="state-name" className="text-sm font-medium">
           Name
@@ -605,6 +633,59 @@ function StateForm({
   );
 }
 
+/**
+ * What a state changes. States of different kinds combine in one mention,
+ * so naming the kind is what makes wet and frightened possible together.
+ */
+function StateKindField({
+  element,
+  value,
+  onChange,
+  id,
+  disabled,
+}: {
+  element: Element;
+  value: StateKind;
+  onChange: (kind: StateKind) => void;
+  id: string;
+  disabled?: boolean;
+}) {
+  const suggested = STATE_KINDS_BY_TYPE[element.type].map((k) => k.kind);
+  const kinds: StateKind[] = [
+    ...suggested,
+    ...stateKindSchema.options.filter(
+      (k) => !(suggested as readonly StateKind[]).includes(k),
+    ),
+  ];
+  return (
+    <div>
+      <label htmlFor={id} className="text-sm font-medium">
+        What it changes
+      </label>
+      <Select
+        value={value}
+        onValueChange={(v) => onChange(v as StateKind)}
+        disabled={disabled}
+      >
+        <SelectTrigger id={id} className="mt-2 min-w-48">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {kinds.map((k) => (
+            <SelectItem key={k} value={k}>
+              {STATE_KIND_LABELS[k]}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
+        States of different kinds combine, one of each: @{element.handle}
+        :wet+frightened.
+      </p>
+    </div>
+  );
+}
+
 function StateHeader({
   element,
   state,
@@ -613,6 +694,10 @@ function StateHeader({
   state: ElementState;
 }) {
   const navigate = useNavigate();
+  const [error, setError] = useState("");
+  const combinable = element.states.filter(
+    (s) => s.id !== state.id && (s.kind === "other" || s.kind !== state.kind),
+  );
   return (
     <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
       <div className="max-w-2xl">
@@ -623,6 +708,55 @@ function StateHeader({
           {state.description ||
             `How ${element.name} looks when ${state.name.toLowerCase()}.`}
         </p>
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-muted-foreground">
+          <Select
+            value={state.kind}
+            onValueChange={(kind) => {
+              setError("");
+              updateState({ id: state.id, kind: kind as StateKind }).catch(
+                (e: unknown) =>
+                  setError(
+                    e instanceof Error
+                      ? e.message
+                      : "Could not save the state.",
+                  ),
+              );
+            }}
+          >
+            <SelectTrigger
+              size="sm"
+              aria-label={`What ${state.name} changes`}
+              className="min-w-36"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {stateKindSchema.options.map((k) => (
+                <SelectItem key={k} value={k}>
+                  {STATE_KIND_LABELS[k]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {combinable.length > 0 && (
+            <span>
+              Combines with{" "}
+              {combinable.slice(0, 3).map((s, i) => (
+                <span key={s.id}>
+                  {i > 0 && ", "}
+                  <code className="font-mono text-foreground">
+                    @{element.handle}:{stateHandle(state)}+{stateHandle(s)}
+                  </code>
+                </span>
+              ))}
+            </span>
+          )}
+          {error && (
+            <span role="alert" className="text-destructive">
+              {error}
+            </span>
+          )}
+        </div>
       </div>
       <ConfirmDelete
         label="Remove state"

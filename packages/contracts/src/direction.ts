@@ -151,7 +151,7 @@ export const LOOK_OPTIONS: Record<LookField, readonly DirectionOption[]> = {
       id: "anamorphic",
       label: "Anamorphic",
       phrase:
-        "anamorphic lens look with oval bokeh and horizontal flares, widescreen framing",
+        "shot on anamorphic cinema lenses, oval bokeh and subtle horizontal flares, the full widescreen frame with no masking",
       hint: "Cinema widescreen",
     },
     {

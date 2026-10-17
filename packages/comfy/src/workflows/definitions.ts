@@ -203,7 +203,14 @@ export const ltxVideoWorkflow: WorkflowDefinition<"video.ltx"> = {
   provider: (inputs) => (inputs.camera ? "cloud-workflow" : "router"),
   cloudOutputNodes: LTX_CAMERA_OUTPUT_NODES,
   async build(inputs, context) {
-    if (inputs.camera) return ltxCameraRequest(inputs, context);
+    if (inputs.camera)
+      return ltxCameraRequest(
+        {
+          ...inputs,
+          prompt: withDirection(inputs.prompt, inputs.direction, "video"),
+        },
+        context,
+      );
     const frame = inputs.firstFrame && (await context.asset(inputs.firstFrame));
     // Router's LTX reads text only: mentions say who they are, not just a name.
     const prompt = expandMentions(

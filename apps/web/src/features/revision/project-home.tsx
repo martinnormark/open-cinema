@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft, Plus, Wand2 } from "lucide-react";
+import { useState } from "react";
+import { ArrowLeft, Clapperboard, Plus, Wand2 } from "lucide-react";
 import {
   assetRefKey,
   type Project,
@@ -14,6 +15,11 @@ import {
   type MediaItem,
 } from "@/features/library";
 import { useGeneration } from "@/features/generation/store";
+import {
+  ProjectLook,
+  ProjectShots,
+} from "@/features/direction/project-direction";
+import type { ProjectShot } from "@/server/projects";
 import { useElements } from "@/features/elements/store";
 import {
   elementTypeOrder,
@@ -30,12 +36,15 @@ import {
 } from "./model";
 
 export function ProjectHome({
-  project,
+  project: loaded,
   revisions,
+  shots,
 }: {
   project: Project;
   revisions: Revision[];
+  shots: ProjectShot[];
 }) {
+  const [project, setProject] = useState(loaded);
   const items = useLibrary((s) => s.items);
   const videos = items.filter((item) => item.kind === "video");
   return (
@@ -63,13 +72,22 @@ export function ProjectHome({
             </p>
           )}
         </div>
-        <Button asChild>
-          <Link to="/revisions/new" search={{ project: project.id }}>
-            <Wand2 aria-hidden="true" /> New revision
-          </Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" asChild>
+            <Link to="/revisions/new" search={{ project: project.id }}>
+              <Wand2 aria-hidden="true" /> New revision
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link to="/" search={{ project: project.id }}>
+              <Clapperboard aria-hidden="true" /> Make a shot
+            </Link>
+          </Button>
+        </div>
       </header>
 
+      <ProjectLook project={project} onSaved={setProject} />
+      <ProjectShots project={project} shots={shots} />
       <Revisions project={project} revisions={revisions} />
       <Sources project={project} videos={videos} />
       <ProjectElements />

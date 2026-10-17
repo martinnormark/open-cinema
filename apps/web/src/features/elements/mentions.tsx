@@ -7,7 +7,12 @@ import {
   type KeyboardEvent,
 } from "react";
 import { cn } from "@/lib/utils";
-import type { AssetRef, ElementMention } from "@open-cinema/contracts";
+import {
+  combineStates,
+  STATE_KIND_LABELS,
+  type AssetRef,
+  type ElementMention,
+} from "@open-cinema/contracts";
 import {
   assetUrl,
   elementTypes,
@@ -19,9 +24,9 @@ import {
 } from "./model";
 import { useElements } from "./store";
 
-/** `@Handle` or `@Handle:state` where the `@` starts a word. */
+/** `@Handle`, `@Handle:state` or `@Handle:state+state` where the `@` starts a word. */
 const MENTION =
-  /(^|[^\p{L}\p{N}_@])@([A-Za-z][A-Za-z0-9_]{0,39})(?::([A-Za-z0-9-]+))?/gu;
+  /(^|[^\p{L}\p{N}_@])@([A-Za-z][A-Za-z0-9_]{0,39})(?::([A-Za-z0-9-]+(?:\+[A-Za-z0-9-]+)*))?/gu;
 
 export interface MentionToken {
   /** Offset of the `@`. */
@@ -29,7 +34,8 @@ export interface MentionToken {
   end: number;
   raw: string;
   handle: string;
-  stateHandle: string | null;
+  /** Every state named after the `:`, in order. */
+  stateHandles: string[];
 }
 
 export function parseMentions(text: string): MentionToken[] {
@@ -42,7 +48,7 @@ export function parseMentions(text: string): MentionToken[] {
       end: start + raw.length,
       raw,
       handle: match[2]!,
-      stateHandle: match[3] ?? null,
+      stateHandles: match[3] ? match[3].split("+") : [],
     });
   }
   return tokens;
@@ -59,7 +65,9 @@ export interface MentionReference {
 export interface ResolvedMention {
   token: MentionToken;
   element: Element | null;
+  /** The first selected state; `states` holds every combined one. */
   state: ElementState | null;
+  states: ElementState[];
   /** Approved state references first, then approved identity references. */
   references: MentionReference[];
   problem: string | null;
@@ -93,26 +101,41 @@ export function resolveMentions(
         token,
         element,
         state: null,
+        states: [],
         references: [],
         problem: `No Element is named @${token.handle}.`,
       };
-    const state = token.stateHandle
-      ? (element.states.find(
-          (s) => stateHandle(s) === token.stateHandle!.toLowerCase(),
-        ) ?? null)
-      : null;
+    const found = token.stateHandles.map(
+      (name) =>
+        element.states.find((s) => stateHandle(s) === name.toLowerCase()) ??
+        name,
+    );
+    const unknown = found.find((s): s is string => typeof s === "string");
+    const combined = combineStates(
+      element,
+      found.flatMap((s) => (typeof s === "string" ? [] : [s.id])),
+    );
+    const states = combined.states;
     const identity = approved(element.references, null);
     const references = [
-      ...(state ? approved(element.references, state.id) : []),
+      ...states.flatMap((s) => approved(element.references, s.id)),
       ...identity,
     ];
-    const problem =
-      token.stateHandle && !state
-        ? `@${element.handle} has no state named “${token.stateHandle}”.`
+    const problem = unknown
+      ? `@${element.handle} has no state named “${unknown}”.`
+      : combined.problem
+        ? combined.problem
         : identity.length === 0
           ? `@${element.handle} has no approved references yet.`
           : null;
-    return { token, element, state, references, problem };
+    return {
+      token,
+      element,
+      state: states[0] ?? null,
+      states,
+      references,
+      problem,
+    };
   });
 }
 
@@ -137,12 +160,14 @@ export function mentionPayload(mentions: readonly ResolvedMention[]): {
   };
   for (const mention of mentions) {
     if (!mention.element) continue;
-    const key = `${mention.element.id}:${mention.state?.id ?? ""}`;
+    const key = `${mention.element.id}:${mention.states.map((s) => s.id).join("+")}`;
     if (seen.has(key)) continue;
     seen.add(key);
+    const [first, ...rest] = mention.states;
     payload.mentions.push({
       elementId: mention.element.id,
-      ...(mention.state ? { stateId: mention.state.id } : {}),
+      ...(first ? { stateId: first.id } : {}),
+      ...(rest.length ? { stateIds: rest.map((s) => s.id) } : {}),
     });
     for (const reference of mention.references)
       if (!seen.has(reference.id)) {
@@ -158,20 +183,25 @@ interface Query {
   start: number;
   end: number;
   handle: string;
-  /** Present once the creator typed `:` after a known handle. */
+  /** Present once the creator typed `:` (or `+`) after a known handle. */
   stateQuery: string | null;
+  /** States already chosen before a `+`. */
+  chosen: string[];
 }
-const ACTIVE = /(^|[^\p{L}\p{N}_@])@([A-Za-z0-9_]*)(?::([A-Za-z0-9-]*))?$/u;
+const ACTIVE =
+  /(^|[^\p{L}\p{N}_@])@([A-Za-z0-9_]*)(?::((?:[A-Za-z0-9-]+\+)*)([A-Za-z0-9-]*))?$/u;
 function activeQuery(text: string, caret: number): Query | null {
   const match = ACTIVE.exec(text.slice(0, caret));
   if (!match) return null;
   const start = match.index + match[1]!.length;
-  const rest = /^[A-Za-z0-9_:-]*/.exec(text.slice(caret))![0];
+  const rest = /^[A-Za-z0-9_:+-]*/.exec(text.slice(caret))![0];
+  const colon = match[3] !== undefined;
   return {
     start,
     end: caret + rest.length,
     handle: match[2]!,
-    stateQuery: match[3] ?? null,
+    stateQuery: colon ? (match[4] ?? "") : null,
+    chosen: colon && match[3] ? match[3].split("+").filter(Boolean) : [],
   };
 }
 
@@ -200,13 +230,23 @@ function suggestionsFor(
     );
     if (!element) return [];
     const q = query.stateQuery.toLowerCase();
+    // After a `+`, offer only states that can combine with those chosen.
+    const chosen = query.chosen
+      .map((name) =>
+        element.states.find((s) => stateHandle(s) === name.toLowerCase()),
+      )
+      .filter((s): s is ElementState => !!s);
+    const prefix = `@${element.handle}:${query.chosen.map((c) => `${c}+`).join("")}`;
     return element.states
       .filter(
-        (s) => stateHandle(s).includes(q) || s.name.toLowerCase().includes(q),
+        (s) =>
+          !chosen.some((c) => c.id === s.id) &&
+          !chosen.some((c) => c.kind !== "other" && c.kind === s.kind) &&
+          (stateHandle(s).includes(q) || s.name.toLowerCase().includes(q)),
       )
       .map((state) => ({
         key: state.id,
-        insert: `@${element.handle}:${stateHandle(state)}`,
+        insert: `${prefix}${stateHandle(state)}`,
         element,
         state,
         thumbnail: thumbnail(element, state.id),
@@ -380,7 +420,7 @@ export function MentionTextarea({
             </span>
             <span className="shrink-0 text-xs text-muted-foreground">
               {suggestion.state
-                ? "State"
+                ? STATE_KIND_LABELS[suggestion.state.kind]
                 : elementTypes[suggestion.element.type].label}
             </span>
           </li>
@@ -440,7 +480,7 @@ export function MentionSummary({
             }
           >
             {mention.problem ??
-              `${mention.references.length} ${mention.references.length === 1 ? "reference" : "references"}${mention.state ? ` · ${mention.state.name}` : ""}`}
+              `${mention.references.length} ${mention.references.length === 1 ? "reference" : "references"}${mention.states.length ? ` · ${mention.states.map((s) => s.name).join(" + ")}` : ""}`}
           </span>
         </li>
       ))}

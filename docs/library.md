@@ -65,6 +65,8 @@ Options for the deferred case, cheapest first:
 2. **Use a provider's own thumbnail.** Some Router models return a cover image with the video, which could be saved as the poster at no cost.
 3. **Run a poster graph on Comfy Cloud** (VideoHelperSuite's loader, then one saved frame) when a result is saved, or when a non-browser client first asks for its poster. This works for every codec but costs a short GPU run for each video, which is why it is not the default.
 
+**Decision (Martin, 2026-10-17):** when this is picked up, build option 3. The poster graph runs on Comfy Cloud when a result is saved, and its run can measure the size and length at the same time. Options 1 and 2 are not planned.
+
 ## Library UI
 
 `/library` shows uploads in flight first, then uploads and generated outputs, newest first. The page accepts drag-and-drop anywhere when a session is active. Filters cover images, videos, uploads and generated items. Selecting a tile opens a non-modal inspector at `?item=<id>`, which can be deep-linked; picking another tile swaps it in place, and Escape returns focus to the tile. The inspector shows metadata, playback, Download, Delete (with confirmation, uploads only) and the use-as links.

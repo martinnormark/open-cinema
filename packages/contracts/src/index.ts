@@ -191,7 +191,10 @@ export interface GenerationCoordinatorApi {
   /** Display-safe: whether the jobs Worker holds Comfy credentials. Never the key. */
   getProviderStatus(): Promise<{ comfyConfigured: boolean }>;
   /** Proposes shots for an idea; falls back to a sentence split, never throws. */
-  planSequence(scope: OwnerScope, input: PlanSequenceInput): Promise<SequencePlan>;
+  planSequence(
+    scope: OwnerScope,
+    input: PlanSequenceInput,
+  ): Promise<SequencePlan>;
   getStoredOutput(
     scope: OwnerScope,
     jobId: string,
