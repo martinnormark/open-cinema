@@ -27,7 +27,7 @@ def cost(pipeline, metrics, log):
     p = pipeline.split("+")[0]
     if p == "bria-composite":
         return 0.05 * seconds
-    if p == "switchx-ref":
+    if p in ("switchx-ref", "comfyui-switchx"):
         return 0.143 * -(-frames // 30)
     if p in ("kling-o1-edit", "comfyui-kling"):
         units = None
