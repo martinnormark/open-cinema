@@ -25,6 +25,10 @@ The media container is `node:24-alpine` with ffmpeg and a small server (`apps/jo
 
 Verified offline on the Phase 0 clips (`artifacts/background-job/clips/`, review frames in `…/review/`): C4 (25 fps, 153 frames) against a 24 fps, 145-frame edit with burned-in frame numbers gives 153 frames at 25 fps, and output frames 50, 100 and 152 show edit frames 48, 96 and 144. C1 (24 fps) locks the walking couple over Kling's dusk harbor with their faces unchanged. The same server ran inside the built image.
 
+## Live run through the app (2026-10-17)
+
+A 4 s, 25 fps, 1280×720 take with an AAC track ran through the revision studio on the local stack (relay to Router, media server in Docker). Kling returned 24 fps and 97 frames; the matte came back at 25 fps and 100 frames; both variants came out at exactly 25 fps, 100 frames and 4.00 s with the source audio, and the revision was proposed with the locked output. A second, 3 s run was recorded in the browser through review: the As shot / Relit switch, side by side, and keeping the relit version. Evidence is in `artifacts/background-job/e2e/`.
+
 ## Cost and time for a 6 s take
 
 Kling $0.76, Bria matte about $0.30 (it ran in 33 s on 2026-10-17), and a few seconds of container CPU (under 3 s per output for a 640×360 clip on 4 cores). Against Phase 0's lock with a SwitchX matte (about $1.50), this is cheaper and keeps everything on Router. Where Bria's matte misses a prop (Phase 0 saw it drop a lamp and a bicycle wheel when it composited over a still), the lock shows Kling's own version of the prop instead, which Kling keeps.
