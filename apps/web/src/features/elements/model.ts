@@ -6,7 +6,12 @@ import type {
   ElementReference,
   ElementState,
   ElementType,
+  GenerationRequest,
   ReferenceView,
+} from "@open-cinema/contracts";
+import {
+  approvedReferences,
+  generationRequestSchema,
 } from "@open-cinema/contracts";
 
 export type {
@@ -335,4 +340,46 @@ export function guessView(
   for (const [pattern, view] of viewHints)
     if (pattern.test(name) && allowed.has(view)) return view;
   return null;
+}
+
+/** Approved references that hold this identity; a state's own views lead. */
+export function conditioningReferences(
+  element: Element,
+  state: ElementState | null,
+  limit = 6,
+): AssetRef[] {
+  return approvedReferences(element, state?.id)
+    .sort((a, b) => Number(!!b.stateId) - Number(!!a.stateId))
+    .slice(0, limit)
+    .map((r) => r.asset);
+}
+
+/**
+ * A new view is conditioned on the approved sheet, so it keeps the same face,
+ * place or object. Without approved references it starts from the description.
+ */
+export function viewRequest(
+  element: Element,
+  slot: GuidanceSlot,
+  state: ElementState | null,
+): GenerationRequest {
+  const references = conditioningReferences(element, state);
+  const prompt = viewPrompt(element, slot, state);
+  return references.length
+    ? generationRequestSchema.parse({
+        workflowKind: "image.flux-reference",
+        inputs: {
+          prompt:
+            `Same ${elementTypes[element.type].label.toLowerCase()} as the reference images. ${prompt}`.slice(
+              0,
+              2000,
+            ),
+          aspectRatio: "1:1",
+          references,
+        },
+      })
+    : generationRequestSchema.parse({
+        workflowKind: "image.flux",
+        inputs: { prompt },
+      });
 }

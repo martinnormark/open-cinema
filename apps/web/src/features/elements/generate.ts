@@ -1,6 +1,17 @@
 import { useMemo, useSyncExternalStore } from "react";
-import { isActiveJob, type Job } from "@open-cinema/contracts";
-import { beginLocalSession, submitGeneration } from "@/server/functions";
+import {
+  isActiveJob,
+  type GenerationRequest,
+  type Job,
+} from "@open-cinema/contracts";
+import { estimateGeneration } from "@open-cinema/comfy/estimates";
+import {
+  formatCost,
+  shouldShowEstimate,
+  type CostPreferences,
+} from "@/features/settings/preferences";
+import { beginLocalSession } from "@/server/functions";
+import { submitWorkflow } from "@/server/generation";
 import {
   acceptSnapshot,
   reconnectGeneration,
@@ -12,7 +23,7 @@ import type {
   GuidanceSlot,
   ReferenceView,
 } from "./model";
-import { elementTypes, viewPrompt } from "./model";
+import { elementTypes, viewRequest } from "./model";
 import { reloadElements } from "./store";
 
 export interface JobView {
@@ -138,7 +149,10 @@ export function retagPendingView(jobId: string, view: ReferenceView) {
   );
 }
 
-/** Submits one image job per slot; results arrive as explorations to review. */
+/**
+ * Submits one image job per slot, conditioned on the approved references;
+ * results arrive as explorations to review.
+ */
 export async function generateViews(
   element: Element,
   slots: GuidanceSlot[],
@@ -149,30 +163,25 @@ export async function generateViews(
   let failure: string | null = null;
   let submitted = 0;
   for (const slot of slots) {
-    const prompt = viewPrompt(element, slot, state);
-    const result = await submitGeneration({
-      data: { prompt, idempotencyKey: crypto.randomUUID() },
+    const request = viewRequest(element, slot, state);
+    const result = await submitWorkflow({
+      data: { idempotencyKey: crypto.randomUUID(), request },
     });
     if (!result.ok) {
       failure = result.error;
       break;
     }
     acceptSnapshot(result.snapshot);
-    const known = new Set(readPending().map((p) => p.jobId));
-    // The newest job with this prompt is the one just accepted.
-    const job = result.snapshot.jobs
-      .filter((j) => j.prompt === prompt && !known.has(j.id))
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
-    if (!job) continue;
+    if (!result.jobId) continue;
     submitted++;
     writePending([
       ...readPending(),
       {
-        jobId: job.id,
+        jobId: result.jobId,
         elementId: element.id,
         stateId: state?.id ?? null,
         view: slot.id,
-        prompt,
+        prompt: request.inputs.prompt ?? "",
         createdAt: new Date().toISOString(),
       },
     ]);
@@ -191,4 +200,30 @@ export function nextSlots(
     ? missing
     : elementTypes[element.type].slots.filter((s) => !s.required);
   return slots.slice(0, count);
+}
+
+/** "FLUX 3 Image · 4 approved references · about 6 credits, 20–80 s" */
+export function describeViewRequest(
+  request: GenerationRequest,
+  preferences: CostPreferences,
+  count = 1,
+) {
+  const parts = ["FLUX 3 Image"];
+  if (request.workflowKind === "image.flux-reference") {
+    const n = request.inputs.references.length;
+    parts.push(
+      `guided by ${n} approved ${n === 1 ? "reference" : "references"}`,
+    );
+  }
+  const estimate = estimateGeneration(request);
+  if (shouldShowEstimate(preferences, "image") && estimate.credits) {
+    const credits = {
+      min: estimate.credits.min * count,
+      max: estimate.credits.max * count,
+    };
+    parts.push(
+      `about ${formatCost(credits, preferences.unit)}, ${Math.round(estimate.seconds.min)}–${Math.round(estimate.seconds.max)} s`,
+    );
+  } else parts.push("uses your Comfy Router credits");
+  return parts.join(" · ");
 }

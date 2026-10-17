@@ -16,7 +16,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { useCostPreferences } from "@/features/settings/preferences";
 import {
+  describeViewRequest,
   generateViews,
   nextSlots,
   retagPendingView,
@@ -32,6 +34,7 @@ import {
   guessView,
   reviewSheet,
   stateHandle,
+  viewRequest,
   type Element,
   type ElementReference,
   type ElementState,
@@ -137,6 +140,7 @@ function ElementWorkspace({
   const complementary = state
     ? info.slots.filter((s) => s.required).slice(0, 1)
     : nextSlots(element, review.missingRequired, 1);
+  const preferences = useCostPreferences();
 
   return (
     <section
@@ -276,7 +280,8 @@ function ElementWorkspace({
             {complementary[0]
               ? `Next: ${complementary[0].label.toLowerCase()}${state ? ` while ${state.name.toLowerCase()}` : ""}. `
               : ""}
-            FLUX 3 Image · uses your Comfy Router credits.
+            {complementary[0] &&
+              `${describeViewRequest(viewRequest(element, complementary[0], state), preferences)}.`}
           </p>
         </aside>
       </div>
