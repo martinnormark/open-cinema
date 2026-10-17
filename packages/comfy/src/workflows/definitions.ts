@@ -29,6 +29,7 @@ import {
 } from "./results";
 import {
   CHARACTER_REPLACE_MODEL,
+  characterConformStage,
   characterReplaceRequest,
 } from "./character-replace";
 import type {
@@ -274,4 +275,6 @@ export const characterReplaceWorkflow: WorkflowDefinition<"video.character-repla
     build: characterReplaceRequest,
     // Same Kling edit result document as background replacement.
     outputs: backgroundReplaceOutputs,
+    label: "Recasting the character",
+    stages: [characterConformStage],
   };
