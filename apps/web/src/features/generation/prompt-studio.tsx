@@ -276,10 +276,11 @@ export function PromptStudio({
           {project && ` · filed under ${project.name}`}
           {request.workflowKind === "image.flux-reference" &&
             ` · ${request.inputs.references.length} ${request.inputs.references.length === 1 ? "reference" : "references"} from your Elements`}
-          {shouldShowEstimate(preferences, "image") &&
+          {shouldShowEstimate(preferences, medium) &&
             estimate.credits &&
             ` · about ${formatCost(estimate.credits, preferences.unit)}, ${Math.round(estimate.seconds.min)}–${Math.round(estimate.seconds.max)} s`}
-          {!estimate.credits &&
+          {shouldShowEstimate(preferences, medium) &&
+            !estimate.credits &&
             request.workflowKind === "video.ltx" &&
             request.inputs.camera &&
             ` · GPU time, about ${Math.round(estimate.seconds.min / 60)}–${Math.round(estimate.seconds.max / 60)} min`}
