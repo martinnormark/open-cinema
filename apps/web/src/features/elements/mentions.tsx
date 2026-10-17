@@ -244,6 +244,7 @@ export function MentionTextarea({
   onValueChange,
   className,
   onKeyDown,
+  onBlur,
   ...props
 }: TextareaProps & {
   value: string;
@@ -329,7 +330,10 @@ export function MentionTextarea({
           track(event.target);
         }}
         onSelect={(event) => track(event.currentTarget)}
-        onBlur={() => setCaret(null)}
+        onBlur={(event) => {
+          setCaret(null);
+          onBlur?.(event);
+        }}
         onKeyDown={keyDown}
         className={cn(
           "w-full resize-y rounded-xl border border-input bg-background p-4 text-base leading-7 outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60",
