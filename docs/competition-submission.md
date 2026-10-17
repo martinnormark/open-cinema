@@ -20,6 +20,20 @@ Open Cinema is an open, Comfy-powered Cinema Studio: build a cast, a place and t
 
 Not targeted: **Open Weights Only** (we use partner models through Comfy Router) and **MiniMax H3**.
 
+## Demo video
+
+**Current cut: [open-cinema-demo.mp4](media/open-cinema-demo.mp4)** (1:58, 1152×720, 2.3 MB). The full-quality master is `demo/open-cinema-demo.mp4` (1440×900) in the project's shared files, beside `demo/build-demo.sh`, which rebuilds it with ffmpeg.
+
+It is cut from the live MVP journey recording of 2026-10-17 and the evidence clips, with title cards and burned-in captions instead of voice-over. No credits were spent on it. It follows the script below beat for beat, with these differences:
+
+- The cast and place are **@Theo** and **@KeepersCottage**, the Elements made in that run, not @Mara, @Harbor and @Roadster.
+- It opens on the source, background and recast side by side instead of a three-shot sequence, because no finished multi-shot sequence exists yet.
+- The background beat shows the Kling 3.0 Omni result in the app, followed by the LTX 2.5 Alpha Gen before, matte and after clip run on Comfy Cloud.
+- It adds a short Character states beat (@Cal, wet, injured) and ends on the how-it-is-built card and the repository URL.
+- The README and Settings screens from the last beat are not in it.
+
+The README's [example outputs](../README.md#example-outputs) carry the stills and short clips (before/after revisions, Alpha Gen matte, comparison viewer, Character states, LTX clip).
+
 ## Two-minute demo script
 
 Target 1:50. Screen recording of the deployed studio at 1440×900, cursor visible, real generations (cut waiting time, never fake results). Voice-over in plain language; captions burned in for silent autoplay.
@@ -52,8 +66,8 @@ Status as of this document; update it as items land.
 - [x] Uses Comfy Router through the official Comfy SDK
 - [ ] Workflow files for each supported capability committed alongside the code
 - [ ] Deployed instance behind [Cloudflare Access](auth.md), with a demo account or public read-only gallery for judges
-- [ ] Example outputs in the README (stills, a short sequence, before/after revisions)
-- [ ] Demo video, ≤ 2:00, explaining how it was built and naming FLUX 3 and LTX
+- [x] Example outputs in the [README](../README.md#example-outputs) (stills, LTX clip, before/after revisions); a finished multi-shot sequence is still missing
+- [ ] Demo video, ≤ 2:00, explaining how it was built and naming FLUX 3 and LTX: a [captioned cut](media/open-cinema-demo.mp4) exists (1:58); re-record on the deployed studio with voice-over before submitting
 - [ ] Social post with #OpenSourceHiggsfield; link captured for the form
 - [ ] Entry form submitted before the deadline
 

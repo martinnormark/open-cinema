@@ -67,6 +67,19 @@ export const replacementKinds = {
   }
 >;
 
+/**
+ * The kinds the studio offers. Re-stage ("camera") is off until it runs on a
+ * model of our own: its only model was a community IC-LoRA, and the app uses
+ * no LoRA made by someone else (docs/third-party-ip.md). Its revisions still
+ * display.
+ */
+export const offeredKinds: readonly ReplacementKind[] = [
+  "background",
+  "character",
+  "object",
+  "restyle",
+];
+
 /** How each result variant reads to a creator choosing between them. */
 export const variantLabels: Record<
   ResultVariant,
