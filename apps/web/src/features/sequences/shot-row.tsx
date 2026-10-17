@@ -68,6 +68,7 @@ import { captureLastFrame } from "./last-frame";
 import {
   cameraLabels,
   DURATIONS,
+  EMPTY_FRAME_HINT,
   MIN_MOTION_SECONDS,
   framingLabels,
   keyframeRequest,
@@ -447,9 +448,18 @@ export function ShotRow({
           )}
 
           {warnings.length > 0 && (
-            <ul className="mt-3 space-y-1 text-xs leading-5 text-warning">
+            <ul className="mt-3 space-y-1 text-xs leading-5">
               {warnings.map((w) => (
-                <li key={w}>{w}</li>
+                <li
+                  key={w}
+                  className={
+                    w === EMPTY_FRAME_HINT
+                      ? "text-muted-foreground"
+                      : "text-warning"
+                  }
+                >
+                  {w}
+                </li>
               ))}
             </ul>
           )}

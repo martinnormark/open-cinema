@@ -199,6 +199,10 @@ export function prefersReferenceMotion(
   );
 }
 
+/** Shown on every new shot, so it reads as a hint, not a warning. */
+export const EMPTY_FRAME_HINT =
+  "Describe what the frame shows before generating.";
+
 /** Problems worth saying before a creator spends on a shot. */
 export function shotWarnings(shot: Shot, elements: readonly Element[]) {
   const warnings: string[] = [];
@@ -219,6 +223,6 @@ export function shotWarnings(shot: Shot, elements: readonly Element[]) {
       `${bare.map((m) => m.element!.name).join(", ")} ${bare.length === 1 ? "has" : "have"} no approved references yet, so the look may drift.`,
     );
   if ((shot.prompt || shot.beat).trim().length < 3)
-    warnings.push("Describe what the frame shows before generating.");
+    warnings.push(EMPTY_FRAME_HINT);
   return warnings;
 }

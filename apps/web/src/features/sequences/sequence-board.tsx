@@ -170,6 +170,7 @@ export function SequenceBoard({
               apply={apply}
             />
             <AddShot
+              last={index === sequence.shots.length - 1}
               label={
                 index === sequence.shots.length - 1
                   ? "Add a shot"
@@ -198,6 +199,7 @@ export function SequenceBoard({
       {sequence.shots.length === 0 && (
         <div className="mt-10">
           <AddShot
+            last
             label="Add the first shot"
             onAdd={() =>
               apply(
@@ -299,19 +301,26 @@ function Filmstrip({ sequence }: { sequence: Sequence }) {
 
 function AddShot({
   label,
+  last,
   onAdd,
 }: {
   label: string;
+  /** The end of the sequence gets a full button; in-between stays quiet. */
+  last: boolean;
   onAdd: () => Promise<unknown>;
 }) {
   const [busy, setBusy] = useState(false);
   return (
-    <div className="group flex justify-center py-1">
+    <div className={last ? "flex py-3" : "group flex justify-center py-1"}>
       <Button
-        variant="ghost"
-        size="xs"
+        variant={last ? "outline" : "ghost"}
+        size={last ? "sm" : "xs"}
         disabled={busy}
-        className="text-muted-foreground opacity-60 group-hover:opacity-100 focus-visible:opacity-100"
+        className={
+          last
+            ? undefined
+            : "text-muted-foreground opacity-60 group-hover:opacity-100 focus-visible:opacity-100"
+        }
         onClick={() => {
           setBusy(true);
           onAdd()
