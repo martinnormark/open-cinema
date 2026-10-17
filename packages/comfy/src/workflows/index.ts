@@ -24,6 +24,7 @@ export {
   fluxReferenceWorkflow,
   fluxSampleOutputs,
   ltxVideoOutputs,
+  routerSampleOutputs,
   ltxVideoWorkflow,
 } from "./definitions";
 

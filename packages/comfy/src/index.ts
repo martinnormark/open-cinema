@@ -12,7 +12,11 @@ export * from "./workflows/ltx-video";
 export * from "./estimates";
 
 import { FLUX_IMAGE_MODEL } from "./workflows/flux-image";
-import { fluxSampleOutputs, type ProviderOutput } from "./workflows";
+import {
+  routerSampleOutputs,
+  type ProviderOutput,
+  type ProviderRequest,
+} from "./workflows";
 export * from "./workflows";
 
 /** Legacy Router checkpoints carry no workflow kind; they ran FLUX 3 Image. */
@@ -56,8 +60,8 @@ export function submissionFailure(error: unknown, provider = "router") {
 export function createComfyClient(options: {
   apiKey: string;
   provider?: "router" | "cloud-workflow";
-  workflow?: Record<string, unknown>;
-  /** Maps a Router result document to outputs; defaults to FLUX `result.sample`. */
+  workflow?: Record<string, unknown> | ProviderRequest;
+  /** Maps a Router result document to outputs; defaults to `sample` or `video_url`. */
   outputs?: ((data: unknown) => ProviderOutput[]) | undefined;
 }) {
   if (options.provider === "cloud-workflow") return createCloudClient(options);
@@ -71,7 +75,7 @@ export function createComfyClient(options: {
   const model = options.workflow?.model ?? ROUTER_MODEL;
   if (typeof model !== "string")
     throw new Error("Invalid persisted Router model");
-  const readOutputs = options.outputs ?? fluxSampleOutputs;
+  const readOutputs = options.outputs ?? routerSampleOutputs;
   const request = (id: string) => comfy.models.handle(model, id);
   const bounded = () => ({
     timeoutMs: 15_000,

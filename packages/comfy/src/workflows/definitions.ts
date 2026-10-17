@@ -28,6 +28,15 @@ function singleOutput(field: string, id: string, fallback: string) {
 
 /** BFL image models return one image at `result.sample`. */
 export const fluxSampleOutputs = singleOutput("sample", "sample", "image/*");
+/**
+ * Callers that build a client without a workflow kind (pre-v5 checkpoints and
+ * direct uses) read either BFL's `sample` or LTX's `video_url` as "sample".
+ */
+export function routerSampleOutputs(data: unknown): ProviderOutput[] {
+  const image = fluxSampleOutputs(data);
+  if (image.length) return image;
+  return singleOutput("video_url", "sample", "video/mp4")(data);
+}
 /** LTX returns one clip at `result.video_url`. */
 export const ltxVideoOutputs = singleOutput("video_url", "video", "video/mp4");
 

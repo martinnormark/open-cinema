@@ -2,6 +2,8 @@ import { DurableObject } from "cloudflare:workers";
 import {
   isActiveJob,
   ownerScopeSchema,
+  parseMentionHandles,
+  requestMentions,
   promptCommandSchema,
   promptToRequest,
   requestAssetRefs,
@@ -128,18 +130,26 @@ export class GenerationCoordinator
         : await sha256({ prompt: requestPrompt(command.request), model });
     let mentions: ResolvedMention[] = [];
     const assets = requestAssetRefs(command.request);
-    try {
-      const db = createDatabase(this.env.DB);
-      mentions = await resolveMentions(db, scope, command.request);
-      for (const ref of assets)
-        if (!(await resolveAssetRef(db, scope, ref)))
-          return failure(
-            "Some media in this request is no longer available. Choose it again.",
-          );
-    } catch (error) {
-      if (error instanceof MentionError) return failure(error.message);
-      return failure("Your Elements and media could not be loaded. Try again.");
-    }
+    const needsLookup =
+      assets.length > 0 ||
+      requestMentions(command.request).length > 0 ||
+      parseMentionHandles(requestPrompt(command.request)).length > 0;
+    // Plain prompts never touch D1, so a D1 outage cannot block them.
+    if (needsLookup)
+      try {
+        const db = createDatabase(this.env.DB);
+        mentions = await resolveMentions(db, scope, command.request);
+        for (const ref of assets)
+          if (!(await resolveAssetRef(db, scope, ref)))
+            return failure(
+              "Some media in this request is no longer available. Choose it again.",
+            );
+      } catch (error) {
+        if (error instanceof MentionError) return failure(error.message);
+        return failure(
+          "Your Elements and media could not be loaded. Try again.",
+        );
+      }
     let error: string | null = null;
     const record = await mutateCoordinator(
       this.ctx.storage,
