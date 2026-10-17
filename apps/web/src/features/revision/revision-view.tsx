@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { useGeneration } from "@/features/generation/store";
+import { useLibrary } from "@/features/library";
 import { cancelGeneration, reconcileGeneration } from "@/server/functions";
 import { decideRevision, type RevisionEntry } from "@/server/revisions";
 import { CompareViewer } from "./compare-viewer";
@@ -73,6 +74,7 @@ export function RevisionView({
   const result = revisionResult(revision, job);
   const phase = revisionPhase(revision.status, job, !!result);
   const kind = kindOf(revision);
+  const items = useLibrary((s) => s.items);
   const [deciding, setDeciding] = useState<"kept" | "rejected" | null>(null);
   const [error, setError] = useState("");
 
@@ -93,7 +95,18 @@ export function RevisionView({
     }
   }
 
-  const sourceTitle = decisions?.sourceTitle ?? "this clip";
+  const sourceKey = assetRefKey(revision.source);
+  const resultKey = result ? assetRefKey(result) : null;
+  const sourceTitle =
+    decisions?.sourceTitle ??
+    items
+      .find((item) => assetRefKey(item.ref) === sourceKey)
+      ?.title.replace(/\.[a-z0-9]{2,4}$/i, "") ??
+    "this clip";
+  const resultType = items.find(
+    (item) => resultKey && assetRefKey(item.ref) === resultKey,
+  )?.mediaType;
+  const extension = resultType === "video/webm" ? "webm" : "mp4";
   const download = result
     ? `${replacementKinds[kind].label} – ${sourceTitle}`.replace(
         /[\\/:*?"<>|]+/g,
@@ -184,7 +197,10 @@ export function RevisionView({
               </Button>
               <span className="mx-1 hidden h-5 w-px bg-border sm:block" />
               <Button variant="ghost" asChild>
-                <a href={assetUrl(result)} download={`${download}.mp4`}>
+                <a
+                  href={assetUrl(result)}
+                  download={`${download}.${extension}`}
+                >
                   <Download aria-hidden="true" /> Download
                 </a>
               </Button>
