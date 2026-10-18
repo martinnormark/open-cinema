@@ -44,6 +44,7 @@ Primary entry points: [developer documentation](https://docs.comfy.org/developme
 - [Location references and reference shots](location-references.md): empty-location moves as a Location's primary reference, the checklist that prefers them, and text-to-video from references with the staging in words.
 - [Sequences](sequences.md): planning shots from an idea, keyframe and motion approval per shot, continuing from the last frame, playback and the shot list.
 - [World bundles](world-bundles.md): saving Elements, recipes, a project's look and its sequences as one file, and bringing it into another studio.
+- [Vertical footage sources](footage-sources.md): where to get 9:16 takes for recast and background replacement, their licences, model-release caveats and checked clips.
 - [Media library and uploads](library.md): upload path, limits, the picker and how other features use uploads as sources and references.
 - [Phase 0: background replacement](phase0-background.md): evaluation results, supported envelope, turnaround, cost and the MVP release-bar call.
 - [Phase 0: character recast](phase0-recast.md): evaluation of Kling recasting against the shared rubric.
