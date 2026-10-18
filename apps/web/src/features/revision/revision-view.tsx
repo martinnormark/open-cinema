@@ -342,7 +342,13 @@ export function RevisionView({
           {result && (
             <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-border pt-5">
               <Button
-                variant={kept ? "default" : "secondary"}
+                // Keep is the decision a result asks for, so it leads until
+                // the creator rejects it.
+                variant={
+                  revision.status === "rejected" && !kept
+                    ? "secondary"
+                    : "default"
+                }
                 aria-pressed={kept}
                 disabled={!!deciding}
                 onClick={() => void decide("kept")}
