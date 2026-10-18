@@ -31,6 +31,15 @@ test("matches the shared estimate for every replacement kind", () => {
   expect(numbers(estimateReplacement("background", null, "ltx-alpha"))).toEqual(
     shared("video.background-replace", { pipeline: "ltx-alpha" }),
   );
+  expect(numbers(estimateReplacement("background", null, "seedance"))).toEqual(
+    shared("video.background-replace", { pipeline: "seedance" }),
+  );
+});
+
+test("prices a Seedance relocation per source second as observed", () => {
+  const estimate = estimateReplacement("background", 10, "seedance");
+  expect(estimate.credits).toEqual({ min: 1710, max: 2090 });
+  expect(estimate.basis).toBe("observed");
 });
 
 test("prices Router edits per source second once the clip length is known", () => {

@@ -95,7 +95,11 @@ export const referenceVideoInputsSchema = z.object({
 });
 export type ReferenceVideoInputs = z.infer<typeof referenceVideoInputsSchema>;
 
-export const backgroundPipelineSchema = z.enum(["kling", "ltx-alpha"]);
+export const backgroundPipelineSchema = z.enum([
+  "kling",
+  "ltx-alpha",
+  "seedance",
+]);
 export type BackgroundPipelineChoice = z.infer<typeof backgroundPipelineSchema>;
 
 export const backgroundReplaceInputsSchema = z.object({
@@ -111,7 +115,9 @@ export const backgroundReplaceInputsSchema = z.object({
    * `kling` regenerates the setting around the take (Kling 3.0 Omni edit, with
    * relight and parallax). `ltx-alpha` keeps the take's pixels: LTX 2.5 Alpha
    * Gen mattes the subject on Comfy Cloud and composites it over the
-   * background image or clip, or the Location's best reference.
+   * background image or clip, or the Location's best reference. `seedance`
+   * moves the whole shot (Seedance 2.5 video edit) for takes whose camera
+   * travels too far for Kling to hold the new setting.
    */
   pipeline: backgroundPipelineSchema.default("kling"),
   /** The project look the new setting should follow (palette, light, texture). */

@@ -4,6 +4,7 @@ import type {
 } from "@open-cinema/contracts";
 import {
   cloudEstimate,
+  seedanceRelocateEstimate,
   sourceEditEstimate,
   sourceEditRate,
 } from "@open-cinema/comfy/estimates";
@@ -27,6 +28,8 @@ export function estimateReplacement(
       ...cloudEstimate("alpha"),
       note: "Runs on Comfy Cloud, billed by GPU time. Only the first 5 seconds are matted.",
     };
+  if (kind === "background" && pipeline === "seedance")
+    return seedanceRelocateEstimate(sourceSeconds);
   if (kind === "background") {
     const estimate = sourceEditEstimate(
       "video.background-replace",

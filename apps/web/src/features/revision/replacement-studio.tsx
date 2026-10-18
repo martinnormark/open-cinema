@@ -1636,6 +1636,11 @@ function BackgroundMethod({
       detail:
         "LTX 2.5 Alpha Gen mattes the people and lays them over a still or clip, untouched, in their original light.",
     },
+    seedance: {
+      label: "Move the whole shot",
+      detail:
+        "Seedance 2.5 rebuilds every frame in the new place, for takes where the camera travels. People and passers-by keep their moves, though timing can drift slightly. 720p.",
+    },
   } as const;
   return (
     <fieldset className="min-w-0">

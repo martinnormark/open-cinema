@@ -122,6 +122,32 @@ export function sourceEditRate(kind: keyof typeof SOURCE_EDIT_ESTIMATES) {
 }
 
 /** A per-source-second edit; credits are unknown until the clip length is. */
+/**
+ * Seedance 2.5 video edit at 720p bills 4.5154 credits per 1,000 video tokens
+ * (published Router price). The 8.4 s street take used 353,700 tokens on
+ * 2026-10-18, about 1,600 credits ($7.57) or 190 credits per source second.
+ */
+const SEEDANCE_RELOCATE_CREDITS_PER_SECOND = 190;
+
+export function seedanceRelocateEstimate(
+  sourceSeconds: number | null,
+): GenerationEstimate {
+  const rate = SEEDANCE_RELOCATE_CREDITS_PER_SECOND;
+  return {
+    credits:
+      sourceSeconds === null
+        ? null
+        : round(rate * sourceSeconds * 0.9, rate * sourceSeconds * 1.1),
+    // Observed: 3 to 4 minutes on Router, plus the conform step.
+    seconds: round(180, 1800),
+    basis: "observed",
+    note:
+      sourceSeconds === null
+        ? `About ${rate} credits per second of source video (Seedance 2.5 at 720p).`
+        : "Seedance 2.5 at 720p. Every frame is rebuilt, so it costs about five times Kling's background edit.",
+  };
+}
+
 export function sourceEditEstimate(
   kind: keyof typeof SOURCE_EDIT_ESTIMATES,
   sourceSeconds: number | null,
@@ -192,6 +218,8 @@ export function estimateGeneration(
     case "video.background-replace":
       if (request.inputs.pipeline === "ltx-alpha")
         return cloudEstimate("alpha");
+      if (request.inputs.pipeline === "seedance")
+        return seedanceRelocateEstimate(null);
       // The clip length is unknown here.
       return {
         ...sourceEditEstimate(request.workflowKind, null),

@@ -137,3 +137,72 @@ it("reads Kling result documents as recorded in Phase 0", () => {
     }),
   ).toEqual([]);
 });
+
+const moving = backgroundReplaceInputsSchema.parse({
+  ...inputs,
+  pipeline: "seedance",
+});
+
+it("moves the whole shot on Seedance 2.5 with the Location's references as data URIs", async () => {
+  const definition = getWorkflowDefinition("video.background-replace")!;
+  const { displayModel } = definition;
+  expect(
+    typeof displayModel === "function" ? displayModel(moving) : displayModel,
+  ).toBe("Seedance 2.5");
+  const request = await definition.build(moving, context(null));
+  expect(request.model).toBe("byteplus/dreamina-seedance-2-5-260628");
+  expect(request.input).toMatchObject({
+    content: [
+      { type: "text" },
+      {
+        type: "video_url",
+        video_url: { url: "https://comfy-storage.test/take" },
+        role: "reference_video",
+      },
+      {
+        type: "image_url",
+        image_url: { url: "data:image/png;base64,AAAA" },
+        role: "reference_image",
+      },
+      {
+        type: "image_url",
+        image_url: { url: "data:image/png;base64,AAAA" },
+        role: "reference_image",
+      },
+    ],
+    // Seedance edits accept only -1 (keep the source's length).
+    duration: -1,
+    resolution: "720p",
+    generate_audio: false,
+  });
+  const content = (request.input as { content: { text?: string }[] }).content;
+  const prompt = String(content[0]!.text);
+  expect(prompt).toContain("Move the scene in [Video 1] to Harbor (dusk)");
+  expect(prompt).toContain("[Image 1] and [Image 2]");
+  expect(prompt).toContain("everyone who passes through");
+});
+
+it("reads Seedance results and conforms them instead of locking", () => {
+  const definition = getWorkflowDefinition("video.background-replace")!;
+  // Shape of the live Router result on 2026-10-18 (URL shortened).
+  const result = {
+    id: "cgt-1",
+    status: "succeeded",
+    content: { video_url: "https://storage.test/seedance.mp4" },
+  };
+  expect(definition.outputs(result)).toEqual([
+    {
+      providerAssetId: "video",
+      url: "https://storage.test/seedance.mp4",
+      mediaType: "video/mp4",
+    },
+  ]);
+  const stageIds = (i: typeof inputs) => {
+    const stages = definition.stages;
+    return (typeof stages === "function" ? stages(i) : (stages ?? [])).map(
+      (stage) => stage.id,
+    );
+  };
+  expect(stageIds(moving)).toEqual(["conform"]);
+  expect(stageIds(inputs)).not.toContain("conform");
+});

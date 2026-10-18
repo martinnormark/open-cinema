@@ -12,6 +12,10 @@ import {
   BACKGROUND_REPLACE_MODEL,
   klingBackgroundRequest,
   locationReferences,
+  relocateConformStage,
+  SEEDANCE_RELOCATE_MODEL,
+  seedanceRelocateOutputs,
+  seedanceRelocateRequest,
 } from "./background-replace";
 import { MAX_REFERENCE_IMAGES } from "./flux-reference";
 import {
@@ -329,19 +333,25 @@ export const backgroundReplaceWorkflow: WorkflowDefinition<"video.background-rep
   {
     kind: "video.background-replace",
     displayModel: (inputs) =>
-      inputs.pipeline === "ltx-alpha" ? "LTX 2.5 Alpha Gen" : "Kling 3.0 Omni",
+      inputs.pipeline === "ltx-alpha"
+        ? "LTX 2.5 Alpha Gen"
+        : inputs.pipeline === "seedance"
+          ? "Seedance 2.5"
+          : "Kling 3.0 Omni",
     deadlineMs: 60 * 60_000,
     model: (inputs) =>
       inputs.pipeline === "ltx-alpha"
         ? LTX_ALPHA_MODEL_ID
-        : BACKGROUND_REPLACE_MODEL,
+        : inputs.pipeline === "seedance"
+          ? SEEDANCE_RELOCATE_MODEL
+          : BACKGROUND_REPLACE_MODEL,
     provider: (inputs) =>
       inputs.pipeline === "ltx-alpha" ? "cloud-workflow" : "router",
     cloudOutputNodes: LTX_ALPHA_OUTPUT_NODES,
     async build(inputs, context) {
       if (inputs.pipeline === "ltx-alpha")
         return ltxAlphaBackgroundRequest(inputs, context);
-      // Kling fetches the source clip by URL only.
+      // Kling and Seedance fetch the source clip by URL only.
       const source = await context.asset(inputs.source);
       const videoUrl = await source.fetchableUrl();
       const location = context.mentions.find(
@@ -351,26 +361,40 @@ export const backgroundReplaceWorkflow: WorkflowDefinition<"video.background-rep
         ...(inputs.background ? [inputs.background] : []),
         ...locationReferences(location),
       ].slice(0, KLING_EDIT_LIMITS.maxReferenceImages);
+      const seedance = inputs.pipeline === "seedance";
       const referenceImages = await Promise.all(
         refs.map(async (ref) => {
           const asset = await context.asset(ref);
           if (asset.publicUrl) return asset.publicUrl;
-          // Kling takes bare base64 and rejects a data: URI with provider_error.
-          return await asset.base64();
+          // Kling takes bare base64 and rejects a data: URI with provider_error;
+          // Seedance takes only a data: URI.
+          return seedance ? await asset.dataUri() : await asset.base64();
         }),
       );
-      return klingBackgroundRequest(inputs, location, {
-        videoUrl,
-        referenceImages,
-      });
+      return seedance
+        ? seedanceRelocateRequest(inputs, location, {
+            videoUrl,
+            referenceImages,
+          })
+        : klingBackgroundRequest(inputs, location, {
+            videoUrl,
+            referenceImages,
+          });
     },
-    outputs: backgroundReplaceOutputs,
+    // The two Router results have different shapes; each parser finds only its own.
+    outputs: (data) => [
+      ...backgroundReplaceOutputs(data),
+      ...seedanceRelocateOutputs(data),
+    ],
     label: "Replacing the background",
-    // Kling's edit gets the lock; the alpha composite already keeps the take's own pixels.
+    // Kling's edit gets the lock; the alpha composite already keeps the take's
+    // own pixels; Seedance rebuilds everything, so it is only conformed.
     stages: (inputs) =>
       inputs.pipeline === "ltx-alpha"
         ? []
-        : [backgroundMatteStage, backgroundLockStage],
+        : inputs.pipeline === "seedance"
+          ? [relocateConformStage]
+          : [backgroundMatteStage, backgroundLockStage],
   };
 
 /**
