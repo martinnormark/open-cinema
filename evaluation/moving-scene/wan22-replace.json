@@ -1,0 +1,741 @@
+{
+ "video": {
+  "class_type": "LoadVideo",
+  "inputs": {
+   "file": "f6b130f79b760c5beeacb93cff7f2eb5e89205299213682a4517aac153bc41ee.mp4"
+  }
+ },
+ "parts": {
+  "class_type": "GetVideoComponents",
+  "inputs": {
+   "video": [
+    "video",
+    0
+   ]
+  }
+ },
+ "frames": {
+  "class_type": "ImageScale",
+  "inputs": {
+   "image": [
+    "parts",
+    0
+   ],
+   "upscale_method": "lanczos",
+   "width": 544,
+   "height": 960,
+   "crop": "center"
+  }
+ },
+ "count": {
+  "class_type": "GetImageSize",
+  "inputs": {
+   "image": [
+    "frames",
+    0
+   ]
+  }
+ },
+ "ref": {
+  "class_type": "LoadImage",
+  "inputs": {
+   "image": "edb2ee9389033e2c5849a34ad065ea93fe29e07fa3d818cd33a6d80ff165f2f7.png"
+  }
+ },
+ "refs": {
+  "class_type": "ImageScale",
+  "inputs": {
+   "image": [
+    "ref",
+    0
+   ],
+   "upscale_method": "lanczos",
+   "width": 544,
+   "height": 960,
+   "crop": "center"
+  }
+ },
+ "posemodel": {
+  "class_type": "OnnxDetectionModelLoader",
+  "inputs": {
+   "vitpose_model": "vitpose-l-wholebody.onnx",
+   "yolo_model": "yolov10m.onnx",
+   "onnx_device": "CUDAExecutionProvider"
+  }
+ },
+ "detect": {
+  "class_type": "PoseAndFaceDetection",
+  "inputs": {
+   "model": [
+    "posemodel",
+    0
+   ],
+   "images": [
+    "frames",
+    0
+   ],
+   "width": 544,
+   "height": 960
+  }
+ },
+ "pose": {
+  "class_type": "DrawViTPose",
+  "inputs": {
+   "pose_data": [
+    "detect",
+    0
+   ],
+   "width": 544,
+   "height": 960,
+   "retarget_padding": 16,
+   "body_stick_width": -1,
+   "hand_stick_width": -1,
+   "draw_head": true
+  }
+ },
+ "sam2": {
+  "class_type": "DownloadAndLoadSAM2Model",
+  "inputs": {
+   "model": "sam2.1_hiera_base_plus.safetensors",
+   "segmentor": "video",
+   "device": "cuda",
+   "precision": "fp16"
+  }
+ },
+ "seg": {
+  "class_type": "Sam2Segmentation",
+  "inputs": {
+   "sam2_model": [
+    "sam2",
+    0
+   ],
+   "image": [
+    "frames",
+    0
+   ],
+   "keep_model_loaded": false,
+   "bboxes": [
+    "detect",
+    3
+   ],
+   "individual_objects": false
+  }
+ },
+ "grow": {
+  "class_type": "GrowMaskWithBlur",
+  "inputs": {
+   "mask": [
+    "seg",
+    0
+   ],
+   "expand": 10,
+   "incremental_expandrate": 0,
+   "tapered_corners": true,
+   "flip_input": false,
+   "blur_radius": 0,
+   "lerp_alpha": 1,
+   "decay_factor": 1,
+   "fill_holes": false
+  }
+ },
+ "block": {
+  "class_type": "BlockifyMask",
+  "inputs": {
+   "masks": [
+    "grow",
+    0
+   ],
+   "block_size": 32,
+   "device": "cpu"
+  }
+ },
+ "bg": {
+  "class_type": "DrawMaskOnImage",
+  "inputs": {
+   "image": [
+    "frames",
+    0
+   ],
+   "mask": [
+    "block",
+    0
+   ],
+   "color": "0, 0, 0",
+   "device": "cpu"
+  }
+ },
+ "unet": {
+  "class_type": "UNETLoader",
+  "inputs": {
+   "unet_name": "Wan2_2-Animate-14B_fp8_e4m3fn_scaled_KJ.safetensors",
+   "weight_dtype": "default"
+  }
+ },
+ "lx": {
+  "class_type": "LoraLoaderModelOnly",
+  "inputs": {
+   "model": [
+    "unet",
+    0
+   ],
+   "lora_name": "lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
+   "strength_model": 1
+  }
+ },
+ "relight": {
+  "class_type": "LoraLoaderModelOnly",
+  "inputs": {
+   "model": [
+    "lx",
+    0
+   ],
+   "lora_name": "WanAnimate_relight_lora_fp16.safetensors",
+   "strength_model": 1
+  }
+ },
+ "msd3": {
+  "class_type": "ModelSamplingSD3",
+  "inputs": {
+   "model": [
+    "relight",
+    0
+   ],
+   "shift": 8
+  }
+ },
+ "clip": {
+  "class_type": "CLIPLoader",
+  "inputs": {
+   "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+   "type": "wan",
+   "device": "default"
+  }
+ },
+ "vae": {
+  "class_type": "VAELoader",
+  "inputs": {
+   "vae_name": "wan_2.1_vae.safetensors"
+  }
+ },
+ "cv": {
+  "class_type": "CLIPVisionLoader",
+  "inputs": {
+   "clip_name": "clip_vision_h.safetensors"
+  }
+ },
+ "cve": {
+  "class_type": "CLIPVisionEncode",
+  "inputs": {
+   "clip_vision": [
+    "cv",
+    0
+   ],
+   "image": [
+    "refs",
+    0
+   ],
+   "crop": "none"
+  }
+ },
+ "pos": {
+  "class_type": "CLIPTextEncode",
+  "inputs": {
+   "clip": [
+    "clip",
+    0
+   ],
+   "text": "An older man with swept-back silver hair in a charcoal wool overcoat, navy sweater, dark trousers and black shoes dances joyfully across the street."
+  }
+ },
+ "neg": {
+  "class_type": "CLIPTextEncode",
+  "inputs": {
+   "clip": [
+    "clip",
+    0
+   ],
+   "text": "\u8272\u8c03\u8273\u4e3d\uff0c\u8fc7\u66dd\uff0c\u9759\u6001\uff0c\u7ec6\u8282\u6a21\u7cca\u4e0d\u6e05\uff0c\u5b57\u5e55\uff0c\u98ce\u683c\uff0c\u4f5c\u54c1\uff0c\u753b\u4f5c\uff0c\u753b\u9762\uff0c\u9759\u6b62\uff0c\u6574\u4f53\u53d1\u7070\uff0c\u6700\u5dee\u8d28\u91cf\uff0c\u4f4e\u8d28\u91cf\uff0cJPEG\u538b\u7f29\u6b8b\u7559\uff0c\u4e11\u964b\u7684\uff0c\u6b8b\u7f3a\u7684\uff0c\u591a\u4f59\u7684\u624b\u6307\uff0c\u753b\u5f97\u4e0d\u597d\u7684\u624b\u90e8\uff0c\u753b\u5f97\u4e0d\u597d\u7684\u8138\u90e8\uff0c\u7578\u5f62\u7684\uff0c\u6bc1\u5bb9\u7684\uff0c\u5f62\u6001\u7578\u5f62\u7684\u80a2\u4f53\uff0c\u624b\u6307\u878d\u5408\uff0c\u9759\u6b62\u4e0d\u52a8\u7684\u753b\u9762\uff0c\u6742\u4e71\u7684\u80cc\u666f\uff0c\u4e09\u6761\u817f\uff0c\u80cc\u666f\u4eba\u5f88\u591a\uff0c\u5012\u7740\u8d70"
+  }
+ },
+ "wa0": {
+  "class_type": "WanAnimateToVideo",
+  "inputs": {
+   "positive": [
+    "pos",
+    0
+   ],
+   "negative": [
+    "neg",
+    0
+   ],
+   "vae": [
+    "vae",
+    0
+   ],
+   "width": 544,
+   "height": 960,
+   "length": 77,
+   "batch_size": 1,
+   "continue_motion_max_frames": 5,
+   "video_frame_offset": 0,
+   "clip_vision_output": [
+    "cve",
+    0
+   ],
+   "reference_image": [
+    "refs",
+    0
+   ],
+   "face_video": [
+    "detect",
+    1
+   ],
+   "pose_video": [
+    "pose",
+    0
+   ],
+   "background_video": [
+    "bg",
+    0
+   ],
+   "character_mask": [
+    "block",
+    0
+   ]
+  }
+ },
+ "ks0": {
+  "class_type": "KSampler",
+  "inputs": {
+   "model": [
+    "msd3",
+    0
+   ],
+   "positive": [
+    "wa0",
+    0
+   ],
+   "negative": [
+    "wa0",
+    1
+   ],
+   "latent_image": [
+    "wa0",
+    2
+   ],
+   "seed": 4242,
+   "steps": 6,
+   "cfg": 1,
+   "sampler_name": "euler",
+   "scheduler": "simple",
+   "denoise": 1
+  }
+ },
+ "tr0": {
+  "class_type": "TrimVideoLatent",
+  "inputs": {
+   "samples": [
+    "ks0",
+    0
+   ],
+   "trim_amount": [
+    "wa0",
+    3
+   ]
+  }
+ },
+ "dec0": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "tr0",
+    0
+   ],
+   "vae": [
+    "vae",
+    0
+   ]
+  }
+ },
+ "keep0": {
+  "class_type": "ImageFromBatch",
+  "inputs": {
+   "image": [
+    "dec0",
+    0
+   ],
+   "batch_index": [
+    "wa0",
+    4
+   ],
+   "length": 4096
+  }
+ },
+ "wa1": {
+  "class_type": "WanAnimateToVideo",
+  "inputs": {
+   "positive": [
+    "pos",
+    0
+   ],
+   "negative": [
+    "neg",
+    0
+   ],
+   "vae": [
+    "vae",
+    0
+   ],
+   "width": 544,
+   "height": 960,
+   "length": 77,
+   "batch_size": 1,
+   "continue_motion_max_frames": 5,
+   "video_frame_offset": [
+    "wa0",
+    5
+   ],
+   "clip_vision_output": [
+    "cve",
+    0
+   ],
+   "reference_image": [
+    "refs",
+    0
+   ],
+   "face_video": [
+    "detect",
+    1
+   ],
+   "pose_video": [
+    "pose",
+    0
+   ],
+   "background_video": [
+    "bg",
+    0
+   ],
+   "character_mask": [
+    "block",
+    0
+   ],
+   "continue_motion": [
+    "dec0",
+    0
+   ]
+  }
+ },
+ "ks1": {
+  "class_type": "KSampler",
+  "inputs": {
+   "model": [
+    "msd3",
+    0
+   ],
+   "positive": [
+    "wa1",
+    0
+   ],
+   "negative": [
+    "wa1",
+    1
+   ],
+   "latent_image": [
+    "wa1",
+    2
+   ],
+   "seed": 4243,
+   "steps": 6,
+   "cfg": 1,
+   "sampler_name": "euler",
+   "scheduler": "simple",
+   "denoise": 1
+  }
+ },
+ "tr1": {
+  "class_type": "TrimVideoLatent",
+  "inputs": {
+   "samples": [
+    "ks1",
+    0
+   ],
+   "trim_amount": [
+    "wa1",
+    3
+   ]
+  }
+ },
+ "dec1": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "tr1",
+    0
+   ],
+   "vae": [
+    "vae",
+    0
+   ]
+  }
+ },
+ "keep1": {
+  "class_type": "ImageFromBatch",
+  "inputs": {
+   "image": [
+    "dec1",
+    0
+   ],
+   "batch_index": [
+    "wa1",
+    4
+   ],
+   "length": 4096
+  }
+ },
+ "wa2": {
+  "class_type": "WanAnimateToVideo",
+  "inputs": {
+   "positive": [
+    "pos",
+    0
+   ],
+   "negative": [
+    "neg",
+    0
+   ],
+   "vae": [
+    "vae",
+    0
+   ],
+   "width": 544,
+   "height": 960,
+   "length": 77,
+   "batch_size": 1,
+   "continue_motion_max_frames": 5,
+   "video_frame_offset": [
+    "wa1",
+    5
+   ],
+   "clip_vision_output": [
+    "cve",
+    0
+   ],
+   "reference_image": [
+    "refs",
+    0
+   ],
+   "face_video": [
+    "detect",
+    1
+   ],
+   "pose_video": [
+    "pose",
+    0
+   ],
+   "background_video": [
+    "bg",
+    0
+   ],
+   "character_mask": [
+    "block",
+    0
+   ],
+   "continue_motion": [
+    "dec1",
+    0
+   ]
+  }
+ },
+ "ks2": {
+  "class_type": "KSampler",
+  "inputs": {
+   "model": [
+    "msd3",
+    0
+   ],
+   "positive": [
+    "wa2",
+    0
+   ],
+   "negative": [
+    "wa2",
+    1
+   ],
+   "latent_image": [
+    "wa2",
+    2
+   ],
+   "seed": 4244,
+   "steps": 6,
+   "cfg": 1,
+   "sampler_name": "euler",
+   "scheduler": "simple",
+   "denoise": 1
+  }
+ },
+ "tr2": {
+  "class_type": "TrimVideoLatent",
+  "inputs": {
+   "samples": [
+    "ks2",
+    0
+   ],
+   "trim_amount": [
+    "wa2",
+    3
+   ]
+  }
+ },
+ "dec2": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "tr2",
+    0
+   ],
+   "vae": [
+    "vae",
+    0
+   ]
+  }
+ },
+ "keep2": {
+  "class_type": "ImageFromBatch",
+  "inputs": {
+   "image": [
+    "dec2",
+    0
+   ],
+   "batch_index": [
+    "wa2",
+    4
+   ],
+   "length": 4096
+  }
+ },
+ "cat01": {
+  "class_type": "ImageBatch",
+  "inputs": {
+   "image1": [
+    "keep0",
+    0
+   ],
+   "image2": [
+    "keep1",
+    0
+   ]
+  }
+ },
+ "cat": {
+  "class_type": "ImageBatch",
+  "inputs": {
+   "image1": [
+    "cat01",
+    0
+   ],
+   "image2": [
+    "keep2",
+    0
+   ]
+  }
+ },
+ "trim": {
+  "class_type": "ImageFromBatch",
+  "inputs": {
+   "image": [
+    "cat",
+    0
+   ],
+   "batch_index": 0,
+   "length": [
+    "count",
+    2
+   ]
+  }
+ },
+ "out": {
+  "class_type": "CreateVideo",
+  "inputs": {
+   "images": [
+    "trim",
+    0
+   ],
+   "fps": [
+    "parts",
+    2
+   ],
+   "audio": [
+    "parts",
+    1
+   ]
+  }
+ },
+ "save": {
+  "class_type": "SaveVideo",
+  "inputs": {
+   "video": [
+    "out",
+    0
+   ],
+   "filename_prefix": "open_cinema/moving/wan22-replace-cal",
+   "format": "mp4",
+   "format.codec": "h264",
+   "format.codec.encoding": "re-encode",
+   "format.codec.encoding.crf": 16
+  }
+ },
+ "bgv": {
+  "class_type": "CreateVideo",
+  "inputs": {
+   "images": [
+    "bg",
+    0
+   ],
+   "fps": [
+    "parts",
+    2
+   ]
+  }
+ },
+ "save_bg": {
+  "class_type": "SaveVideo",
+  "inputs": {
+   "video": [
+    "bgv",
+    0
+   ],
+   "filename_prefix": "open_cinema/moving/wan22-replace-masked-plate",
+   "format": "mp4",
+   "format.codec": "h264",
+   "format.codec.encoding": "re-encode",
+   "format.codec.encoding.crf": 16
+  }
+ },
+ "posev": {
+  "class_type": "CreateVideo",
+  "inputs": {
+   "images": [
+    "pose",
+    0
+   ],
+   "fps": [
+    "parts",
+    2
+   ]
+  }
+ },
+ "save_pose": {
+  "class_type": "SaveVideo",
+  "inputs": {
+   "video": [
+    "posev",
+    0
+   ],
+   "filename_prefix": "open_cinema/moving/wan22-replace-pose",
+   "format": "mp4",
+   "format.codec": "h264",
+   "format.codec.encoding": "re-encode",
+   "format.codec.encoding.crf": 16
+  }
+ }
+}

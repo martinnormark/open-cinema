@@ -38,6 +38,7 @@ Primary entry points: [developer documentation](https://docs.comfy.org/developme
 - [Third-party IP](third-party-ip.md): every model and LoRA the app uses, its provider and licence, and what the no-borrowed-IP rule removed.
 - [Re-stage IC-LoRA](restage-ic-lora.md): the plan for training our own re-staging adapter on LTX 2.3: data, trainer, compute and reach.
 - [Location reference IC-LoRA](location-reference-ic-lora.md): the plan for our own LTX adapter that takes a Location's moving reference, so reference shots can leave Kling: data, pilot, trainer and cost.
+- [Recasting and relocating a moving scene](moving-scenes.md): the app's Kling recast, Seedance 2.5 relocation and Wan Animate on a fast-moving street take, and what the app lacks.
 - [Known limitations](known-limitations.md): capabilities deferred because they are not good enough yet, starting with character performance transfer and replacement.
 - [Reuse a performance](performance-transfer.md): the LTX 2.3 Union Control pose graph on Comfy Cloud, its limits and the live run.
 - [Location references and reference shots](location-references.md): empty-location moves as a Location's primary reference, the checklist that prefers them, and text-to-video from references with the staging in words.
