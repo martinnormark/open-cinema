@@ -1,12 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import {
-  ArrowLeft,
-  Clapperboard,
-  PackageOpen,
-  Plus,
-  Wand2,
-} from "lucide-react";
+import { ArrowLeft, Clapperboard, Wand2 } from "lucide-react";
 import {
   assetRefKey,
   lookPrompt,
@@ -76,11 +70,6 @@ export function ProjectHome({
           )}
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="ghost" asChild>
-            <Link to="/world" search={{ project: project.id }}>
-              <PackageOpen aria-hidden="true" /> Save as world
-            </Link>
-          </Button>
           <Button variant="outline" asChild>
             <Link to="/revisions/new" search={{ project: project.id }}>
               <Wand2 aria-hidden="true" /> New revision
@@ -99,6 +88,13 @@ export function ProjectHome({
       <Revisions project={project} revisions={revisions} />
       <Sources project={project} videos={videos} />
       <ProjectElements />
+      <p className="mt-14 border-t border-border pt-6 text-sm text-muted-foreground">
+        Taking this project elsewhere?{" "}
+        <Link to="/world" search={{ project: project.id }}>
+          Save it as a world
+        </Link>{" "}
+        with its look, Elements and sequences.
+      </p>
     </section>
   );
 }
@@ -187,54 +183,44 @@ function Sources({
   project: Project;
   videos: readonly MediaItem[];
 }) {
+  // Until there is footage, Revisions already says how to start; an empty
+  // Sources section would only repeat it.
+  if (!videos.length) return null;
   return (
     <section className="mt-14" aria-labelledby="sources-title">
-      <div className="flex items-center justify-between gap-4">
-        <h2 id="sources-title" className="text-lg font-medium">
-          Sources
-        </h2>
-        <Button variant="ghost" size="sm" asChild>
-          <Link to="/revisions/new" search={{ project: project.id }}>
-            <Plus aria-hidden="true" /> Add a clip
-          </Link>
-        </Button>
-      </div>
-      {videos.length === 0 ? (
-        <p className="mt-3 text-sm leading-6 text-muted-foreground">
-          Upload footage or generate a video, then revise it here.
-        </p>
-      ) : (
-        <ul className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {videos.slice(0, 12).map((item) => (
-            <li key={item.id} className="group">
-              <span className="relative block overflow-hidden rounded-lg">
-                <Thumbnail
-                  src={item.thumbnailUrl}
-                  kind="video"
-                  className="aspect-video"
-                />
-                <DurationBadge item={item} className="right-1.5 bottom-1.5" />
+      <h2 id="sources-title" className="text-lg font-medium">
+        Sources
+      </h2>
+      <ul className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+        {videos.slice(0, 12).map((item) => (
+          <li key={item.id} className="group">
+            <span className="relative block overflow-hidden rounded-lg">
+              <Thumbnail
+                src={item.thumbnailUrl}
+                kind="video"
+                className="aspect-video"
+              />
+              <DurationBadge item={item} className="right-1.5 bottom-1.5" />
+            </span>
+            <span className="mt-1.5 flex items-center justify-between gap-2">
+              <span className="truncate text-xs text-muted-foreground">
+                {item.title}
               </span>
-              <span className="mt-1.5 flex items-center justify-between gap-2">
-                <span className="truncate text-xs text-muted-foreground">
-                  {item.title}
-                </span>
-                <Link
-                  to="/revisions/new"
-                  search={{
-                    source: assetRefKey(item.ref),
-                    project: project.id,
-                  }}
-                  className="shrink-0 text-xs"
-                  aria-label={`Revise ${item.title}`}
-                >
-                  Revise
-                </Link>
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
+              <Link
+                to="/revisions/new"
+                search={{
+                  source: assetRefKey(item.ref),
+                  project: project.id,
+                }}
+                className="shrink-0 text-xs"
+                aria-label={`Revise ${item.title}`}
+              >
+                Revise
+              </Link>
+            </span>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

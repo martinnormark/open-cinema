@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { BookmarkPlus, Clapperboard } from "lucide-react";
+import { BookmarkPlus } from "lucide-react";
 import { LOOK_FIELDS, type Look, type Project } from "@open-cinema/contracts";
 import { Button } from "@/components/ui/button";
 import { Thumbnail } from "@/features/library";
@@ -132,16 +132,10 @@ export function ProjectShots({
 }) {
   return (
     <section className="mt-14" aria-labelledby="shots-title">
-      <div className="flex items-center justify-between gap-4">
-        <h2 id="shots-title" className="text-lg font-medium">
-          Shots
-        </h2>
-        <Button variant="ghost" size="sm" asChild>
-          <Link to="/" search={{ project: project.id }}>
-            <Clapperboard aria-hidden="true" /> Make a shot
-          </Link>
-        </Button>
-      </div>
+      {/* Make a shot lives once, in the page header. */}
+      <h2 id="shots-title" className="text-lg font-medium">
+        Shots
+      </h2>
       {shots.length === 0 ? (
         <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
           Images and videos you make with this project chosen in the studio land
