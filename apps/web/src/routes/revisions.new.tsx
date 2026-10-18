@@ -56,8 +56,8 @@ function NewRevision() {
         </Link>
       )}
       <PageHeader
-        title="Revise a shot"
-        description="Change one decision and keep everything else you approved. The original stays beside the result."
+        title="Change a take"
+        description="Pick what changes. Everything else stays as shot, and the original sits beside the result."
       />
       <div className="mt-8">
         <ReplacementStudio

@@ -23,7 +23,7 @@ function Revision() {
           title="This revision isn’t here"
           actions={
             <Button asChild>
-              <Link to="/revisions/new">Revise a shot</Link>
+              <Link to="/revisions/new">Change a take</Link>
             </Button>
           }
         >

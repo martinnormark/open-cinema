@@ -43,7 +43,6 @@ import {
   type VfxEffect,
 } from "@open-cinema/contracts";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { formatDuration } from "@/features/library/model";
 import {
@@ -56,8 +55,10 @@ import {
 import { acceptSnapshot, useGeneration } from "@/features/generation/store";
 import { startSession } from "@/features/elements/generate";
 import { useElements } from "@/features/elements/store";
+import { MentionTextarea, resolveMentions } from "@/features/elements/mentions";
 import { assetUrl } from "@/lib/media-url";
 import {
+  elementTypes,
   stateHandle,
   type Element,
   type ElementState,
@@ -73,6 +74,8 @@ import { requestScan, useShotScan, type ScanState } from "./shot-checks-client";
 import {
   LTX_REVISION_SECONDS,
   checkKlingSource,
+  defaultElement,
+  kindElementTypes,
   formatEstimate,
   formatTimecode,
   preservedLabels,
@@ -171,7 +174,7 @@ const DEFAULT_KEPT: Record<ReplacementKind, readonly PreservedAspect[]> = {
 
 /** What runs where, so the composer reads the right limits. */
 const KLING_KINDS: readonly ReplacementKind[] = ["background", "character"];
-/** In the order the composer lists them: swaps, then take edits, then looks. */
+/** In the front page's order: swaps, then take edits, then effects and looks. */
 const KIND_ICONS = {
   background: Mountain,
   character: UserRound,
@@ -180,24 +183,13 @@ const KIND_ICONS = {
   moment: RotateCcw,
   extend: FastForward,
   reframe: Expand,
+  // As the front page's "More": effects, then looks.
+  effect: Sparkles,
   restyle: Palette,
   camera: Video,
-  effect: Sparkles,
 } as const satisfies Record<ReplacementKind, unknown>;
-const ELEMENT_TYPES = {
-  background: "location",
-  character: "character",
-  object: "thing",
-  restyle: "location",
-  camera: null,
-  effect: null,
-  // A Thing as the area's reference came back empty; Swap an object takes Things.
-  area: null,
-  // Optional: who walks in, or who the moment is about.
-  moment: "character",
-  extend: "character",
-  reframe: null,
-} as const satisfies Record<ReplacementKind, string | null>;
+/** Fix an area keeps 81 frames, about three seconds. */
+const AREA_REVISION_SECONDS = 3;
 /** Moment lengths offered, in seconds, within `MOMENT_LIMITS`. */
 const MOMENT_LENGTHS = [1, 2, 3] as const;
 
@@ -235,8 +227,9 @@ export function ReplacementStudio({
       ? (videos[0] ?? null)
       : (videos.find((v) => assetRefKey(v.ref) === sourceKey) ?? null);
   const [kind, setKind] = useState<ReplacementKind>(draft?.kind ?? initialKind);
-  const [elementId, setElementId] = useState<string | null>(
-    draft?.element?.id ?? initialElementId ?? null,
+  /** Undefined until the creator chooses, so a sensible default can stand in; null is "none". */
+  const [elementId, setElementId] = useState<string | null | undefined>(
+    draft ? (draft.element?.id ?? null) : initialElementId,
   );
   const [stateId, setStateId] = useState<string | null>(
     draft?.draft?.stateId ?? null,
@@ -321,12 +314,15 @@ export function ReplacementStudio({
   const [mask, setMask] = useState<string | null>(null);
   const [maskEpoch, setMaskEpoch] = useState(0);
 
-  const elementType = ELEMENT_TYPES[kind];
+  const elementType = kindElementTypes[kind];
   const candidates = elementType
     ? elements.filter((e) => e.type === elementType)
     : [];
   const kling = KLING_KINDS.includes(kind);
-  const element = candidates.find((e) => e.id === elementId) ?? null;
+  const element =
+    elementId === undefined
+      ? defaultElement(kind, candidates)
+      : (candidates.find((e) => e.id === elementId) ?? null);
   const state = element?.states.find((s) => s.id === stateId) ?? null;
   const references = element ? approvedReferences(element, state?.id) : [];
   const preserved = preserve[kind];
@@ -389,8 +385,21 @@ export function ReplacementStudio({
     preferences.unit,
   );
 
+  // The open-weights modes revise the start of the take; the area graph makes 81 frames.
+  const revisedSeconds =
+    kling || kind === "moment" || kind === "extend"
+      ? null
+      : kind === "area"
+        ? AREA_REVISION_SECONDS
+        : LTX_REVISION_SECONDS;
+  // Said once, in the line above, rather than again in the estimate's note.
+  const estimateNote =
+    estimate.note
+      ?.replace(/\s*Uses the first \d+ seconds of the take\./, "")
+      .trim() || null;
+
   const problems: string[] = [];
-  if (!source) problems.push("Choose a clip to revise.");
+  if (!source) problems.push("Choose a take to change.");
   // What is wrong with the clip itself comes before any other choice.
   problems.push(...sourceCheck.problems);
   if (alpha && !plate && !element)
@@ -451,7 +460,7 @@ export function ReplacementStudio({
   if (kind === "area" && !mask)
     problems.push("Paint over the area to fix on the frame.");
   if (kind === "moment" && direction.trim().length < 3)
-    problems.push("Describe what happens in the moment instead.");
+    problems.push("Describe what happens in the moment.");
   if (kind === "moment" && clipSeconds !== null && clipSeconds < 1.5)
     problems.push("Redoing a moment needs a take of at least 1.5 seconds.");
   if (
@@ -467,10 +476,26 @@ export function ReplacementStudio({
   function chooseKind(next: ReplacementKind) {
     if (next === kind) return;
     setKind(next);
-    setElementId(null);
-    setStateId(null);
+    // Cal stays chosen from Redo a moment to Recast; a Location from Restyle to Replace background.
+    if (kindElementTypes[next] !== elementType) {
+      setElementId(undefined);
+      setStateId(null);
+    }
     setPendingKey(null);
     setError("");
+  }
+  /** A mention of the mode's Element type in the words chooses that Element. */
+  function writeDirection(next: string) {
+    setDirection(next);
+    setPendingKey(null);
+    const named = resolveMentions(next, candidates)
+      .filter((m) => m.element)
+      .at(-1);
+    if (!named?.element) return;
+    const nextState = named.state?.id ?? null;
+    if (named.element.id === element?.id && nextState === stateId) return;
+    setElementId(named.element.id);
+    setStateId(nextState);
   }
   function chooseSource(item: MediaItem) {
     setSourceKey(assetRefKey(item.ref));
@@ -583,7 +608,7 @@ export function ReplacementStudio({
         : wardrobe === "describe"
           ? `wearing ${wardrobeNote.trim()}`
           : "in their own look";
-    return `Replace ${who} with ${mention}, ${dress}, preserving their performance and everything else in the shot.`;
+    return `Replace ${who} with ${mention ?? "a Character"}, ${dress}, preserving their performance and everything else in the shot.`;
   }
 
   /** The four take edits; null for the other kinds. */
@@ -1092,7 +1117,7 @@ export function ReplacementStudio({
             kind={kind}
             loading={elementsStatus === "loading"}
             candidates={candidates}
-            elementId={elementId}
+            elementId={element?.id ?? null}
             stateId={stateId}
             onChoose={(id, nextState) => {
               setElementId(id);
@@ -1256,7 +1281,7 @@ export function ReplacementStudio({
                 ? `${VFX_EFFECTS[effect].ask} (optional)`
                 : kind === "background"
                   ? element
-                    ? "Direction (optional)"
+                    ? "Anything else about the setting (optional)"
                     : "Describe the new setting"
                   : kind === "restyle"
                     ? element || styleImage
@@ -1272,18 +1297,21 @@ export function ReplacementStudio({
                             ? "What happens next (optional)"
                             : kind === "reframe"
                               ? "What is around the shot (optional)"
-                              : "Direction (optional)"}
+                              : kind === "object"
+                                ? "How it sits in the shot (optional)"
+                                : "How they play it (optional)"}
             </label>
-            <Textarea
+            <MentionTextarea
               id="revision-direction"
               value={direction}
-              onChange={(event) => {
-                setDirection(event.target.value);
-                setPendingKey(null);
-              }}
+              onValueChange={writeDirection}
+              types={elementType ? [elementType] : []}
               maxLength={1500}
               rows={3}
-              className="mt-2 text-sm leading-6"
+              aria-describedby={
+                elementType ? "revision-direction-mention" : undefined
+              }
+              className="mt-2 rounded-md px-3 py-2 text-sm leading-6"
               placeholder={
                 kind === "background"
                   ? "Harbor at dusk, sodium lights coming on, light rain"
@@ -1306,6 +1334,15 @@ export function ReplacementStudio({
                                   : "Slightly older, the same quiet intensity"
               }
             />
+            {elementType && (
+              <p
+                id="revision-direction-mention"
+                className="mt-1.5 text-xs leading-5 text-muted-foreground"
+              >
+                Or type @ to name a {elementTypes[elementType].label} in your
+                words.
+              </p>
+            )}
           </div>
         )}
 
@@ -1398,7 +1435,7 @@ export function ReplacementStudio({
                         : kind === "camera"
                           ? "Where the camera stands"
                           : kind === "area"
-                            ? "Only what you painted, in the first 3 seconds"
+                            ? "Only what you painted"
                             : kind === "moment"
                               ? range
                                 ? `Only ${formatTimecode(range.start)} to ${formatTimecode(range.end)}, blended in at both ends`
@@ -1441,19 +1478,17 @@ export function ReplacementStudio({
               {estimate.time} · {estimate.basis.toLowerCase()}
             </dd>
           </dl>
-          {estimate.note && (
+          {estimateNote && (
             <p className="mt-2 text-xs leading-5 text-muted-foreground">
-              {estimate.note}
+              {estimateNote}
             </p>
           )}
-          {!kling &&
-            kind !== "moment" &&
-            kind !== "extend" &&
+          {revisedSeconds !== null &&
             clipSeconds !== null &&
-            clipSeconds > LTX_REVISION_SECONDS + 0.2 && (
+            clipSeconds > revisedSeconds + 0.2 && (
               <p className="mt-2 text-xs leading-5 text-foreground">
-                Only the first {LTX_REVISION_SECONDS} seconds are revised, so
-                the result is {LTX_REVISION_SECONDS} seconds long.
+                Only the first {revisedSeconds} seconds are revised, so the
+                result is {revisedSeconds} seconds long.
               </p>
             )}
           {kind === "restyle" && (
@@ -1471,14 +1506,13 @@ export function ReplacementStudio({
           {kind === "area" && (
             <p className="mt-2 text-xs leading-5 text-muted-foreground">
               {areaAdds
-                ? "Wan 2.1 VACE draws what you asked for in the area. It takes several minutes, and only the first 3 seconds are kept."
-                : "LTX 2.3 clears what is under the paint and rebuilds what was behind it, in under a minute. Only the first 3 seconds are kept. Describe something to put there instead."}
+                ? "Wan 2.1 VACE draws what you asked for in the area. It takes several minutes."
+                : "LTX 2.3 clears what is under the paint and rebuilds what was behind it, in under a minute. Describe something to put there instead."}
             </p>
           )}
           {kind === "extend" && (
             <p className="mt-2 text-xs leading-5 text-muted-foreground">
-              {EXTEND_PIPELINES[extendPipeline].description} The new seconds are
-              silent; the take keeps its sound.
+              The new seconds are silent; the take keeps its sound.
             </p>
           )}
           {kind === "reframe" && (
@@ -1587,10 +1621,10 @@ function SourceStage({
             aria-hidden="true"
             className="mx-auto size-6 text-subtle-foreground"
           />
-          <p className="mt-3 text-sm font-medium">Choose a clip to revise</p>
+          <p className="mt-3 text-sm font-medium">Choose a take</p>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            Upload footage or pick a generated shot below. The original is never
-            changed.
+            Upload footage or pick one of your clips below. The original is
+            never changed.
           </p>
         </div>
       </div>
@@ -2135,8 +2169,12 @@ function ElementChoice({
       ) : candidates.length === 0 ? (
         <p className="mt-2 text-xs leading-5 text-muted-foreground">
           No {noun}s yet.{" "}
-          <Link to="/elements/new" className="text-foreground">
-            Create a {noun}
+          <Link
+            to="/elements/new"
+            search={{ type: kindElementTypes[kind] ?? "character" }}
+            className="text-foreground"
+          >
+            Make a {noun}
           </Link>{" "}
           {kind === "background"
             ? "to reuse a place across shots, or describe the setting below."

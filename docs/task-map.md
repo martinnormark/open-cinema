@@ -44,5 +44,6 @@ These are goals creators ask for that we cannot do well enough to promise. Each 
 - A goal is one line of title and one sentence of result. Take goals use the revision studio's mode names so the two screens read alike.
 - The first action is a take (drop, choose a file, or one of your clips) or an Element. Nothing else on the page competes with it.
 - A goal that needs an Element shows the creator's own; with none, it offers to make one.
+- Where the Element is the change (Replace background, Recast, Swap an object), the creator's only ready Element of that type is chosen for them on the front page and in the revision studio; with several, they pick. Typing `@Name` in the studio's words chooses that Element too, and switching between modes that take the same type keeps it.
 - `apps/web/test/start-goals.test.ts` fails if a revision mode has no goal, so a new mode cannot ship without a way in.
 - The sidebar holds Start, Studio, Elements, Sequences and Library (decided 2026-10-18). Activity opens from the Orb, Recipes from Studio, and Projects from Sequences.

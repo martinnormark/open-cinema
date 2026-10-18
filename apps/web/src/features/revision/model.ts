@@ -2,6 +2,7 @@ import { z } from "zod";
 import { formatCost, type CostUnit } from "@/features/settings/preferences";
 import { preflightSchema } from "./shot-checks";
 import {
+  approvedReferences,
   backgroundPipelineSchema,
   extendPipelineSchema,
   KLING_EDIT_LIMITS,
@@ -11,6 +12,8 @@ import {
   preservedAspectSchema,
   resultOutputs,
   type AssetRef,
+  type Element,
+  type ElementType,
   type GenerationEstimate,
   type GenerationRequest,
   type Job,
@@ -117,6 +120,40 @@ export const replacementKinds = {
     changes: string;
   }
 >;
+
+/** The Element type a mode takes, if any; the front page and the studio agree. */
+export const kindElementTypes = {
+  background: "location",
+  character: "character",
+  object: "thing",
+  restyle: "location",
+  camera: null,
+  effect: null,
+  // A Thing as the area's reference came back empty; Swap an object takes Things.
+  area: null,
+  // Optional: who walks in, or who the moment is about.
+  moment: "character",
+  extend: "character",
+  reframe: null,
+} as const satisfies Record<ReplacementKind, ElementType | null>;
+
+/**
+ * Modes whose Element is the change itself. With exactly one ready Element of
+ * the type, it is chosen for the creator; with several, they pick.
+ */
+const ELEMENT_LED: readonly ReplacementKind[] = [
+  "background",
+  "character",
+  "object",
+];
+export function defaultElement(
+  kind: ReplacementKind,
+  candidates: readonly Element[],
+): Element | null {
+  if (!ELEMENT_LED.includes(kind)) return null;
+  const ready = candidates.filter((e) => approvedReferences(e).length > 0);
+  return ready.length === 1 ? ready[0]! : null;
+}
 
 /** How each result variant reads to a creator choosing between them. */
 export const variantLabels: Record<

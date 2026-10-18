@@ -17,6 +17,7 @@ import {
   type MentionToken,
   type AssetRef,
   type ElementMention,
+  type ElementType,
 } from "@open-cinema/contracts";
 import {
   assetUrl,
@@ -296,14 +297,21 @@ export function MentionTextarea({
   onKeyDown,
   onBlur,
   focusAtEnd = false,
+  types,
   ...props
 }: TextareaProps & {
   value: string;
   onValueChange: (value: string) => void;
   /** Focus with the caret after the text, to keep writing after a mention. */
   focusAtEnd?: boolean;
+  /** Only these Element types are suggested; every type when left out. */
+  types?: readonly ElementType[];
 }) {
-  const { elements } = useElements();
+  const { elements: all } = useElements();
+  const elements = useMemo(
+    () => (types ? all.filter((e) => types.includes(e.type)) : all),
+    [all, types?.join()],
+  );
   const listId = useId();
   const textarea = useRef<HTMLTextAreaElement | null>(null);
   // Stable, so it runs when the textarea mounts, not on every keystroke.

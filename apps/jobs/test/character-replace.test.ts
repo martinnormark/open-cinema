@@ -213,3 +213,17 @@ it("refuses a recast with no way to identify the person", async () => {
     ),
   ).rejects.toThrow("Describe or point at the person to recast");
 });
+
+it("reads a mention in the creator's direction as the Character's name", async () => {
+  const definition = getWorkflowDefinition("video.character-replace")!;
+  const request = await definition.build(
+    characterReplaceInputsSchema.parse({
+      ...base,
+      prompt: "@Mara looks up slowly before she speaks",
+    }),
+    context(),
+  );
+  const prompt = String((request.input as Record<string, unknown>).prompt);
+  expect(prompt).toContain("Mara looks up slowly before she speaks");
+  expect(prompt).not.toContain("@Mara");
+});

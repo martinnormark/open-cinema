@@ -6,6 +6,7 @@ import {
   type ResolvedMention,
   type TargetSelection,
 } from "@open-cinema/contracts";
+import { expandMentions } from "./results";
 import type { BuildContext, MediaStage, ProviderRequest } from "./types";
 
 /**
@@ -210,7 +211,10 @@ export async function characterReplaceRequest(
         guide: referenceGuide(
           refs.map((ref, i) => ({ tag: imageTags[i]!, view: ref.view })),
         ),
-        direction: inputs.prompt,
+        // "@Cal looks up slower" reads as the Character's name to Kling.
+        direction: inputs.prompt
+          ? expandMentions(inputs.prompt, context.mentions)
+          : undefined,
       }),
       mode: "pro",
       video_list: [

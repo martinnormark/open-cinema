@@ -41,6 +41,7 @@ import { ElementCover } from "@/features/elements/visuals";
 import { mentionOf } from "@/features/elements/next-step";
 import { elementTypes, type Element } from "@/features/elements/model";
 import { openInStudio } from "@/features/generation/draft";
+import { defaultElement } from "@/features/revision/model";
 import {
   goals,
   type Goal,
@@ -261,8 +262,13 @@ function TakeStage({ goal }: { goal: TakeGoal }) {
   const candidates = goal.element
     ? elements.filter((e) => e.type === goal.element)
     : [];
-  const [chosen, setChosen] = useState<string | null>(null);
-  const element = candidates.find((e) => e.id === chosen) ?? null;
+  // Per goal, so clearing the Location for Restyle leaves Replace background's.
+  const [chosen, setChosen] = useState<Record<string, string | null>>({});
+  const pick = chosen[goal.id];
+  const element =
+    pick === undefined
+      ? defaultElement(goal.kind, candidates)
+      : (candidates.find((e) => e.id === pick) ?? null);
   const [uploading, setUploading] = useState<string | null>(null);
   const [error, setError] = useState("");
   const input = useRef<HTMLInputElement>(null);
@@ -367,7 +373,8 @@ function TakeStage({ goal }: { goal: TakeGoal }) {
           type={goal.element}
           elements={candidates}
           chosen={element}
-          onChoose={(e) => setChosen(e?.id ?? null)}
+          required={goal.kind === "character" || goal.kind === "object"}
+          onChoose={(e) => setChosen({ ...chosen, [goal.id]: e?.id ?? null })}
         />
       )}
 
@@ -408,18 +415,20 @@ function ElementPick({
   type,
   elements,
   chosen,
+  required,
   onChoose,
 }: {
   type: ElementType;
   elements: Element[];
   chosen: Element | null;
+  required: boolean;
   onChoose: (element: Element | null) => void;
 }) {
   const info = elementTypes[type];
   if (!elements.length)
     return (
       <p className="text-sm leading-6 text-muted-foreground">
-        Works best with a {info.label} of your own.{" "}
+        {required ? "Needs" : "Works best with"} a {info.label} of your own.{" "}
         <Link to="/elements/new" search={{ type }}>
           Make a {info.label}
         </Link>
