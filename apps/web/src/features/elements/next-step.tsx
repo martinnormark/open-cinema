@@ -38,7 +38,7 @@ export function useInStudio(element: Element, state: ElementState | null) {
       overrides: {},
       shot: {},
     });
-    void navigate({ to: "/" });
+    void navigate({ to: "/studio" });
   };
 }
 

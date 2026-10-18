@@ -42,7 +42,7 @@ export const Route = createRootRoute({
         title="This page is off the reel"
         actions={
           <Button asChild>
-            <Link to="/">Back to Studio</Link>
+            <Link to="/">Back to the start</Link>
           </Button>
         }
       >

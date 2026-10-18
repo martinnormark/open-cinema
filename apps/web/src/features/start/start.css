@@ -1,0 +1,84 @@
+/* Front page: goals on the left, the place the take lands on the right. */
+
+.start-goal {
+  transition: background-color var(--duration-quick) var(--ease-smooth-out);
+}
+.start-goal:hover {
+  background-color: color-mix(in oklab, var(--surface) 60%, transparent);
+}
+.start-goal[data-checked] {
+  background-color: var(--surface);
+}
+
+/* The drop frame answers the drag: the hairline warms and the arrow lifts. */
+.start-drop {
+  background-color: color-mix(in oklab, var(--surface) 60%, transparent);
+  outline: 1px dashed transparent;
+  outline-offset: -1px;
+  transition:
+    background-color var(--duration-quick) var(--ease-smooth-out),
+    outline-color var(--duration-quick) var(--ease-smooth-out);
+}
+.start-drop[data-active] {
+  background-color: var(--surface);
+  outline-color: color-mix(in oklab, var(--tungsten) 70%, transparent);
+}
+.start-drop-icon {
+  transition:
+    transform var(--duration-fast) var(--ease-smooth-out),
+    color var(--duration-quick) var(--ease-smooth-out);
+}
+.start-drop[data-active] .start-drop-icon {
+  transform: translateY(-4px);
+  color: var(--tungsten);
+}
+
+.start-chip {
+  border-color: var(--border);
+  transition:
+    border-color var(--duration-quick) var(--ease-smooth-out),
+    background-color var(--duration-quick) var(--ease-smooth-out);
+}
+.start-chip:hover {
+  background-color: var(--surface);
+}
+.start-chip[data-checked] {
+  border-color: color-mix(in oklab, var(--tungsten) 70%, transparent);
+  background-color: var(--surface);
+}
+
+.start-clip {
+  transition: opacity var(--duration-quick) var(--ease-smooth-out);
+}
+.group:hover .start-clip {
+  opacity: 0.8;
+}
+
+/* Text swap when the goal changes: the words settle in place, nothing slides
+   across the page. Opacity, a 4px rise and a 2px blur on small text only. */
+.start-swap {
+  animation: start-swap var(--duration-fast) var(--ease-smooth-out);
+}
+@keyframes start-swap {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+    filter: blur(2px);
+  }
+}
+
+.start-pending {
+  animation: start-pending 1.6s ease-in-out infinite;
+}
+@keyframes start-pending {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .start-swap,
+  .start-pending {
+    animation: none;
+  }
+}

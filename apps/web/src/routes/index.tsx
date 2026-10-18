@@ -1,19 +1,24 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
-import { PromptStudio } from "@/features/generation/prompt-studio";
-import { getStudioIntroduction } from "@/server/studio";
+import { StartPage } from "@/features/start/start-page";
+import { goalById, goalIds } from "@/features/start/goals";
 export const Route = createFileRoute("/")({
-  validateSearch: z.object({ project: z.string().max(100).optional() }),
-  loader: () => getStudioIntroduction(),
-  component: Studio,
+  validateSearch: z.object({ goal: z.enum(goalIds).optional() }),
+  component: Start,
 });
-function Studio() {
-  const { project } = Route.useSearch();
+function Start() {
+  const { goal } = Route.useSearch();
+  const navigate = Route.useNavigate();
   return (
-    <PromptStudio
-      key={project ?? "studio"}
-      introduction={Route.useLoaderData()}
-      {...(project ? { projectId: project } : {})}
+    <StartPage
+      goal={goalById(goal)}
+      onGoal={(id) =>
+        void navigate({
+          search: { goal: id },
+          replace: true,
+          resetScroll: false,
+        })
+      }
     />
   );
 }

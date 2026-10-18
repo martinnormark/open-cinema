@@ -738,7 +738,7 @@ function UseRecipe({ view }: { view: RecipeView }) {
               // "No project" must not leave the shot filed under, and lit by,
               // whichever project the studio last had open.
               setCurrentProject(project?.id ?? null);
-              void navigate({ to: "/" });
+              void navigate({ to: "/studio" });
             }}
           >
             Open in studio

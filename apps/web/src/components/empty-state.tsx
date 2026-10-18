@@ -56,7 +56,7 @@ const marks = [
   "bottom-0 right-0 border-b border-r",
 ];
 
-function CropMarks() {
+export function CropMarks() {
   return (
     <>
       {marks.map((position) => (

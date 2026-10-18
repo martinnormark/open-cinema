@@ -140,7 +140,7 @@ export function ProjectShots({
         <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
           Images and videos you make with this project chosen in the studio land
           here, carrying its look.{" "}
-          <Link to="/" search={{ project: project.id }}>
+          <Link to="/studio" search={{ project: project.id }}>
             Make the first shot
           </Link>
           .

@@ -156,12 +156,14 @@ const ELEMENT_TYPES = {
 export function ReplacementStudio({
   initialSource,
   initialKind = "background",
+  initialElementId,
   projectId,
   parentRevisionId,
   draft,
 }: {
   initialSource?: AssetRef | null;
   initialKind?: ReplacementKind | undefined;
+  initialElementId?: string | undefined;
   projectId?: string | undefined;
   parentRevisionId?: string | undefined;
   /** A failed revision's choices, for "Try again". Read once, at mount. */
@@ -186,7 +188,7 @@ export function ReplacementStudio({
       : (videos.find((v) => assetRefKey(v.ref) === sourceKey) ?? null);
   const [kind, setKind] = useState<ReplacementKind>(draft?.kind ?? initialKind);
   const [elementId, setElementId] = useState<string | null>(
-    draft?.element?.id ?? null,
+    draft?.element?.id ?? initialElementId ?? null,
   );
   const [stateId, setStateId] = useState<string | null>(
     draft?.draft?.stateId ?? null,

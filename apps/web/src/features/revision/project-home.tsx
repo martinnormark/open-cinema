@@ -76,7 +76,7 @@ export function ProjectHome({
             </Link>
           </Button>
           <Button asChild>
-            <Link to="/" search={{ project: project.id }}>
+            <Link to="/studio" search={{ project: project.id }}>
               <Clapperboard aria-hidden="true" /> Make a shot
             </Link>
           </Button>

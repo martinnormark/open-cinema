@@ -20,6 +20,8 @@ export const Route = createFileRoute("/revisions/new")({
       ])
       .optional(),
     project: z.string().max(100).optional(),
+    /** An Element chosen on the front page for this mode. */
+    element: z.string().max(100).optional(),
     parent: z.string().max(100).optional(),
     /** A failed revision whose choices "Try again" starts from. */
     retry: z.string().max(100).optional(),
@@ -67,9 +69,10 @@ function NewRevision() {
       />
       <div className="mt-8">
         <ReplacementStudio
-          key={`${search.source ?? ""}-${search.kind ?? ""}-${search.retry ?? ""}`}
+          key={`${search.source ?? ""}-${search.kind ?? ""}-${search.element ?? ""}-${search.retry ?? ""}`}
           initialSource={search.source ? parseAssetRefKey(search.source) : null}
           initialKind={search.kind}
+          initialElementId={search.element}
           projectId={project?.id}
           parentRevisionId={search.parent}
           draft={draft}

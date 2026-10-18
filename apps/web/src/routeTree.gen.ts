@@ -17,6 +17,7 @@ import { Route as ProjectsRouteImport } from './routes/projects'
 import { Route as RecipesRouteImport } from './routes/recipes'
 import { Route as SequencesRouteImport } from './routes/sequences'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as StudioRouteImport } from './routes/studio'
 import { Route as WorldRouteImport } from './routes/world'
 import { Route as ApiHealthRouteImport } from './routes/api.health'
 import { Route as ElementsIndexRouteImport } from './routes/elements.index'
@@ -75,6 +76,11 @@ const SequencesRoute = SequencesRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudioRoute = StudioRouteImport.update({
+  id: '/studio',
+  path: '/studio',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WorldRoute = WorldRouteImport.update({
@@ -182,6 +188,7 @@ export interface FileRoutesByFullPath {
   '/recipes': typeof RecipesRouteWithChildren
   '/sequences': typeof SequencesRouteWithChildren
   '/settings': typeof SettingsRoute
+  '/studio': typeof StudioRoute
   '/world': typeof WorldRoute
   '/api/health': typeof ApiHealthRoute
   '/elements/$elementId': typeof ElementsElementIdRoute
@@ -207,6 +214,7 @@ export interface FileRoutesByTo {
   '/activity': typeof ActivityRoute
   '/library': typeof LibraryRoute
   '/settings': typeof SettingsRoute
+  '/studio': typeof StudioRoute
   '/world': typeof WorldRoute
   '/api/health': typeof ApiHealthRoute
   '/elements/$elementId': typeof ElementsElementIdRoute
@@ -237,6 +245,7 @@ export interface FileRoutesById {
   '/recipes': typeof RecipesRouteWithChildren
   '/sequences': typeof SequencesRouteWithChildren
   '/settings': typeof SettingsRoute
+  '/studio': typeof StudioRoute
   '/world': typeof WorldRoute
   '/api/health': typeof ApiHealthRoute
   '/elements/$elementId': typeof ElementsElementIdRoute
@@ -268,6 +277,7 @@ export interface FileRouteTypes {
     | '/recipes'
     | '/sequences'
     | '/settings'
+    | '/studio'
     | '/world'
     | '/api/health'
     | '/elements/$elementId'
@@ -293,6 +303,7 @@ export interface FileRouteTypes {
     | '/activity'
     | '/library'
     | '/settings'
+    | '/studio'
     | '/world'
     | '/api/health'
     | '/elements/$elementId'
@@ -322,6 +333,7 @@ export interface FileRouteTypes {
     | '/recipes'
     | '/sequences'
     | '/settings'
+    | '/studio'
     | '/world'
     | '/api/health'
     | '/elements/$elementId'
@@ -352,6 +364,7 @@ export interface RootRouteChildren {
   RecipesRoute: typeof RecipesRouteWithChildren
   SequencesRoute: typeof SequencesRouteWithChildren
   SettingsRoute: typeof SettingsRoute
+  StudioRoute: typeof StudioRoute
   WorldRoute: typeof WorldRoute
   ApiHealthRoute: typeof ApiHealthRoute
   RevisionsRevisionIdRoute: typeof RevisionsRevisionIdRoute
@@ -419,6 +432,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/studio': {
+      id: '/studio'
+      path: '/studio'
+      fullPath: '/studio'
+      preLoaderRoute: typeof StudioRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/world': {
@@ -625,6 +645,7 @@ const rootRouteChildren: RootRouteChildren = {
   RecipesRoute: RecipesRouteWithChildren,
   SequencesRoute: SequencesRouteWithChildren,
   SettingsRoute: SettingsRoute,
+  StudioRoute: StudioRoute,
   WorldRoute: WorldRoute,
   ApiHealthRoute: ApiHealthRoute,
   RevisionsRevisionIdRoute: RevisionsRevisionIdRoute,

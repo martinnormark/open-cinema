@@ -32,7 +32,7 @@ function Activity() {
           className="mt-8"
           actions={
             <Button asChild>
-              <Link to="/">Start in Studio</Link>
+              <Link to="/studio">Start in Studio</Link>
             </Button>
           }
         >
