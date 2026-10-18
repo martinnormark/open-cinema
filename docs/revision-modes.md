@@ -8,6 +8,7 @@ Four revision and generation modes run as open-weights FLUX and LTX graphs on Co
 | Swap an object      | Revise a shot                 | `video.object-swap`       | FLUX 3 Klein keyframe → LTX 2.3 union IC-LoRA → SAM 3 composite                 |
 | Restyle             | Revise a shot                 | `video.restyle`           | FLUX 3 Klein keyframe → LTX 2.3 union IC-LoRA                                   |
 | Re-stage the camera | Revise a shot                 | `video.restage`           | MoGe-2 geometry → per-frame re-projection → LTX 2.3 In-Outpainting IC-LoRA fill |
+| Add an effect       | Revise a shot                 | `video.vfx`               | LTX 2.3 with a Lightricks V2V IC-LoRA on the take ([vfx-ltx.md](vfx-ltx.md))    |
 
 Graph builders are pure functions in `packages/comfy/src/workflows/`: `ltx-graph.ts` (shared loaders, sampler and save nodes), `ltx-camera.ts` (camera moves), `ltx-restage.ts` (re-staging) and `ltx-edit.ts` (swap and restyle). `revision-modes.ts` turns typed inputs into a `CloudWorkflowRequest`. Each graph keeps the take's frame count, frame rate and audio, and trims the source to at most 97 frames (about 4 s at 24 fps) at up to 768 px on the long side.
 
