@@ -10,6 +10,7 @@
  *   bun scripts/ltx-graph.ts <server> <out-dir> recast source=<clip> ref=<img>[,<img>] [sheet=<img>] box=x,y,w,h \
  *     target="the woman on the left" name=Mara identity="..." wardrobe="..." action="..." [pose=0.9]
  *   bun scripts/ltx-graph.ts <server> <out-dir> performance source=<clip> prompt="..." [keyframe=<img>] [control=edges|edges-detailed] [strength=0.9]
+ *   bun scripts/ltx-graph.ts <server> <out-dir> vfx source=<clip> effect=water|night|clean-plate [prompt="..."] [keep="the couple"] [frames=121] [side=960]
  *
  * Add submit-only=1 to stop once the server has accepted the graph (a check
  * against a local ComfyUI with placeholder model files).
@@ -34,10 +35,12 @@ import {
   ltxRecastGraph,
   ltxRecastPrompts,
 } from "../packages/comfy/src/workflows/ltx-recast";
+import { ltxVfxGraph } from "../packages/comfy/src/workflows/ltx-vfx";
 import type {
   CameraMove,
   RestageAngle,
 } from "../packages/contracts/src/camera";
+import type { VfxEffect } from "../packages/contracts/src/vfx";
 
 const [server, outDir, kind, ...rest] = process.argv.slice(2);
 if (!server || !outDir || !kind) {
@@ -152,6 +155,25 @@ if (kind === "camera") {
   });
   files.push(["source", "file", args.source!]);
   if (args.keyframe) files.push(["keyframe", "image", args.keyframe]);
+} else if (kind === "vfx") {
+  graph = ltxVfxGraph({
+    effect: (args.effect ?? "water") as VfxEffect,
+    direction: args.prompt ?? "",
+    keep: args.keep,
+    seed,
+    strength: args.strength ? Number(args.strength) : undefined,
+    schedule: args.steps
+      ? { steps: Number(args.steps), cfg: Number(args.cfg ?? 3.5) }
+      : undefined,
+    limits:
+      args.frames || args.side
+        ? {
+            maxFrames: Number(args.frames ?? 121),
+            maxSide: Number(args.side ?? 960),
+          }
+        : undefined,
+  });
+  files.push(["source", "file", args.source!]);
 } else throw new Error(`unknown graph ${kind}`);
 
 for (const [node, field, path] of files) {

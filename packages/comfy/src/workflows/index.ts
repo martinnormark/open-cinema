@@ -12,6 +12,7 @@ import {
   objectSwapWorkflow,
   restageWorkflow,
   restyleWorkflow,
+  vfxWorkflow,
 } from "./revision-modes";
 import type { WorkflowDefinition, WorkflowStage } from "./types";
 
@@ -95,6 +96,7 @@ export {
   restageWorkflow,
   restyleWorkflow,
   thingReferences,
+  vfxWorkflow,
 } from "./revision-modes";
 export { ltxEditGraph, ltxEditPrompts, LTX_EDIT_LIMITS } from "./ltx-edit";
 export {
@@ -105,6 +107,7 @@ export {
 } from "./ltx-recast";
 export { ltxCameraGraph } from "./ltx-camera";
 export { ltxRestageGraph, LTX_RESTAGE_LIMITS } from "./ltx-restage";
+export { ltxVfxGraph, ltxVfxPrompts, LTX_VFX_LIMITS } from "./ltx-vfx";
 
 type Registry = { [K in WorkflowKind]?: WorkflowDefinition<K> };
 
@@ -124,6 +127,7 @@ const registry: Registry = {
   "video.object-swap": objectSwapWorkflow,
   "video.restyle": restyleWorkflow,
   "video.restage": restageWorkflow,
+  "video.vfx": vfxWorkflow,
 };
 
 export function getWorkflowDefinition<K extends WorkflowKind>(

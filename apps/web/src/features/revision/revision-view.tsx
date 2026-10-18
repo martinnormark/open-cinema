@@ -58,6 +58,7 @@ const GENERATING: Record<ReplacementKind, string> = {
   object: "Swapping the object…",
   restyle: "Restyling the shot…",
   camera: "Re-staging the camera…",
+  effect: "Adding the effect…",
 };
 
 /** What the chosen Element is to this kind of revision. */
@@ -67,6 +68,7 @@ const ELEMENT_ROLE: Record<ReplacementKind, string> = {
   object: "Swapped in",
   restyle: "Style",
   camera: "Element",
+  effect: "Element",
 };
 
 const kindOf = (revision: Pick<Revision, "workflowKind">): ReplacementKind =>

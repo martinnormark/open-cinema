@@ -10,7 +10,14 @@ export const Route = createFileRoute("/revisions/new")({
   validateSearch: z.object({
     source: z.string().max(400).optional(),
     kind: z
-      .enum(["background", "character", "object", "restyle", "camera"])
+      .enum([
+        "background",
+        "character",
+        "object",
+        "restyle",
+        "camera",
+        "effect",
+      ])
       .optional(),
     project: z.string().max(100).optional(),
     parent: z.string().max(100).optional(),

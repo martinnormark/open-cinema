@@ -12,5 +12,6 @@ export const workflowKindSchema = z.enum([
   "video.object-swap",
   "video.restyle",
   "video.restage",
+  "video.vfx",
 ]);
 export type WorkflowKind = z.infer<typeof workflowKindSchema>;

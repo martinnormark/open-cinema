@@ -5,6 +5,7 @@ import {
   backgroundPipelineSchema,
   KLING_EDIT_LIMITS,
   restageAngleSchema,
+  vfxEffectSchema,
   preservedAspectSchema,
   resultOutputs,
   type AssetRef,
@@ -19,7 +20,7 @@ import {
 
 /** Browser-safe vocabulary for the revision studio. */
 export type ReplacementKind =
-  "background" | "character" | "object" | "restyle" | "camera";
+  "background" | "character" | "object" | "restyle" | "camera" | "effect";
 
 export const replacementKinds = {
   background: {
@@ -57,6 +58,13 @@ export const replacementKinds = {
     label: "Re-stage the camera",
     verb: "Re-stage this shot",
     changes: "The same take from a camera a step away.",
+  },
+  effect: {
+    kind: "effect",
+    workflowKind: "video.vfx",
+    label: "Add an effect",
+    verb: "Add an effect",
+    changes: "Rain or a flood, day for night, or a cleared set, on LTX.",
   },
 } as const satisfies Record<
   ReplacementKind,
@@ -131,7 +139,14 @@ export type WardrobeIntent = keyof typeof wardrobeIntents;
  * result. Elements live in the browser for now, so names travel with the ids.
  */
 export const revisionDecisionsSchema = z.object({
-  kind: z.enum(["background", "character", "object", "restyle", "camera"]),
+  kind: z.enum([
+    "background",
+    "character",
+    "object",
+    "restyle",
+    "camera",
+    "effect",
+  ]),
   sourceTitle: z.string().max(300),
   element: z
     .object({
@@ -172,6 +187,9 @@ export const revisionDecisionsSchema = z.object({
       original: z.string().max(200).nullable().optional(),
       /** Restyle: `assetRefKey` of an explicit style reference image. */
       styleImage: z.string().max(400).nullable().optional(),
+      /** Effects: which one, and who stays when the set is cleared. */
+      effect: vfxEffectSchema.nullable().optional(),
+      keep: z.string().max(200).nullable().optional(),
     })
     .optional(),
 });
@@ -201,6 +219,8 @@ export function revisionKindOf(
       return "restyle";
     case "video.restage":
       return "camera";
+    case "video.vfx":
+      return "effect";
     default:
       return "background";
   }
@@ -322,7 +342,7 @@ export function formatEstimate(estimate: GenerationEstimate, unit: CostUnit) {
  * after the run is queued, so the studio refuses first and says why.
  */
 /**
- * The open-weights revisions (Object Swap, Restyle, re-staging) run on the
+ * The open-weights revisions (Object Swap, Restyle, re-staging, effects) run on the
  * first 97 frames of a take, about four seconds at 24 or 25 fps.
  */
 export const LTX_REVISION_SECONDS = 4;

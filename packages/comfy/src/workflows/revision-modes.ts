@@ -24,6 +24,7 @@ import {
   ltxEditGraph,
   ltxEditPrompts,
 } from "./ltx-edit";
+import { LTX_VFX_MODEL_ID, LTX_VFX_OUTPUT_NODES, ltxVfxGraph } from "./ltx-vfx";
 import { mediaFilename, seedFrom } from "./ltx-alpha-background";
 import { expandMentions } from "./results";
 import type {
@@ -269,6 +270,30 @@ export const restageWorkflow: WorkflowDefinition<"video.restage"> = {
             "source",
           ),
         ],
+      },
+    };
+  },
+  outputs: noRouterOutputs,
+};
+
+export const vfxWorkflow: WorkflowDefinition<"video.vfx"> = {
+  kind: "video.vfx",
+  displayModel: "LTX 2.3 + Lightricks effect IC-LoRA",
+  deadlineMs: 45 * 60_000,
+  model: () => LTX_VFX_MODEL_ID,
+  provider: () => "cloud-workflow",
+  cloudOutputNodes: LTX_VFX_OUTPUT_NODES,
+  async build(inputs, context) {
+    return {
+      model: LTX_VFX_MODEL_ID,
+      input: {
+        graph: ltxVfxGraph({
+          effect: inputs.effect,
+          direction: expandMentions(inputs.prompt ?? "", context.mentions),
+          keep: inputs.keep,
+          seed: seedFrom(JSON.stringify(inputs)),
+        }),
+        media: [await sourceVideo(context, inputs.source)],
       },
     };
   },

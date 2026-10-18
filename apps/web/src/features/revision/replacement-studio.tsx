@@ -15,12 +15,14 @@ import {
   Ban,
   Package,
   Palette,
+  Sparkles,
   UserRound,
   Video,
 } from "lucide-react";
 import {
   DEFAULT_PRESERVATION,
   RESTAGE_ANGLES,
+  VFX_EFFECTS,
   approvedReferences,
   assetRefKey,
   type AssetRef,
@@ -28,6 +30,7 @@ import {
   type GenerationRequestInput,
   type PreservedAspect,
   type RestageAngle,
+  type VfxEffect,
 } from "@open-cinema/contracts";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -93,6 +96,8 @@ const LOCKED: Record<ReplacementKind, readonly PreservedAspect[]> = {
   // Restyle and re-staging follow the take's depth or the take itself.
   restyle: ["performance", "camera", "framing"],
   camera: ["performance", "timing"],
+  // The take is the effect's reference, frame for frame.
+  effect: ["performance", "timing", "camera", "framing"],
 };
 const OFFERED: Record<ReplacementKind, readonly PreservedAspect[]> = {
   background: [
@@ -126,6 +131,7 @@ const OFFERED: Record<ReplacementKind, readonly PreservedAspect[]> = {
   ],
   restyle: ["performance", "camera", "framing", "timing", "audio"],
   camera: ["performance", "timing", "audio"],
+  effect: ["performance", "timing", "camera", "framing", "audio"],
 };
 
 /** What runs where, so the composer reads the right limits. */
@@ -136,6 +142,7 @@ const KIND_ICONS = {
   object: Package,
   restyle: Palette,
   camera: Video,
+  effect: Sparkles,
 } as const;
 const ELEMENT_TYPES = {
   background: "location",
@@ -143,6 +150,7 @@ const ELEMENT_TYPES = {
   object: "thing",
   restyle: "location",
   camera: null,
+  effect: null,
 } as const;
 
 export function ReplacementStudio({
@@ -220,10 +228,19 @@ export function ReplacementStudio({
         ? draft.preserve
         : DEFAULT_PRESERVATION.restage.preserve,
     ),
+    effect: new Set(
+      draft?.kind === "effect"
+        ? draft.preserve
+        : DEFAULT_PRESERVATION.vfx.preserve,
+    ),
   }));
   const [angle, setAngle] = useState<RestageAngle>(
     draft?.draft?.angle ?? "closer",
   );
+  const [effect, setEffect] = useState<VfxEffect>(
+    draft?.draft?.effect ?? "clean-plate",
+  );
+  const [keep, setKeep] = useState(draft?.draft?.keep ?? "");
   const [original, setOriginal] = useState(draft?.draft?.original ?? "");
   const [styleKey, setStyleKey] = useState<string | null>(
     draft?.draft?.styleImage ?? null,
@@ -355,6 +372,13 @@ export function ReplacementStudio({
     direction.trim().length < 3
   )
     problems.push("Choose a Location or style image, or describe the look.");
+  if (
+    kind === "effect" &&
+    effect === "clean-plate" &&
+    keep.trim().length > 0 &&
+    keep.trim().length < 3
+  )
+    problems.push("Name who stays in a few words, or leave it empty.");
 
   function chooseKind(next: ReplacementKind) {
     if (next === kind) return;
@@ -410,6 +434,16 @@ export function ReplacementStudio({
           ? `Restyle this shot: ${note}, keeping the action and camera.`
           : "Restyle this shot, keeping the action and camera.";
       return `Restyle this shot in the look of ${look.join(" and ")}, keeping the action and camera.${after}`;
+    }
+    if (kind === "effect") {
+      const words = note || VFX_EFFECTS[effect].fallback;
+      if (effect === "water")
+        return `Add water to this take: ${words}, keeping the performance and camera.`;
+      if (effect === "night")
+        return `Turn this take to night, lit by ${words}, keeping the performance and camera.`;
+      const who = keep.trim().replace(/[.\s]+$/, "");
+      const lower = words.replace(/^(The|A|An) /, (a) => a.toLowerCase());
+      return `Clear ${lower} from this take${who ? `, keeping ${who.replace(/^(The|A|An) /, (a) => a.toLowerCase())} exactly as shot` : ""}, and rebuild what was behind them.`;
     }
     if (kind === "camera")
       return `Re-stage this take from a new angle: ${RESTAGE_ANGLES[angle].label.toLowerCase()}, keeping the performance and timing.${after}`;
@@ -504,73 +538,88 @@ export function ReplacementStudio({
                   preservation,
                 },
               }
-            : kind === "camera"
+            : kind === "effect"
               ? {
-                  workflowKind: "video.restage",
+                  workflowKind: "video.vfx",
                   inputs: {
                     source: source.ref,
-                    angle,
+                    effect,
                     ...(direction.trim().length >= 3
                       ? { prompt: direction.trim() }
+                      : {}),
+                    ...(effect === "clean-plate" && keep.trim().length >= 3
+                      ? { keep: keep.trim() }
                       : {}),
                     preservation,
                   },
                 }
-              : kind === "background"
+              : kind === "camera"
                 ? {
-                    workflowKind: "video.background-replace",
+                    workflowKind: "video.restage",
                     inputs: {
                       source: source.ref,
-                      ...(mention ? { location: mention } : {}),
-                      ...(alpha && plate ? { background: plate.ref } : {}),
-                      ...(!alpha && direction.trim().length >= 3
+                      angle,
+                      ...(direction.trim().length >= 3
                         ? { prompt: direction.trim() }
                         : {}),
-                      target: { type: "background" },
                       preservation,
-                      pipeline,
                     },
                   }
-                : {
-                    workflowKind: "video.character-replace",
-                    inputs: {
-                      source: source.ref,
-                      character: mention!,
-                      references: [],
-                      target: {
-                        type: "person",
-                        ...(target
-                          ? {
-                              point: {
-                                x: target.x,
-                                y: target.y,
-                                timeMs: target.timeMs,
-                              },
-                            }
+                : kind === "background"
+                  ? {
+                      workflowKind: "video.background-replace",
+                      inputs: {
+                        source: source.ref,
+                        ...(mention ? { location: mention } : {}),
+                        ...(alpha && plate ? { background: plate.ref } : {}),
+                        ...(!alpha && direction.trim().length >= 3
+                          ? { prompt: direction.trim() }
                           : {}),
-                        ...(targetNote.trim()
-                          ? { description: targetNote.trim() }
+                        target: { type: "background" },
+                        preservation,
+                        pipeline,
+                      },
+                    }
+                  : {
+                      workflowKind: "video.character-replace",
+                      inputs: {
+                        source: source.ref,
+                        character: mention!,
+                        references: [],
+                        target: {
+                          type: "person",
+                          ...(target
+                            ? {
+                                point: {
+                                  x: target.x,
+                                  y: target.y,
+                                  timeMs: target.timeMs,
+                                },
+                              }
+                            : {}),
+                          ...(targetNote.trim()
+                            ? { description: targetNote.trim() }
+                            : {}),
+                        },
+                        ...(recastPrompt.length >= 3
+                          ? { prompt: recastPrompt }
                           : {}),
+                        preservation: {
+                          ...preservation,
+                          preserve:
+                            wardrobe === "keep"
+                              ? [
+                                  ...new Set([
+                                    ...preservation.preserve,
+                                    "wardrobe" as const,
+                                  ]),
+                                ]
+                              : preservation.preserve.filter(
+                                  (a) => a !== "wardrobe",
+                                ),
+                        },
                       },
-                      ...(recastPrompt.length >= 3
-                        ? { prompt: recastPrompt }
-                        : {}),
-                      preservation: {
-                        ...preservation,
-                        preserve:
-                          wardrobe === "keep"
-                            ? [
-                                ...new Set([
-                                  ...preservation.preserve,
-                                  "wardrobe" as const,
-                                ]),
-                              ]
-                            : preservation.preserve.filter(
-                                (a) => a !== "wardrobe",
-                              ),
-                      },
-                    },
-                  };
+                    };
       const decisions: RevisionDecisions = {
         kind,
         sourceTitle: source.title.slice(0, 300),
@@ -597,18 +646,20 @@ export function ReplacementStudio({
                 .slice(0, 300)
             : kind === "restyle"
               ? "The whole look"
-              : kind === "camera"
-                ? `New angle: ${RESTAGE_ANGLES[angle].label}`
-                : kind === "character"
-                  ? [
-                      targetNote.trim(),
-                      target
-                        ? `marked at ${formatTimecode(target.timeMs / 1000)}`
-                        : "",
-                    ]
-                      .filter(Boolean)
-                      .join(", ")
-                  : "Background",
+              : kind === "effect"
+                ? `Effect: ${VFX_EFFECTS[effect].label}`
+                : kind === "camera"
+                  ? `New angle: ${RESTAGE_ANGLES[angle].label}`
+                  : kind === "character"
+                    ? [
+                        targetNote.trim(),
+                        target
+                          ? `marked at ${formatTimecode(target.timeMs / 1000)}`
+                          : "",
+                      ]
+                        .filter(Boolean)
+                        .join(", ")
+                    : "Background",
         wardrobe: kind === "character" ? wardrobe : null,
         wardrobeNote: kind === "character" ? wardrobeNote.trim() : "",
         preserve:
@@ -631,6 +682,11 @@ export function ReplacementStudio({
           angle: kind === "camera" ? angle : null,
           original: kind === "object" ? original.trim().slice(0, 200) : null,
           styleImage: kind === "restyle" ? styleKey : null,
+          effect: kind === "effect" ? effect : null,
+          keep:
+            kind === "effect" && effect === "clean-plate"
+              ? keep.trim().slice(0, 200)
+              : null,
         },
       };
       const result = await submitRevision({
@@ -710,8 +766,6 @@ export function ReplacementStudio({
                   key={option}
                   className={cn(
                     "flex cursor-pointer flex-col gap-1.5 rounded-xl border p-3 transition-colors has-focus-visible:ring-2 has-focus-visible:ring-ring",
-                    // Five choices: the last one spans the row.
-                    option === "camera" && "col-span-2",
                     kind === option
                       ? "border-tungsten/70 bg-surface"
                       : "border-border hover:bg-surface",
@@ -767,7 +821,15 @@ export function ReplacementStudio({
           </fieldset>
         )}
 
-        {kind === "camera" ? (
+        {kind === "effect" ? (
+          <EffectChoice
+            effect={effect}
+            onEffect={(next) => {
+              setEffect(next);
+              setPendingKey(null);
+            }}
+          />
+        ) : kind === "camera" ? (
           <AngleChoice
             angle={angle}
             onAngle={(next) => {
@@ -915,20 +977,45 @@ export function ReplacementStudio({
           </fieldset>
         )}
 
+        {kind === "effect" && effect === "clean-plate" && (
+          <div className="revision-reveal">
+            <label htmlFor="effect-keep" className="text-sm font-medium">
+              Who stays (optional)
+            </label>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              They are found in every frame and kept exactly as shot; everyone
+              else is cleared.
+            </p>
+            <input
+              id="effect-keep"
+              value={keep}
+              onChange={(event) => {
+                setKeep(event.target.value);
+                setPendingKey(null);
+              }}
+              maxLength={200}
+              placeholder="The couple holding hands"
+              className="mt-2 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          </div>
+        )}
+
         {!alpha && (
           <div>
             <label htmlFor="revision-direction" className="text-sm font-medium">
-              {kind === "background"
-                ? element
-                  ? "Direction (optional)"
-                  : "Describe the new setting"
-                : kind === "restyle"
-                  ? element || styleImage
-                    ? "Describe the look (optional)"
-                    : "Describe the look"
-                  : kind === "camera"
-                    ? "What is in the shot (optional)"
-                    : "Direction (optional)"}
+              {kind === "effect"
+                ? `${VFX_EFFECTS[effect].ask} (optional)`
+                : kind === "background"
+                  ? element
+                    ? "Direction (optional)"
+                    : "Describe the new setting"
+                  : kind === "restyle"
+                    ? element || styleImage
+                      ? "Describe the look (optional)"
+                      : "Describe the look"
+                    : kind === "camera"
+                      ? "What is in the shot (optional)"
+                      : "Direction (optional)"}
             </label>
             <Textarea
               id="revision-direction"
@@ -943,13 +1030,15 @@ export function ReplacementStudio({
               placeholder={
                 kind === "background"
                   ? "Harbor at dusk, sodium lights coming on, light rain"
-                  : kind === "object"
-                    ? "Lit, with a soft flicker on the table"
-                    : kind === "restyle"
-                      ? "Hand-painted gouache, warm dusk palette, visible brush texture"
-                      : kind === "camera"
-                        ? "Two people talking across a kitchen table at night"
-                        : "Slightly older, the same quiet intensity"
+                  : kind === "effect"
+                    ? VFX_EFFECTS[effect].placeholder
+                    : kind === "object"
+                      ? "Lit, with a soft flicker on the table"
+                      : kind === "restyle"
+                        ? "Hand-painted gouache, warm dusk palette, visible brush texture"
+                        : kind === "camera"
+                          ? "Two people talking across a kitchen table at night"
+                          : "Slightly older, the same quiet intensity"
               }
             />
           </div>
@@ -1031,11 +1120,19 @@ export function ReplacementStudio({
                   ? "Only the setting behind the people and Things"
                   : kind === "object"
                     ? "Only the object, and the light it casts nearby"
-                    : kind === "restyle"
-                      ? "The look of every frame, people included"
-                      : kind === "camera"
-                        ? "Where the camera stands"
-                        : "Only the marked person"}
+                    : kind === "effect"
+                      ? effect === "clean-plate"
+                        ? keep.trim()
+                          ? "Everyone else, and what was behind them"
+                          : "People and passing traffic, and what was behind them"
+                        : effect === "night"
+                          ? "The light of every frame, people included"
+                          : "Water on every surface, people included"
+                      : kind === "restyle"
+                        ? "The look of every frame, people included"
+                        : kind === "camera"
+                          ? "Where the camera stands"
+                          : "Only the marked person"}
             </dd>
             <dt className="text-muted-foreground">Keeps</dt>
             <dd>
@@ -1087,6 +1184,11 @@ export function ReplacementStudio({
               People are restyled too. Their faces follow the new look and can
               drift from the actors’ likeness; the check after the run says
               where.
+            </p>
+          )}
+          {kind === "effect" && (
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">
+              {VFX_EFFECTS[effect].note}
             </p>
           )}
           {kind === "camera" && (
@@ -1817,6 +1919,48 @@ function AngleChoice({
             <span className="text-sm">{RESTAGE_ANGLES[option].label}</span>
             <span className="text-xs leading-5 text-muted-foreground">
               {RESTAGE_ANGLES[option].description}
+            </span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+function EffectChoice({
+  effect,
+  onEffect,
+}: {
+  effect: VfxEffect;
+  onEffect: (effect: VfxEffect) => void;
+}) {
+  return (
+    <fieldset>
+      <legend className="text-sm font-medium">Effect</legend>
+      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+        LTX reads the take frame by frame, so the action and camera stay.
+      </p>
+      <div className="mt-2 flex flex-col gap-1.5">
+        {(Object.keys(VFX_EFFECTS) as VfxEffect[]).map((option) => (
+          <label
+            key={option}
+            className={cn(
+              "flex cursor-pointer flex-col rounded-lg border px-2.5 py-2 transition-colors has-focus-visible:ring-2 has-focus-visible:ring-ring",
+              effect === option
+                ? "border-tungsten/70 bg-surface"
+                : "border-border hover:bg-surface",
+            )}
+          >
+            <input
+              type="radio"
+              name="vfx-effect"
+              className="sr-only"
+              checked={effect === option}
+              onChange={() => onEffect(option)}
+            />
+            <span className="text-sm">{VFX_EFFECTS[option].label}</span>
+            <span className="text-xs leading-5 text-muted-foreground">
+              {VFX_EFFECTS[option].description}
             </span>
           </label>
         ))}

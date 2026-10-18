@@ -111,6 +111,10 @@ export const DEFAULT_PRESERVATION = {
     preserve: ["performance", "timing", "audio"],
     allowIntegration: true,
   },
+  vfx: {
+    preserve: ["performance", "timing", "camera", "framing", "audio"],
+    allowIntegration: true,
+  },
 } as const satisfies Record<string, PreservationIntent>;
 
 export const revisionStatusSchema = z.enum([

@@ -21,6 +21,7 @@ export function estimateReplacement(
   if (kind === "object") return cloudEstimate("swap");
   if (kind === "restyle") return cloudEstimate("restyle");
   if (kind === "camera") return cloudEstimate("restage");
+  if (kind === "effect") return cloudEstimate("vfx");
   if (kind === "background" && pipeline === "ltx-alpha")
     return {
       ...cloudEstimate("alpha"),

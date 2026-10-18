@@ -498,6 +498,90 @@
     ]
   },
   {
+    "file": "vfx/water.api.json",
+    "title": "Effect: Add water",
+    "usedBy": "video.vfx (comfy-cloud/ltx-2.3-vfx)",
+    "inputs": [
+      {
+        "node": "source",
+        "field": "file",
+        "file": "source.mp4"
+      }
+    ],
+    "outputs": [
+      "save_result"
+    ],
+    "models": [
+      "gemma_3_12B_it_fp4_mixed.safetensors",
+      "ltx-2.3-22b-dev-fp8.safetensors",
+      "ltx-2.3-22b-distilled-lora-384-1.1.safetensors",
+      "ltx-2.3-22b-ic-lora-water-simulation-0.9.safetensors"
+    ]
+  },
+  {
+    "file": "vfx/night.api.json",
+    "title": "Effect: Day for night",
+    "usedBy": "video.vfx (comfy-cloud/ltx-2.3-vfx)",
+    "inputs": [
+      {
+        "node": "source",
+        "field": "file",
+        "file": "source.mp4"
+      }
+    ],
+    "outputs": [
+      "save_result"
+    ],
+    "models": [
+      "gemma_3_12B_it_fp4_mixed.safetensors",
+      "ltx-2.3-22b-dev-fp8.safetensors",
+      "ltx-2.3-22b-ic-lora-day-to-night-0.9.safetensors"
+    ]
+  },
+  {
+    "file": "vfx/clean-plate.api.json",
+    "title": "Effect: Clear the set",
+    "usedBy": "video.vfx (comfy-cloud/ltx-2.3-vfx)",
+    "inputs": [
+      {
+        "node": "source",
+        "field": "file",
+        "file": "source.mp4"
+      }
+    ],
+    "outputs": [
+      "save_result"
+    ],
+    "models": [
+      "gemma_3_12B_it_fp4_mixed.safetensors",
+      "ltx-2.3-22b-dev-fp8.safetensors",
+      "ltx-2.3-22b-distilled-lora-384-1.1.safetensors",
+      "ltx-2.3-22b-ic-lora-clean-plate-1.0.safetensors"
+    ]
+  },
+  {
+    "file": "vfx/clean-plate-keep.api.json",
+    "title": "Effect: Clear the set, keeping someone",
+    "usedBy": "video.vfx (comfy-cloud/ltx-2.3-vfx)",
+    "inputs": [
+      {
+        "node": "source",
+        "field": "file",
+        "file": "source.mp4"
+      }
+    ],
+    "outputs": [
+      "save_result"
+    ],
+    "models": [
+      "gemma_3_12B_it_fp4_mixed.safetensors",
+      "ltx-2.3-22b-dev-fp8.safetensors",
+      "ltx-2.3-22b-distilled-lora-384-1.1.safetensors",
+      "ltx-2.3-22b-ic-lora-clean-plate-1.0.safetensors",
+      "sam3.1_multiplex_fp16.safetensors"
+    ]
+  },
+  {
     "file": "performance/edges.api.json",
     "title": "Performance transfer, soft edge control",
     "usedBy": "video.performance-transfer (comfy-cloud/ltx-2.3-union-edges)",

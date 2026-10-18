@@ -151,6 +151,13 @@ export interface LtxSamplerOptions {
   firstFrame?: { image: Link; strength: number } | undefined;
   /** An IC-LoRA guide clip, aligned with the output from frame 0. */
   guide?: { image: Link; strength: number } | undefined;
+  /** Defaults to `euler_ancestral`. */
+  sampler?: string;
+  /**
+   * A full schedule with guidance, for a dev checkpoint without the distilled
+   * LoRA. Defaults to the distilled eight steps at CFG 1.
+   */
+  schedule?: { steps: number; cfg: number } | undefined;
 }
 
 /**
@@ -276,16 +283,28 @@ export function ltxSamplerNodes(o: LtxSamplerOptions) {
     [n("noise")]: { class_type: "RandomNoise", inputs: { noise_seed: o.seed } },
     [n("guider")]: {
       class_type: "CFGGuider",
-      inputs: { model, positive, negative, cfg: 1 },
+      inputs: { model, positive, negative, cfg: o.schedule?.cfg ?? 1 },
     },
     [n("sampler")]: {
       class_type: "KSamplerSelect",
-      inputs: { sampler_name: "euler_ancestral" },
+      inputs: { sampler_name: o.sampler ?? "euler_ancestral" },
     },
-    [n("sigmas")]: {
-      class_type: "ManualSigmas",
-      inputs: { sigmas: LTX_DISTILLED_SIGMAS },
-    },
+    [n("sigmas")]: o.schedule
+      ? {
+          class_type: "LTXVScheduler",
+          inputs: {
+            steps: o.schedule.steps,
+            max_shift: 2.05,
+            base_shift: 0.95,
+            stretch: true,
+            terminal: 0.1,
+            latent: [n("av"), 0],
+          },
+        }
+      : {
+          class_type: "ManualSigmas",
+          inputs: { sigmas: LTX_DISTILLED_SIGMAS },
+        },
     [n("sample")]: {
       class_type: "SamplerCustomAdvanced",
       inputs: {

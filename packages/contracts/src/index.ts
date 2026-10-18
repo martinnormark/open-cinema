@@ -206,3 +206,4 @@ export * from "./direction";
 export * from "./capabilities";
 export * from "./recipes";
 export * from "./camera";
+export * from "./vfx";

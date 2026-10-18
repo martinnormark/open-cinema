@@ -6,6 +6,7 @@ import {
   referenceViewSchema,
 } from "./elements";
 import { cameraMoveSchema, restageAngleSchema } from "./camera";
+import { vfxEffectSchema } from "./vfx";
 import { assetRefSchema, type AssetRef } from "./media";
 import { directionSnapshotSchema } from "./direction";
 import { preservationIntentSchema, targetSelectionSchema } from "./replacement";
@@ -212,6 +213,17 @@ export const restageInputsSchema = z.object({
 });
 export type RestageInputs = z.infer<typeof restageInputsSchema>;
 
+export const vfxInputsSchema = z.object({
+  source: assetRefSchema,
+  effect: vfxEffectSchema,
+  /** The water, the night, or what to clear, in the creator's words. */
+  prompt: prompt.optional(),
+  /** Clear the set only: who stays in the shot, as a short noun phrase. */
+  keep: objectPhrase.optional(),
+  preservation: preservationIntentSchema,
+});
+export type VfxInputs = z.infer<typeof vfxInputsSchema>;
+
 export const workflowInputsSchemas = {
   "image.flux": fluxImageInputsSchema,
   "image.flux-reference": fluxReferenceInputsSchema,
@@ -223,6 +235,7 @@ export const workflowInputsSchemas = {
   "video.object-swap": objectSwapInputsSchema,
   "video.restyle": restyleInputsSchema,
   "video.restage": restageInputsSchema,
+  "video.vfx": vfxInputsSchema,
 } as const satisfies Record<WorkflowKind, z.ZodType>;
 
 export type WorkflowInputs<K extends WorkflowKind = WorkflowKind> = z.infer<
@@ -270,6 +283,10 @@ export const generationRequestSchema = z.discriminatedUnion("workflowKind", [
   z.object({
     workflowKind: z.literal("video.restage"),
     inputs: restageInputsSchema,
+  }),
+  z.object({
+    workflowKind: z.literal("video.vfx"),
+    inputs: vfxInputsSchema,
   }),
 ]);
 export type GenerationRequest = z.infer<typeof generationRequestSchema>;
@@ -323,6 +340,7 @@ export function requestAssetRefs(request: GenerationRequest): AssetRef[] {
       ];
     case "video.object-swap":
     case "video.restage":
+    case "video.vfx":
       return [request.inputs.source];
     case "video.restyle":
       return [
@@ -363,6 +381,7 @@ export function requestMentions(request: GenerationRequest) {
     case "video.restyle":
       return request.inputs.style ? [request.inputs.style] : [];
     case "video.restage":
+    case "video.vfx":
       return [];
     default:
       return request.inputs.mentions;
@@ -460,6 +479,12 @@ export const WORKFLOW_DESCRIPTORS = {
     label: "Re-stage the camera",
     output: "video",
     models: ["comfy-cloud/ltx-2.3-restage"],
+  },
+  "video.vfx": {
+    kind: "video.vfx",
+    label: "Add an effect",
+    output: "video",
+    models: ["comfy-cloud/ltx-2.3-vfx"],
   },
 } as const satisfies Record<WorkflowKind, WorkflowDescriptor>;
 

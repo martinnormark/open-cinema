@@ -4,6 +4,7 @@ import {
   objectSwapInputsSchema,
   restageInputsSchema,
   restyleInputsSchema,
+  vfxInputsSchema,
   type ResolvedMention,
 } from "@open-cinema/contracts";
 import {
@@ -192,6 +193,46 @@ it("re-stages a take by re-projecting every frame and filling with Lightricks' o
   expect(ofType(request, "RenderMesh")).toHaveLength(97);
   const [camera] = ofType(request, "CreateCameraInfo");
   expect(camera!.inputs["mode.position_x"]).toBeLessThan(0);
+});
+
+it("adds an effect with the take as the IC-LoRA reference, keeping someone only when clearing the set", async () => {
+  const definition = getWorkflowDefinition("video.vfx")!;
+  const build = async (inputs: unknown) =>
+    (await definition.build(
+      vfxInputsSchema.parse(inputs),
+      context,
+    )) as CloudWorkflowRequest;
+  const clean = await build({
+    source,
+    effect: "clean-plate",
+    prompt: "the people walking behind them",
+    keep: "the couple holding hands",
+    preservation: { preserve: ["performance"] },
+  });
+  expectWired(clean, definition.cloudOutputNodes!);
+  const loras = (request: CloudWorkflowRequest) =>
+    ofType(request, "LoraLoaderModelOnly").map((n) =>
+      String(n.inputs.lora_name),
+    );
+  expect(loras(clean).at(-1)).toBe(
+    "ltx-2.3-22b-ic-lora-clean-plate-1.0.safetensors",
+  );
+  const [guide] = ofType(clean, "LTXVAddGuide");
+  expect(guide!.inputs.frame_idx).toBe(0);
+  expect(ofType(clean, "SAM3_VideoTrack")).toHaveLength(1);
+
+  const water = await build({
+    source,
+    effect: "water",
+    keep: "the couple holding hands",
+    preservation: { preserve: ["performance"] },
+  });
+  expect(loras(water).at(-1)).toMatch(/water-simulation/);
+  expect(ofType(water, "SAM3_VideoTrack")).toHaveLength(0);
+  const [prompt] = ofType(water, "CLIPTextEncode").filter((n) =>
+    String(n.inputs.text).includes("ADD WATER"),
+  );
+  expect(prompt).toBeDefined();
 });
 
 it("runs a camera move on Cloud and leaves free-camera LTX on Router", async () => {

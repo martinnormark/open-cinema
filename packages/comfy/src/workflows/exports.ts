@@ -1,8 +1,10 @@
 import {
   CAMERA_MOVES,
   RESTAGE_ANGLES,
+  VFX_EFFECTS,
   type CameraMove,
   type RestageAngle,
+  type VfxEffect,
 } from "@open-cinema/contracts";
 import {
   LTX_ALPHA_MEDIA_INPUTS,
@@ -44,6 +46,12 @@ import {
   LTX_RESTAGE_OUTPUT_NODES,
   ltxRestageGraph,
 } from "./ltx-restage";
+import {
+  LTX_VFX_MEDIA_INPUTS,
+  LTX_VFX_MODEL_ID,
+  LTX_VFX_OUTPUT_NODES,
+  ltxVfxGraph,
+} from "./ltx-vfx";
 import {
   MEDIA_GRAPH_INPUTS,
   MEDIA_GRAPH_OUTPUT,
@@ -240,6 +248,22 @@ function restage(angle: RestageAngle): WorkflowExport {
   };
 }
 
+function vfx(effect: VfxEffect, keep?: string): WorkflowExport {
+  const graph = ltxVfxGraph({
+    effect,
+    direction: VFX_EFFECTS[effect].placeholder,
+    keep,
+    seed: SEED,
+  });
+  return {
+    file: `vfx/${effect}${keep ? "-keep" : ""}.api.json`,
+    title: `Effect: ${VFX_EFFECTS[effect].label}${keep ? ", keeping someone" : ""}`,
+    usedBy: `video.vfx (${LTX_VFX_MODEL_ID})`,
+    ...withFiles(graph, [[LTX_VFX_MEDIA_INPUTS.source, "source.mp4"]]),
+    outputs: LTX_VFX_OUTPUT_NODES,
+  };
+}
+
 function performance(control: PerformanceControl): WorkflowExport {
   const graph = ltxPerformanceGraph({
     prompt:
@@ -306,6 +330,8 @@ export function workflowExports(): WorkflowExport[] {
     edit("swap"),
     edit("restyle"),
     ...(Object.keys(RESTAGE_ANGLES) as RestageAngle[]).map(restage),
+    ...(Object.keys(VFX_EFFECTS) as VfxEffect[]).map((e) => vfx(e)),
+    vfx("clean-plate", "the couple in front"),
     performance("edges"),
     performance("edges-detailed"),
     recast(),
