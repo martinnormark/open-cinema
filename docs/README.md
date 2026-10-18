@@ -32,6 +32,7 @@ Primary entry points: [developer documentation](https://docs.comfy.org/developme
 - [Elements: the default path](elements.md): the anchor-first next step shared by Characters, Locations and Things, the defaults the app decides, Thing turnarounds, and which references a mention sends.
 - [Character sheets](character-sheets.md): the three-panel sheet, close portraits with and without a smile, states as sheets of their own, and how heads are removed from the full-body panels.
 - [Character recast on LTX 2.5](recast-ltx.md): an all-Lightricks open-weights recast graph, its live comparison with Kling, and the proposal for our own recast IC-LoRA.
+- [Character recast on MiniMax H3](recast-minimax-h3.md): H3 Reference to Video as a recast engine for the MiniMax H3 prize, measured against Kling on the two real takes.
 - [Camera moves, Object Swap, Restyle and re-staging](revision-modes.md): the FLUX and LTX graphs on Comfy Cloud, their guardrails, check runs and limits.
 - [Third-party IP](third-party-ip.md): every model and LoRA the app uses, its provider and licence, and what the no-borrowed-IP rule removed.
 - [Re-stage IC-LoRA](restage-ic-lora.md): the plan for training our own re-staging adapter on LTX 2.3: data, trainer, compute and reach.

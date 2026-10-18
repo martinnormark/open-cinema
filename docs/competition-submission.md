@@ -18,7 +18,7 @@ Open Cinema is an open, Comfy-powered Cinema Studio: build a cast, a place and t
 | Built with FLUX             | Up to $1,000 in API credits | FLUX 3 (`bfl/flux-3-image`) is the core image model for Elements and stills. Mention it by name in the video.                                          |
 | Most Innovative (stretch)   | RTX 5090                    | Only if we can state the innovation crisply: Elements that carry identity and approved references into any workflow via `@` mentions, not prompt text. |
 
-Not targeted: **Open Weights Only** (we use partner models through Comfy Router) and **MiniMax H3**.
+Not targeted: **Open Weights Only** (we use partner models through Comfy Router) and **MiniMax H3**. A MiniMax H3 recast was tested on 2026-10-18 and is a credible entry for that prize; see [recast-minimax-h3.md](recast-minimax-h3.md).
 
 ## Demo video
 
