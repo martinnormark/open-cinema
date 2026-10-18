@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Clapperboard, Sparkles } from "lucide-react";
+import { Clapperboard, FolderOpen, Sparkles } from "lucide-react";
 import { lookPrompt } from "@open-cinema/contracts";
 import type { Project, SequenceSummary } from "@open-cinema/contracts";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,13 @@ export function SequencesIndex({
       <PageHeader
         title="Sequences"
         description="Turn an idea into shots that belong together. Each shot keeps your cast, place and look, and is approved on its own."
+        actions={
+          <Button asChild variant="outline">
+            <Link to="/projects">
+              <FolderOpen aria-hidden="true" /> Projects
+            </Link>
+          </Button>
+        }
       />
       <IdeaComposer projects={projects} initialProjectId={initialProjectId} />
       <section className="mt-14" aria-labelledby="sequences-title">

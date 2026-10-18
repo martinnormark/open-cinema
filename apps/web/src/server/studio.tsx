@@ -13,7 +13,8 @@ export const getStudioIntroduction = createServerFn({ method: "GET" }).handler(
           Make a first frame
         </h1>
         <p className="mt-3 max-w-2xl text-base leading-7 text-muted-foreground">
-          Describe a scene, explore a direction, and see what emerges.
+          Describe a scene, explore a direction, and see what emerges. Or start
+          from one of your <a href="/recipes">recipes</a>.
         </p>
       </div>,
     );

@@ -4,12 +4,9 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Clapperboard,
   House,
-  FolderOpen,
   Film,
   Shapes,
-  BookOpen,
   Images,
-  Activity,
   Settings2,
 } from "lucide-react";
 import {
@@ -29,13 +26,11 @@ import { BrandMark } from "@/components/brand-mark";
 
 const navigation = [
   { title: "Start", to: "/", icon: House },
-  { title: "Studio", to: "/studio", icon: Clapperboard },
+  // Pages folded out of the nav light up the item they now open from.
+  { title: "Studio", to: "/studio", icon: Clapperboard, also: "/recipes" },
   { title: "Elements", to: "/elements", icon: Shapes },
-  { title: "Sequences", to: "/sequences", icon: Film },
-  { title: "Projects", to: "/projects", icon: FolderOpen },
-  { title: "Recipes", to: "/recipes", icon: BookOpen },
+  { title: "Sequences", to: "/sequences", icon: Film, also: "/projects" },
   { title: "Library", to: "/library", icon: Images },
-  { title: "Activity", to: "/activity", icon: Activity },
 ] as const;
 
 export function AppSidebar() {
@@ -65,10 +60,14 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <nav aria-label="Main navigation">
               <SidebarMenu>
-                {navigation.map(({ title, to, icon: Icon }) => {
+                {navigation.map((item) => {
+                  const { title, to, icon: Icon } = item;
+                  const under = (path: string) =>
+                    pathname === path || pathname.startsWith(`${path}/`);
                   const active =
                     pathname === to ||
-                    (to !== "/" && pathname.startsWith(`${to}/`));
+                    (to !== "/" && under(to)) ||
+                    ("also" in item && under(item.also));
                   return (
                     <SidebarMenuItem key={to}>
                       <SidebarMenuButton

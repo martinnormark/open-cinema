@@ -8,7 +8,6 @@ import {
 import type { ReactNode } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { EmptyState } from "@/components/empty-state";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   SidebarInset,
@@ -81,9 +80,6 @@ function AppLayout() {
       <SidebarInset>
         <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-3 md:px-4">
           <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
-          <Badge variant="outline" className="ml-auto text-muted-foreground">
-            Early preview
-          </Badge>
         </header>
         <main id="main-content" tabIndex={-1} className="flex-1 outline-none">
           <Outlet />

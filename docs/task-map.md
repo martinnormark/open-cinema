@@ -43,3 +43,4 @@ These are goals creators ask for that we cannot do well enough to promise. Each 
 - The first action is a take (drop, choose a file, or one of your clips) or an Element. Nothing else on the page competes with it.
 - A goal that needs an Element shows the creator's own; with none, it offers to make one.
 - `apps/web/test/start-goals.test.ts` fails if a revision mode has no goal, so a new mode cannot ship without a way in.
+- The sidebar holds Start, Studio, Elements, Sequences and Library (decided 2026-10-18). Activity opens from the Orb, Recipes from Studio, and Projects from Sequences.
