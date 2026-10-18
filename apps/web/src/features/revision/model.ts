@@ -3,7 +3,9 @@ import { formatCost, type CostUnit } from "@/features/settings/preferences";
 import { preflightSchema } from "./shot-checks";
 import {
   backgroundPipelineSchema,
+  extendPipelineSchema,
   KLING_EDIT_LIMITS,
+  reframeAspectSchema,
   restageAngleSchema,
   vfxEffectSchema,
   preservedAspectSchema,
@@ -19,8 +21,19 @@ import {
 } from "@open-cinema/contracts";
 
 /** Browser-safe vocabulary for the revision studio. */
-export type ReplacementKind =
-  "background" | "character" | "object" | "restyle" | "camera" | "effect";
+export const replacementKindSchema = z.enum([
+  "background",
+  "character",
+  "object",
+  "area",
+  "moment",
+  "extend",
+  "reframe",
+  "restyle",
+  "camera",
+  "effect",
+]);
+export type ReplacementKind = z.infer<typeof replacementKindSchema>;
 
 export const replacementKinds = {
   background: {
@@ -44,6 +57,34 @@ export const replacementKinds = {
     label: "Swap an object",
     verb: "Swap this object",
     changes: "One object becomes a Thing from your library.",
+  },
+  area: {
+    kind: "area",
+    workflowKind: "video.area",
+    label: "Fix an area",
+    verb: "Fix this area",
+    changes: "Only what you paint over, rebuilt from the rest of the shot.",
+  },
+  moment: {
+    kind: "moment",
+    workflowKind: "video.moment",
+    label: "Redo a moment",
+    verb: "Redo this moment",
+    changes: "Up to three seconds, acted again; the take either side stays.",
+  },
+  extend: {
+    kind: "extend",
+    workflowKind: "video.extend",
+    label: "Make it longer",
+    verb: "Make this longer",
+    changes: "New seconds after the last frame, in the same shot.",
+  },
+  reframe: {
+    kind: "reframe",
+    workflowKind: "video.reframe",
+    label: "Reframe",
+    verb: "Reframe this shot",
+    changes: "The frame's shape, with the new edges drawn in.",
   },
   restyle: {
     kind: "restyle",
@@ -139,14 +180,7 @@ export type WardrobeIntent = keyof typeof wardrobeIntents;
  * result. Elements live in the browser for now, so names travel with the ids.
  */
 export const revisionDecisionsSchema = z.object({
-  kind: z.enum([
-    "background",
-    "character",
-    "object",
-    "restyle",
-    "camera",
-    "effect",
-  ]),
+  kind: replacementKindSchema,
   sourceTitle: z.string().max(300),
   element: z
     .object({
@@ -190,6 +224,16 @@ export const revisionDecisionsSchema = z.object({
       /** Effects: which one, and who stays when the set is cleared. */
       effect: vfxEffectSchema.nullable().optional(),
       keep: z.string().max(200).nullable().optional(),
+      /** Make it longer: which model, and how many seconds Seedance adds. */
+      extendPipeline: extendPipelineSchema.nullable().optional(),
+      extendSeconds: z.number().int().positive().nullable().optional(),
+      /** Redo a moment: the stretch, in seconds. */
+      range: z
+        .object({ start: z.number(), end: z.number() })
+        .nullable()
+        .optional(),
+      /** Reframe: the new shape. */
+      aspect: reframeAspectSchema.nullable().optional(),
     })
     .optional(),
 });
@@ -221,6 +265,14 @@ export function revisionKindOf(
       return "camera";
     case "video.vfx":
       return "effect";
+    case "video.extend":
+      return "extend";
+    case "video.area":
+      return "area";
+    case "video.moment":
+      return "moment";
+    case "video.reframe":
+      return "reframe";
     default:
       return "background";
   }

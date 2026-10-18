@@ -23,6 +23,8 @@ export interface TakeGoal extends GoalBase {
   keeps: string;
   /** Said up front when the workflow only holds inside a narrow envelope. */
   caution?: string;
+  /** Listed under "More ways to change a take", so the first list stays short. */
+  more?: true;
 }
 export interface WorldGoal extends GoalBase {
   source: "world";
@@ -63,6 +65,42 @@ export const goals = [
     keeps: "Keeps every pixel outside the object.",
   },
   {
+    id: "fix",
+    source: "take",
+    kind: "area",
+    title: replacementKinds.area.label,
+    promise: "Paint over something to remove it, or say what goes there.",
+    element: null,
+    keeps: "Keeps every pixel outside what you paint.",
+  },
+  {
+    id: "redo",
+    source: "take",
+    kind: "moment",
+    title: replacementKinds.moment.label,
+    promise: "A few seconds acted again; the take either side stays.",
+    element: "character",
+    keeps: "Keeps the take before and after the moment, and its sound.",
+  },
+  {
+    id: "longer",
+    source: "take",
+    kind: "extend",
+    title: replacementKinds.extend.label,
+    promise: "The shot carries on past its last frame, without a cut.",
+    element: "character",
+    keeps: "Keeps the whole take as shot; the new seconds follow it.",
+  },
+  {
+    id: "reframe",
+    source: "take",
+    kind: "reframe",
+    title: replacementKinds.reframe.label,
+    promise: "Vertical, square or wide, with the new edges drawn in.",
+    element: null,
+    keeps: "Keeps the take whole in the middle of the new frame.",
+  },
+  {
     id: "effect",
     source: "take",
     kind: "effect",
@@ -70,6 +108,7 @@ export const goals = [
     promise: "Rain or a flood, day for night, or a cleared set.",
     element: null,
     keeps: "Keeps the performance, the camera and the framing.",
+    more: true,
   },
   {
     id: "look",
@@ -79,6 +118,7 @@ export const goals = [
     promise: "The whole take repainted from a Location or a style image.",
     element: "location",
     keeps: "Keeps the performance and the camera. Faces restyle too.",
+    more: true,
   },
   {
     id: "camera",
@@ -88,6 +128,7 @@ export const goals = [
     promise: "The same take, filmed from a little closer or to one side.",
     element: null,
     keeps: "Keeps the performance and the timing.",
+    more: true,
   },
   {
     id: "shot",

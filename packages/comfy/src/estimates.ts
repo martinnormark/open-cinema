@@ -75,6 +75,27 @@ export const CLOUD_GRAPH_ESTIMATES = {
     seconds: [30, 900],
     note: "Runs LTX 2.3 with a Lightricks effect IC-LoRA on Comfy Cloud, billed by GPU time. Uses the first 4 seconds of the take.",
   },
+  area: {
+    seconds: [30, 900],
+    note: "Runs LTX 2.3 with Lightricks' In-Outpainting IC-LoRA on Comfy Cloud, billed by GPU time. Uses the first 3 seconds of the take.",
+  },
+  // Observed 2026-10-18: about 4.5 minutes of GPU for 81 frames at 832 × 480.
+  "area-add": {
+    seconds: [300, 1500],
+    note: "Runs Wan 2.1 VACE on Comfy Cloud, billed by GPU time: several minutes, longer than clearing an area. Uses the first 3 seconds of the take.",
+  },
+  moment: {
+    seconds: [30, 900],
+    note: "Runs LTX 2.3 on Comfy Cloud, billed by GPU time. Up to 3 seconds anywhere in the take are redone; the rest is the take itself.",
+  },
+  reframe: {
+    seconds: [45, 900],
+    note: "Runs LTX 2.3 with Lightricks' outpainting IC-LoRA on Comfy Cloud, billed by GPU time. Uses the first 4 seconds of the take.",
+  },
+  extend: {
+    seconds: [30, 900],
+    note: "Runs LTX 2.3 on Comfy Cloud, billed by GPU time. Adds about 3 seconds after the take.",
+  },
   restage: {
     seconds: [60, 1200],
     note: "Re-projects the take with MoGe-2 and fills the gaps with LTX 2.3 on Comfy Cloud, billed by GPU time. Uses the first 4 seconds of the take.",
@@ -145,6 +166,34 @@ export function seedanceRelocateEstimate(
       sourceSeconds === null
         ? `About ${rate} credits per second of source video (Seedance 2.5 at 720p).`
         : "Seedance 2.5 at 720p. Every frame is rebuilt, so it costs about five times Kling's background edit.",
+  };
+}
+
+/**
+ * Seedance 2.5 extend bills the same video tokens, counted over the take it
+ * reads and the seconds it adds: about 20,700 tokens per second of either on
+ * 2026-10-18 (237,600 tokens for a 7.6 s take plus 4 s), so about 94 credits
+ * per second of take plus new footage.
+ */
+const SEEDANCE_TOKEN_CREDITS_PER_SECOND = 94;
+
+export function seedanceExtendEstimate(
+  addedSeconds: number,
+  sourceSeconds: number | null,
+): GenerationEstimate {
+  const rate = SEEDANCE_TOKEN_CREDITS_PER_SECOND;
+  return {
+    credits:
+      sourceSeconds === null
+        ? null
+        : round(
+            rate * (sourceSeconds + addedSeconds) * 0.9,
+            rate * (sourceSeconds + addedSeconds) * 1.1,
+          ),
+    // Observed: 6 to 7 minutes on Router, plus the append step.
+    seconds: round(240, 1800),
+    basis: "observed",
+    note: `About ${rate} credits per second of the take plus each new second (Seedance 2.5 at 720p). A refused take is not charged.`,
   };
 }
 
@@ -250,5 +299,17 @@ export function estimateGeneration(
       return cloudEstimate("restage");
     case "video.vfx":
       return cloudEstimate("vfx");
+    case "video.extend":
+      return request.inputs.pipeline === "seedance"
+        ? seedanceExtendEstimate(request.inputs.seconds, null)
+        : cloudEstimate("extend");
+    case "video.area":
+      return cloudEstimate(
+        (request.inputs.prompt ?? "").trim().length >= 3 ? "area-add" : "area",
+      );
+    case "video.moment":
+      return cloudEstimate("moment");
+    case "video.reframe":
+      return cloudEstimate("reframe");
   }
 }

@@ -135,3 +135,22 @@
     animation: none;
   }
 }
+
+/* Reframe preview: the new frame's empty edges, which the model draws in. */
+.reframe-stage {
+  background:
+    repeating-linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--foreground), transparent 92%) 0 1px,
+      transparent 1px 9px
+    ),
+    var(--surface);
+}
+
+/* The moment's slider sits over its own band and track; only the thumb shows. */
+.moment-scrubber::-webkit-slider-runnable-track {
+  background: transparent;
+}
+.moment-scrubber::-moz-range-track {
+  background: transparent;
+}

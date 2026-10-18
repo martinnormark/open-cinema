@@ -2,8 +2,11 @@ import { useMemo, useRef, useState, type PointerEvent } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   ArrowRight,
+  Brush,
   Check,
   Crosshair,
+  Expand,
+  FastForward,
   Film,
   ImageOff,
   Lock,
@@ -15,20 +18,27 @@ import {
   Ban,
   Package,
   Palette,
+  RotateCcw,
   Sparkles,
   UserRound,
   Video,
 } from "lucide-react";
 import {
   DEFAULT_PRESERVATION,
+  EXTEND_PIPELINES,
+  EXTEND_SECONDS,
+  MOMENT_LIMITS,
+  REFRAME_ASPECTS,
   RESTAGE_ANGLES,
   VFX_EFFECTS,
   approvedReferences,
   assetRefKey,
   type AssetRef,
   type BackgroundPipelineChoice,
+  type ExtendPipeline,
   type GenerationRequestInput,
   type PreservedAspect,
+  type ReframeAspect,
   type RestageAngle,
   type VfxEffect,
 } from "@open-cinema/contracts";
@@ -98,6 +108,14 @@ const LOCKED: Record<ReplacementKind, readonly PreservedAspect[]> = {
   camera: ["performance", "timing"],
   // The take is the effect's reference, frame for frame.
   effect: ["performance", "timing", "camera", "framing"],
+  // Only the painted pixels are redrawn; every frame keeps its place.
+  area: ["timing", "camera", "framing"],
+  // The take either side of the moment is spliced back untouched.
+  moment: ["framing", "audio"],
+  // The take itself plays first, as shot.
+  extend: ["performance", "timing", "camera", "framing", "audio"],
+  // The take sits whole inside the new frame.
+  reframe: ["performance", "timing", "camera"],
 };
 const OFFERED: Record<ReplacementKind, readonly PreservedAspect[]> = {
   background: [
@@ -132,18 +150,40 @@ const OFFERED: Record<ReplacementKind, readonly PreservedAspect[]> = {
   restyle: ["performance", "camera", "framing", "timing", "audio"],
   camera: ["performance", "timing", "audio"],
   effect: ["performance", "timing", "camera", "framing", "audio"],
+  area: ["timing", "camera", "framing", "audio"],
+  moment: ["framing", "audio"],
+  extend: ["performance", "timing", "camera", "framing", "audio"],
+  reframe: ["performance", "timing", "camera", "audio"],
+};
+/** The shared defaults where a kind has them; the take edits keep all they offer. */
+const DEFAULT_KEPT: Record<ReplacementKind, readonly PreservedAspect[]> = {
+  background: DEFAULT_PRESERVATION.background.preserve,
+  character: DEFAULT_PRESERVATION.character.preserve,
+  object: DEFAULT_PRESERVATION.object.preserve,
+  restyle: DEFAULT_PRESERVATION.restyle.preserve,
+  camera: DEFAULT_PRESERVATION.restage.preserve,
+  effect: DEFAULT_PRESERVATION.vfx.preserve,
+  area: OFFERED.area,
+  moment: OFFERED.moment,
+  extend: OFFERED.extend,
+  reframe: OFFERED.reframe,
 };
 
 /** What runs where, so the composer reads the right limits. */
 const KLING_KINDS: readonly ReplacementKind[] = ["background", "character"];
+/** In the order the composer lists them: swaps, then take edits, then looks. */
 const KIND_ICONS = {
   background: Mountain,
   character: UserRound,
   object: Package,
+  area: Brush,
+  moment: RotateCcw,
+  extend: FastForward,
+  reframe: Expand,
   restyle: Palette,
   camera: Video,
   effect: Sparkles,
-} as const;
+} as const satisfies Record<ReplacementKind, unknown>;
 const ELEMENT_TYPES = {
   background: "location",
   character: "character",
@@ -151,7 +191,15 @@ const ELEMENT_TYPES = {
   restyle: "location",
   camera: null,
   effect: null,
-} as const;
+  // A Thing as the area's reference came back empty; Swap an object takes Things.
+  area: null,
+  // Optional: who walks in, or who the moment is about.
+  moment: "character",
+  extend: "character",
+  reframe: null,
+} as const satisfies Record<ReplacementKind, string | null>;
+/** Moment lengths offered, in seconds, within `MOMENT_LIMITS`. */
+const MOMENT_LENGTHS = [1, 2, 3] as const;
 
 export function ReplacementStudio({
   initialSource,
@@ -204,38 +252,12 @@ export function ReplacementStudio({
   const [wardrobeNote, setWardrobeNote] = useState(draft?.wardrobeNote ?? "");
   const [preserve, setPreserve] = useState<
     Record<ReplacementKind, Set<PreservedAspect>>
-  >(() => ({
-    background: new Set(
-      draft?.kind === "background"
-        ? draft.preserve
-        : DEFAULT_PRESERVATION.background.preserve,
-    ),
-    character: new Set(
-      draft?.kind === "character"
-        ? draft.preserve
-        : DEFAULT_PRESERVATION.character.preserve,
-    ),
-    object: new Set(
-      draft?.kind === "object"
-        ? draft.preserve
-        : DEFAULT_PRESERVATION.object.preserve,
-    ),
-    restyle: new Set(
-      draft?.kind === "restyle"
-        ? draft.preserve
-        : DEFAULT_PRESERVATION.restyle.preserve,
-    ),
-    camera: new Set(
-      draft?.kind === "camera"
-        ? draft.preserve
-        : DEFAULT_PRESERVATION.restage.preserve,
-    ),
-    effect: new Set(
-      draft?.kind === "effect"
-        ? draft.preserve
-        : DEFAULT_PRESERVATION.vfx.preserve,
-    ),
-  }));
+  >(() => {
+    const sets = {} as Record<ReplacementKind, Set<PreservedAspect>>;
+    for (const k of Object.keys(KIND_ICONS) as ReplacementKind[])
+      sets[k] = new Set(draft?.kind === k ? draft.preserve : DEFAULT_KEPT[k]);
+    return sets;
+  });
   const [angle, setAngle] = useState<RestageAngle>(
     draft?.draft?.angle ?? "closer",
   );
@@ -271,6 +293,34 @@ export function ReplacementStudio({
       ? null
       : (items.find((item) => assetRefKey(item.ref) === plateKey) ?? null);
 
+  const [extendPipeline, setExtendPipeline] = useState<ExtendPipeline>(
+    draft?.draft?.extendPipeline ?? "seedance",
+  );
+  const [extendSeconds, setExtendSeconds] = useState<
+    (typeof EXTEND_SECONDS)[number]
+  >(
+    EXTEND_SECONDS.find((s) => s === draft?.draft?.extendSeconds) ??
+      EXTEND_SECONDS[0],
+  );
+  /** The moment's start and length; null until the creator moves it. */
+  const [momentStart, setMomentStart] = useState<number | null>(
+    draft?.draft?.range?.start ?? null,
+  );
+  const [momentLength, setMomentLength] = useState<number>(
+    draft?.draft?.range
+      ? Math.min(
+          MOMENT_LIMITS.maxSeconds,
+          draft.draft.range.end - draft.draft.range.start,
+        )
+      : 2,
+  );
+  const [aspectChoice, setAspectChoice] = useState<ReframeAspect | null>(
+    draft?.draft?.aspect ?? null,
+  );
+  /** The painted area as a small black-and-white PNG; not kept in drafts. */
+  const [mask, setMask] = useState<string | null>(null);
+  const [maskEpoch, setMaskEpoch] = useState(0);
+
   const elementType = ELEMENT_TYPES[kind];
   const candidates = elementType
     ? elements.filter((e) => e.type === elementType)
@@ -281,6 +331,17 @@ export function ReplacementStudio({
   const references = element ? approvedReferences(element, state?.id) : [];
   const preserved = preserve[kind];
   const clipSeconds = source?.durationSeconds ?? measured?.seconds ?? null;
+  const frameWidth = source?.width ?? measured?.width ?? null;
+  const frameHeight = source?.height ?? measured?.height ?? null;
+  const sourceRatio =
+    frameWidth && frameHeight ? frameWidth / frameHeight : null;
+  // A portrait take goes wide by default; anything else goes vertical.
+  const aspect: ReframeAspect =
+    aspectChoice ?? (sourceRatio !== null && sourceRatio < 1 ? "16:9" : "9:16");
+  const sameShape = (option: ReframeAspect) =>
+    sourceRatio !== null &&
+    Math.abs(REFRAME_ASPECTS[option].ratio / sourceRatio - 1) < 0.03;
+  const range = momentRange(clipSeconds, momentStart, momentLength);
   const alpha = kind === "background" && pipeline === "ltx-alpha";
   // A composite never relights the matted people.
   const locked: readonly PreservedAspect[] = alpha
@@ -316,9 +377,15 @@ export function ReplacementStudio({
     [kind, target, scanState],
   );
 
+  /** Words put something new in the area; otherwise it is cleared. */
+  const areaAdds = direction.trim().length >= 3;
   const preferences = useCostPreferences();
   const estimate = formatEstimate(
-    estimateReplacement(kind, clipSeconds, pipeline),
+    estimateReplacement(kind, clipSeconds, pipeline, {
+      extendPipeline,
+      extendSeconds,
+      areaAdds,
+    }),
     preferences.unit,
   );
 
@@ -381,6 +448,21 @@ export function ReplacementStudio({
     keep.trim().length < 3
   )
     problems.push("Name who stays in a few words, or leave it empty.");
+  if (kind === "area" && !mask)
+    problems.push("Paint over the area to fix on the frame.");
+  if (kind === "moment" && direction.trim().length < 3)
+    problems.push("Describe what happens in the moment instead.");
+  if (kind === "moment" && clipSeconds !== null && clipSeconds < 1.5)
+    problems.push("Redoing a moment needs a take of at least 1.5 seconds.");
+  if (
+    kind === "extend" &&
+    extendPipeline === "seedance" &&
+    element &&
+    !references.length
+  )
+    problems.push(`${element.name} needs an approved reference first.`);
+  if (kind === "reframe" && sameShape(aspect))
+    problems.push("The take is already this shape. Choose another.");
 
   function chooseKind(next: ReplacementKind) {
     if (next === kind) return;
@@ -393,6 +475,9 @@ export function ReplacementStudio({
   function chooseSource(item: MediaItem) {
     setSourceKey(assetRefKey(item.ref));
     setTarget(null);
+    setMask(null);
+    setMaskEpoch((n) => n + 1);
+    setMomentStart(null);
     setMeasured(null);
     setPendingKey(null);
   }
@@ -407,10 +492,16 @@ export function ReplacementStudio({
     setPendingKey(null);
   }
 
+  const mention = element
+    ? `@${element.handle}${state ? `:${stateHandle(state)}` : ""}`
+    : null;
+  /** The direction with the chosen Element named in it, so the prompt can describe them. */
+  const directed =
+    mention && !direction.includes(`@${element!.handle}`)
+      ? `${mention} ${direction.trim()}`.trim()
+      : direction.trim();
+
   function intentSentence() {
-    const mention = element
-      ? `@${element.handle}${state ? `:${stateHandle(state)}` : ""}`
-      : null;
     if (alpha) {
       const where = plate ? `“${plate.title}”` : (mention ?? "a new plate");
       return `Put the performers, exactly as shot, in front of ${where}.`;
@@ -447,6 +538,28 @@ export function ReplacementStudio({
       const lower = words.replace(/^(The|A|An) /, (a) => a.toLowerCase());
       return `Clear ${lower} from this take${who ? `, keeping ${who.replace(/^(The|A|An) /, (a) => a.toLowerCase())} exactly as shot` : ""}, and rebuild what was behind them.`;
     }
+    if (kind === "area") {
+      return note
+        ? `Redraw the painted area: ${note}. Everything outside it stays as shot.`
+        : "Clear what is under the painted area and rebuild what was behind it. Everything outside it stays as shot.";
+    }
+    if (kind === "moment") {
+      const when = range
+        ? `${formatTimecode(range.start)} to ${formatTimecode(range.end)}`
+        : "the chosen moment";
+      return `Act ${when} again: ${note ? `${note[0]!.toLowerCase()}${note.slice(1)}` : "describe what happens"}${mention && !note.includes(mention) ? `, with ${mention}` : ""}. The take either side stays as shot.`;
+    }
+    if (kind === "extend") {
+      const more =
+        extendPipeline === "seedance"
+          ? `${extendSeconds} more seconds`
+          : "about 3 more seconds";
+      const who =
+        mention && !note.includes(mention) ? ` ${mention} comes in.` : "";
+      return `Carry this shot on for ${more}, straight from its last frame.${who}${after}`;
+    }
+    if (kind === "reframe")
+      return `Reframe this shot to ${REFRAME_ASPECTS[aspect].label.toLowerCase()} ${aspect}, drawing in the new edges around the take as shot.${after}`;
     if (kind === "camera")
       return `Re-stage this take from a new angle: ${RESTAGE_ANGLES[angle].label.toLowerCase()}, keeping the performance and timing.${after}`;
     if (kind === "background") {
@@ -471,6 +584,58 @@ export function ReplacementStudio({
           ? `wearing ${wardrobeNote.trim()}`
           : "in their own look";
     return `Replace ${who} with ${mention}, ${dress}, preserving their performance and everything else in the shot.`;
+  }
+
+  /** The four take edits; null for the other kinds. */
+  function takeEditRequest(): GenerationRequestInput | null {
+    if (!source) return null;
+    const preservation = {
+      preserve: kept.filter((a) => OFFERED[kind].includes(a)),
+      allowIntegration: false,
+    };
+    const mentions = element
+      ? [{ elementId: element.id, ...(state ? { stateId: state.id } : {}) }]
+      : [];
+    const words = directed.length >= 3 ? { prompt: directed } : {};
+    if (kind === "area" && mask)
+      return {
+        workflowKind: "video.area",
+        inputs: {
+          source: source.ref,
+          mask,
+          ...words,
+          preservation,
+        },
+      };
+    if (kind === "moment" && range)
+      return {
+        workflowKind: "video.moment",
+        inputs: {
+          source: source.ref,
+          range,
+          prompt: directed,
+          mentions,
+          preservation,
+        },
+      };
+    if (kind === "extend")
+      return {
+        workflowKind: "video.extend",
+        inputs: {
+          source: source.ref,
+          pipeline: extendPipeline,
+          seconds: extendSeconds,
+          ...words,
+          mentions,
+          preservation,
+        },
+      };
+    if (kind === "reframe")
+      return {
+        workflowKind: "video.reframe",
+        inputs: { source: source.ref, aspect, ...words, preservation },
+      };
+    return null;
   }
 
   async function submit() {
@@ -504,8 +669,10 @@ export function ReplacementStudio({
       ]
         .filter(Boolean)
         .join(" ");
-      const request: GenerationRequestInput =
-        kind === "object"
+      const takeEdit = takeEditRequest();
+      const request: GenerationRequestInput = takeEdit
+        ? takeEdit
+        : kind === "object"
           ? {
               workflowKind: "video.object-swap",
               inputs: {
@@ -646,22 +813,34 @@ export function ReplacementStudio({
                 .filter(Boolean)
                 .join(", ")
                 .slice(0, 300)
-            : kind === "restyle"
-              ? "The whole look"
-              : kind === "effect"
-                ? `Effect: ${VFX_EFFECTS[effect].label}`
-                : kind === "camera"
-                  ? `New angle: ${RESTAGE_ANGLES[angle].label}`
-                  : kind === "character"
-                    ? [
-                        targetNote.trim(),
-                        target
-                          ? `marked at ${formatTimecode(target.timeMs / 1000)}`
-                          : "",
-                      ]
-                        .filter(Boolean)
-                        .join(", ")
-                    : "Background",
+            : kind === "area"
+              ? "The painted area"
+              : kind === "moment"
+                ? range
+                  ? `${formatTimecode(range.start)} to ${formatTimecode(range.end)}`
+                  : "A moment"
+                : kind === "extend"
+                  ? extendPipeline === "seedance"
+                    ? `${extendSeconds} more seconds`
+                    : "About 3 more seconds"
+                  : kind === "reframe"
+                    ? `${REFRAME_ASPECTS[aspect].label} (${aspect})`
+                    : kind === "restyle"
+                      ? "The whole look"
+                      : kind === "effect"
+                        ? `Effect: ${VFX_EFFECTS[effect].label}`
+                        : kind === "camera"
+                          ? `New angle: ${RESTAGE_ANGLES[angle].label}`
+                          : kind === "character"
+                            ? [
+                                targetNote.trim(),
+                                target
+                                  ? `marked at ${formatTimecode(target.timeMs / 1000)}`
+                                  : "",
+                              ]
+                                .filter(Boolean)
+                                .join(", ")
+                            : "Background",
         wardrobe: kind === "character" ? wardrobe : null,
         wardrobeNote: kind === "character" ? wardrobeNote.trim() : "",
         preserve:
@@ -689,6 +868,10 @@ export function ReplacementStudio({
             kind === "effect" && effect === "clean-plate"
               ? keep.trim().slice(0, 200)
               : null,
+          extendPipeline: kind === "extend" ? extendPipeline : null,
+          extendSeconds: kind === "extend" ? extendSeconds : null,
+          range: kind === "moment" ? range : null,
+          aspect: kind === "reframe" ? aspect : null,
         },
       };
       const result = await submitRevision({
@@ -741,6 +924,24 @@ export function ReplacementStudio({
           }}
           personBox={shotCheck?.box ?? null}
           onMetadata={setMeasured}
+          paint={kind === "area"}
+          paintKey={maskEpoch}
+          onMask={(next) => {
+            setMask(next);
+            setPendingKey(null);
+          }}
+          moment={
+            kind === "moment" && range && clipSeconds
+              ? { range, seconds: clipSeconds }
+              : null
+          }
+          onMomentStart={(start) => {
+            setMomentStart(start);
+            setPendingKey(null);
+          }}
+          reframeRatio={
+            kind === "reframe" ? REFRAME_ASPECTS[aspect].ratio : null
+          }
         />
         <ClipStrip
           videos={videos}
@@ -760,14 +961,14 @@ export function ReplacementStudio({
       >
         <fieldset>
           <legend className="text-sm font-medium">What changes</legend>
-          <div className="mt-3 grid grid-cols-2 gap-2">
+          <div className="mt-3 grid grid-cols-2 gap-1.5">
             {(Object.keys(KIND_ICONS) as ReplacementKind[]).map((option) => {
               const Icon = KIND_ICONS[option];
               return (
                 <label
                   key={option}
                   className={cn(
-                    "flex cursor-pointer flex-col gap-1.5 rounded-xl border p-3 transition-colors has-focus-visible:ring-2 has-focus-visible:ring-ring",
+                    "flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-2 transition-colors has-focus-visible:ring-2 has-focus-visible:ring-ring",
                     kind === option
                       ? "border-tungsten/70 bg-surface"
                       : "border-border hover:bg-surface",
@@ -783,22 +984,26 @@ export function ReplacementStudio({
                   <Icon
                     aria-hidden="true"
                     className={cn(
-                      "size-4",
+                      "size-4 shrink-0",
                       kind === option
                         ? "text-tungsten"
                         : "text-subtle-foreground",
                     )}
                   />
-                  <span className="text-sm font-medium">
+                  <span className="truncate text-sm">
                     {replacementKinds[option].label}
-                  </span>
-                  <span className="text-xs leading-5 text-muted-foreground">
-                    {replacementKinds[option].changes}
                   </span>
                 </label>
               );
             })}
           </div>
+          {/* One line for the chosen kind keeps ten choices scannable. */}
+          <p
+            key={kind}
+            className="revision-reveal mt-2 text-xs leading-5 text-muted-foreground"
+          >
+            {replacementKinds[kind].changes}
+          </p>
         </fieldset>
 
         {kind === "object" && (
@@ -839,7 +1044,49 @@ export function ReplacementStudio({
               setPendingKey(null);
             }}
           />
-        ) : (
+        ) : kind === "reframe" ? (
+          <AspectChoice
+            aspect={aspect}
+            disabled={sameShape}
+            onAspect={(next) => {
+              setAspectChoice(next);
+              setPendingKey(null);
+            }}
+          />
+        ) : kind === "extend" ? (
+          <ExtendMethod
+            pipeline={extendPipeline}
+            onPipeline={(next) => {
+              setExtendPipeline(next);
+              setPendingKey(null);
+            }}
+            seconds={extendSeconds}
+            onSeconds={(next) => {
+              setExtendSeconds(next);
+              setPendingKey(null);
+            }}
+          />
+        ) : kind === "moment" ? (
+          <MomentLength
+            length={momentLength}
+            range={range}
+            onLength={(next) => {
+              setMomentLength(next);
+              setPendingKey(null);
+            }}
+          />
+        ) : kind === "area" ? (
+          <AreaHint
+            painted={!!mask}
+            onClear={() => {
+              setMask(null);
+              setMaskEpoch((n) => n + 1);
+              setPendingKey(null);
+            }}
+          />
+        ) : null}
+
+        {elementType && (
           <ElementChoice
             key={kind}
             kind={kind}
@@ -1017,7 +1264,15 @@ export function ReplacementStudio({
                       : "Describe the look"
                     : kind === "camera"
                       ? "What is in the shot (optional)"
-                      : "Direction (optional)"}
+                      : kind === "area"
+                        ? "What goes there instead (optional)"
+                        : kind === "moment"
+                          ? "What happens instead"
+                          : kind === "extend"
+                            ? "What happens next (optional)"
+                            : kind === "reframe"
+                              ? "What is around the shot (optional)"
+                              : "Direction (optional)"}
             </label>
             <Textarea
               id="revision-direction"
@@ -1040,7 +1295,15 @@ export function ReplacementStudio({
                         ? "Hand-painted gouache, warm dusk palette, visible brush texture"
                         : kind === "camera"
                           ? "Two people talking across a kitchen table at night"
-                          : "Slightly older, the same quiet intensity"
+                          : kind === "area"
+                            ? "Leave empty to clear it; or bare wooden table"
+                            : kind === "moment"
+                              ? "He looks up and smiles, then nods"
+                              : kind === "extend"
+                                ? "She turns and walks out of frame"
+                                : kind === "reframe"
+                                  ? "A high kitchen ceiling with a pendant lamp"
+                                  : "Slightly older, the same quiet intensity"
               }
             />
           </div>
@@ -1134,7 +1397,17 @@ export function ReplacementStudio({
                         ? "The look of every frame, people included"
                         : kind === "camera"
                           ? "Where the camera stands"
-                          : "Only the marked person"}
+                          : kind === "area"
+                            ? "Only what you painted, in the first 3 seconds"
+                            : kind === "moment"
+                              ? range
+                                ? `Only ${formatTimecode(range.start)} to ${formatTimecode(range.end)}, blended in at both ends`
+                                : "Only the chosen moment"
+                              : kind === "extend"
+                                ? "Nothing in the take; new seconds follow it"
+                                : kind === "reframe"
+                                  ? "Only the new edges around the take"
+                                  : "Only the marked person"}
             </dd>
             <dt className="text-muted-foreground">Keeps</dt>
             <dd>
@@ -1174,6 +1447,8 @@ export function ReplacementStudio({
             </p>
           )}
           {!kling &&
+            kind !== "moment" &&
+            kind !== "extend" &&
             clipSeconds !== null &&
             clipSeconds > LTX_REVISION_SECONDS + 0.2 && (
               <p className="mt-2 text-xs leading-5 text-foreground">
@@ -1191,6 +1466,25 @@ export function ReplacementStudio({
           {kind === "effect" && (
             <p className="mt-2 text-xs leading-5 text-muted-foreground">
               {VFX_EFFECTS[effect].note}
+            </p>
+          )}
+          {kind === "area" && (
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">
+              {areaAdds
+                ? "Wan 2.1 VACE draws what you asked for in the area. It takes several minutes, and only the first 3 seconds are kept."
+                : "LTX 2.3 clears what is under the paint and rebuilds what was behind it, in under a minute. Only the first 3 seconds are kept. Describe something to put there instead."}
+            </p>
+          )}
+          {kind === "extend" && (
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">
+              {EXTEND_PIPELINES[extendPipeline].description} The new seconds are
+              silent; the take keeps its sound.
+            </p>
+          )}
+          {kind === "reframe" && (
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">
+              The take stays whole in the middle; the model draws what lies
+              beyond its edges, which can be softer than the take.
             </p>
           )}
           {kind === "camera" && (
@@ -1256,6 +1550,12 @@ function SourceStage({
   onTarget,
   onMetadata,
   personBox,
+  paint,
+  paintKey,
+  onMask,
+  moment,
+  onMomentStart,
+  reframeRatio,
 }: {
   source: MediaItem | null;
   markTarget: boolean;
@@ -1265,9 +1565,20 @@ function SourceStage({
   onMetadata: (metadata: ClipMetadata) => void;
   /** The person found under the mark, outlined so the creator can confirm it. */
   personBox: Preflight["box"];
+  /** Fix an area: brush over the frame; the mask is exported on each stroke's end. */
+  paint: boolean;
+  /** Changes when the painted area is cleared, so the brush layer starts over. */
+  paintKey: number;
+  onMask: (mask: string | null) => void;
+  /** Redo a moment: the stretch shown on the scrub bar. */
+  moment: { range: { start: number; end: number }; seconds: number } | null;
+  onMomentStart: (start: number) => void;
+  /** Reframe: the new frame's shape, with the take inside it. */
+  reframeRatio: number | null;
 }) {
   const video = useRef<HTMLVideoElement | null>(null);
   const [frameRatio, setFrameRatio] = useState(16 / 9);
+  const scrub = markTarget || paint;
   if (!source)
     return (
       <div className="grid aspect-video place-items-center rounded-xl border border-dashed border-border bg-surface text-center">
@@ -1308,10 +1619,20 @@ function SourceStage({
     <figure className="m-0">
       <div
         className={cn(
-          "relative aspect-video overflow-hidden rounded-xl bg-black",
+          "relative mx-auto overflow-hidden rounded-xl",
+          reframeRatio ? "reframe-stage" : "aspect-video bg-black",
           markTarget && "cursor-crosshair",
         )}
-        style={{ containerType: "size" }}
+        style={
+          reframeRatio
+            ? {
+                containerType: "size",
+                aspectRatio: `${reframeRatio}`,
+                // Tall shapes are capped by the viewport, not the column.
+                width: `min(100%, calc(min(70vh, 40rem) * ${reframeRatio}))`,
+              }
+            : { containerType: "size" }
+        }
         onPointerUp={mark}
         // Start analysing as the pointer arrives, so the check is ready by the click.
         onPointerEnter={markTarget ? () => requestScan(source.url) : undefined}
@@ -1321,7 +1642,7 @@ function SourceStage({
           ref={video}
           src={source.url}
           poster={source.thumbnailUrl ?? undefined}
-          controls={!markTarget}
+          controls={!scrub && !moment}
           playsInline
           preload="metadata"
           className="absolute inset-0 size-full object-contain"
@@ -1334,13 +1655,29 @@ function SourceStage({
             });
             if (v.videoWidth) setFrameRatio(v.videoWidth / v.videoHeight);
           }}
-          onClick={markTarget ? (event) => event.preventDefault() : undefined}
+          onClick={scrub ? (event) => event.preventDefault() : undefined}
         />
         {markTarget && target && (
           <TargetMarker target={target} ratio={frameRatio} box={personBox} />
         )}
+        {paint && (
+          <PaintLayer
+            key={`${source.id}-${paintKey}`}
+            ratio={frameRatio}
+            onMask={onMask}
+          />
+        )}
       </div>
-      {markTarget && <ScrubBar video={video} />}
+      {scrub && <ScrubBar video={video} />}
+      {moment && (
+        <MomentBar
+          key={source.id}
+          video={video}
+          range={moment.range}
+          seconds={moment.seconds}
+          onStart={onMomentStart}
+        />
+      )}
       <figcaption className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
         <span className="truncate text-foreground">{source.title}</span>
         {source.durationSeconds && (
@@ -1352,6 +1689,12 @@ function SourceStage({
         {markTarget && (
           <span className="ml-auto flex items-center gap-1">
             <Crosshair aria-hidden="true" className="size-3" /> {markLabel}
+          </span>
+        )}
+        {paint && (
+          <span className="ml-auto flex items-center gap-1">
+            <Brush aria-hidden="true" className="size-3" /> Paint over what to
+            fix
           </span>
         )}
       </figcaption>
@@ -1757,12 +2100,16 @@ function ElementChoice({
   onChoose: (elementId: string | null, stateId: string | null) => void;
 }) {
   const noun =
-    kind === "character"
+    kind === "character" || kind === "extend" || kind === "moment"
       ? "Character"
       : kind === "object"
         ? "Thing"
         : "Location";
-  const optional = kind === "background" || kind === "restyle";
+  const optional =
+    kind === "background" ||
+    kind === "restyle" ||
+    kind === "extend" ||
+    kind === "moment";
   const selected = candidates.find((e) => e.id === elementId) ?? null;
   const cover = (element: Element, state: ElementState | null) => {
     const reference = approvedReferences(element, state?.id)[0];
@@ -1777,7 +2124,11 @@ function ElementChoice({
             ? "Swap in"
             : kind === "restyle"
               ? "Look from a Location"
-              : "New character"}
+              : kind === "extend"
+                ? "Who comes in (optional)"
+                : kind === "moment"
+                  ? "Who it is about (optional)"
+                  : "New character"}
       </legend>
       {loading ? (
         <p className="mt-2 text-xs text-muted-foreground">Loading Elements…</p>
@@ -1793,7 +2144,9 @@ function ElementChoice({
               ? "with approved references to swap it into shots."
               : kind === "restyle"
                 ? "to borrow its look, or use a style image or words below."
-                : "with approved references to cast them."}
+                : kind === "extend" || kind === "moment"
+                  ? "to keep a person the same from shot to shot."
+                  : "with approved references to cast them."}
         </p>
       ) : (
         <ul className="mt-2 flex flex-col gap-1" aria-label={`${noun}s`}>
@@ -2040,6 +2393,412 @@ function StyleImageChoice({
           onSelect={onImage}
         />
       </div>
+    </fieldset>
+  );
+}
+
+/** The moment to redo, clamped inside the take; null until the take's length is known. */
+function momentRange(
+  seconds: number | null,
+  start: number | null,
+  length: number,
+) {
+  if (seconds === null || seconds < MOMENT_LIMITS.minSeconds + 0.5) return null;
+  const span = Math.min(length, MOMENT_LIMITS.maxSeconds, seconds - 0.5);
+  const latest = seconds - span;
+  const from = Math.min(Math.max(start ?? (seconds - span) / 2, 0), latest);
+  const round = (n: number) => Math.round(n * 100) / 100;
+  return { start: round(from), end: round(from + span) };
+}
+
+/** Mask size: the long side, enough for a soft-edged area at generation size. */
+const MASK_SIDE = 512;
+
+/**
+ * A brush over the letterboxed frame. Strokes go straight to a canvas, so
+ * painting never re-renders React; the mask is exported once per stroke.
+ */
+function PaintLayer({
+  ratio,
+  onMask,
+}: {
+  ratio: number;
+  onMask: (mask: string | null) => void;
+}) {
+  const width = ratio >= 1 ? MASK_SIDE : Math.round(MASK_SIDE * ratio);
+  const height = ratio >= 1 ? Math.round(MASK_SIDE / ratio) : MASK_SIDE;
+  const last = useRef<{ x: number; y: number } | null>(null);
+  const painted = useRef(false);
+
+  function point(event: PointerEvent<HTMLCanvasElement>) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return {
+      x: ((event.clientX - rect.left) / rect.width) * width,
+      y: ((event.clientY - rect.top) / rect.height) * height,
+    };
+  }
+  function stroke(canvas: HTMLCanvasElement, to: { x: number; y: number }) {
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const from = last.current ?? to;
+    ctx.strokeStyle = getComputedStyle(canvas).color;
+    ctx.lineWidth = Math.max(width, height) * 0.06;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
+    last.current = to;
+    painted.current = true;
+  }
+  function exportMask(canvas: HTMLCanvasElement) {
+    if (!painted.current) return onMask(null);
+    const out = document.createElement("canvas");
+    out.width = width;
+    out.height = height;
+    const ctx = out.getContext("2d");
+    if (!ctx) return;
+    // Painted pixels turn white, the rest black: white is redone.
+    ctx.drawImage(canvas, 0, 0);
+    ctx.globalCompositeOperation = "source-in";
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, width, height);
+    ctx.globalCompositeOperation = "destination-over";
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, width, height);
+    onMask(out.toDataURL("image/png"));
+  }
+
+  return (
+    <div
+      className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+      style={{
+        width: `min(100cqw, ${ratio * 100}cqh)`,
+        height: `min(100cqh, ${100 / ratio}cqw)`,
+      }}
+    >
+      <canvas
+        width={width}
+        height={height}
+        aria-label="Paint over the area to fix"
+        className="size-full cursor-crosshair touch-none text-tungsten opacity-55"
+        onPointerDown={(event) => {
+          event.currentTarget.setPointerCapture(event.pointerId);
+          last.current = null;
+          stroke(event.currentTarget, point(event));
+        }}
+        onPointerMove={(event) => {
+          if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+          const canvas = event.currentTarget;
+          // Coalesced points keep fast strokes continuous at any frame rate.
+          const events = event.nativeEvent.getCoalescedEvents?.() ?? [];
+          if (!events.length) return stroke(canvas, point(event));
+          const rect = canvas.getBoundingClientRect();
+          for (const e of events)
+            stroke(canvas, {
+              x: ((e.clientX - rect.left) / rect.width) * width,
+              y: ((e.clientY - rect.top) / rect.height) * height,
+            });
+        }}
+        onPointerUp={(event) => {
+          last.current = null;
+          exportMask(event.currentTarget);
+        }}
+        onPointerCancel={() => {
+          last.current = null;
+        }}
+      />
+    </div>
+  );
+}
+
+/**
+ * The moment on the take's timeline. Dragging moves the band and the frame
+ * directly; the studio hears the new start when the drag ends.
+ */
+function MomentBar({
+  video,
+  range,
+  seconds,
+  onStart,
+}: {
+  video: { current: HTMLVideoElement | null };
+  range: { start: number; end: number };
+  seconds: number;
+  onStart: (start: number) => void;
+}) {
+  const band = useRef<HTMLSpanElement | null>(null);
+  const label = useRef<HTMLSpanElement | null>(null);
+  const span = range.end - range.start;
+  const latest = Math.max(seconds - span, 0);
+  const show = (start: number) => {
+    if (band.current)
+      band.current.style.transform = `translateX(${(start / span) * 100}%)`;
+    if (label.current)
+      label.current.textContent = `${formatTimecode(start)} – ${formatTimecode(start + span)}`;
+  };
+  const seek = (start: number) => {
+    const v = video.current;
+    if (!v) return;
+    v.pause();
+    if (v.fastSeek) v.fastSeek(start);
+    else v.currentTime = start;
+  };
+  const commit = (input: HTMLInputElement) => {
+    const start = Number(input.value);
+    if (Math.abs(start - range.start) > 0.005) onStart(start);
+  };
+  return (
+    <div className="mt-2">
+      <div className="relative h-6">
+        <span
+          aria-hidden="true"
+          className="absolute inset-x-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full bg-input"
+        />
+        <span
+          ref={band}
+          aria-hidden="true"
+          className="absolute top-1/2 left-0 h-2 -translate-y-1/2 rounded-full bg-tungsten/60"
+          style={{
+            width: `${(span / seconds) * 100}%`,
+            transform: `translateX(${(range.start / span) * 100}%)`,
+          }}
+        />
+        <input
+          key={span}
+          type="range"
+          min={0}
+          max={latest}
+          step={0.04}
+          defaultValue={range.start}
+          aria-label="Where the moment starts"
+          aria-valuetext={`${formatTimecode(range.start)} to ${formatTimecode(range.end)}`}
+          className="compare-scrubber moment-scrubber absolute top-0 -ml-[6.5px]"
+          // The thumb travels the band's possible starts, so it sits on the band's left edge.
+          style={{ width: `calc(${(latest / seconds) * 100}% + 13px)` }}
+          onChange={(event) => {
+            const start = Number(event.target.value);
+            show(start);
+            seek(start);
+          }}
+          onPointerUp={(event) => commit(event.currentTarget)}
+          onKeyUp={(event) => commit(event.currentTarget)}
+          onBlur={(event) => commit(event.currentTarget)}
+        />
+      </div>
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span ref={label} className="tabular">
+          {formatTimecode(range.start)} – {formatTimecode(range.end)}
+        </span>
+        <button
+          type="button"
+          className="rounded-md px-1.5 py-0.5 text-foreground outline-none hover:bg-surface focus-visible:ring-2 focus-visible:ring-ring"
+          onClick={() => {
+            const v = video.current;
+            if (!v) return;
+            v.currentTime = range.start;
+            const stop = () => {
+              if (v.currentTime < range.end) return;
+              v.pause();
+              v.removeEventListener("timeupdate", stop);
+            };
+            v.addEventListener("timeupdate", stop);
+            void v.play();
+          }}
+        >
+          Play the moment
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function MomentLength({
+  length,
+  range,
+  onLength,
+}: {
+  length: number;
+  range: { start: number; end: number } | null;
+  onLength: (length: number) => void;
+}) {
+  return (
+    <fieldset>
+      <legend className="text-sm font-medium">The moment</legend>
+      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+        {range
+          ? `${formatTimecode(range.start)} to ${formatTimecode(range.end)}. Drag the band under the take to move it; both ends blend back into the take.`
+          : "Choose a take to place the moment."}
+      </p>
+      <div
+        role="radiogroup"
+        aria-label="How long"
+        className="mt-2 flex gap-1.5"
+      >
+        {MOMENT_LENGTHS.map((option) => (
+          <button
+            key={option}
+            type="button"
+            role="radio"
+            aria-checked={length === option}
+            onClick={() => onLength(option)}
+            className="tabular inline-flex h-7 items-center rounded-full border border-border px-3 text-xs text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring aria-checked:border-tungsten/70 aria-checked:text-foreground"
+          >
+            {option} s
+          </button>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+function AreaHint({
+  painted,
+  onClear,
+}: {
+  painted: boolean;
+  onClear: () => void;
+}) {
+  return (
+    <fieldset>
+      <legend className="text-sm font-medium">The area</legend>
+      <div className="mt-1 flex items-start gap-3">
+        <p className="flex-1 text-xs leading-5 text-muted-foreground">
+          {painted
+            ? "Painted. The same area is used in every frame, so cover everywhere the thing moves."
+            : "Pause on a frame and paint over what to fix. The same area is used in every frame, so cover everywhere the thing moves."}
+        </p>
+        {painted && (
+          <Button type="button" variant="ghost" size="sm" onClick={onClear}>
+            Clear
+          </Button>
+        )}
+      </div>
+    </fieldset>
+  );
+}
+
+function AspectChoice({
+  aspect,
+  disabled,
+  onAspect,
+}: {
+  aspect: ReframeAspect;
+  disabled: (aspect: ReframeAspect) => boolean;
+  onAspect: (aspect: ReframeAspect) => void;
+}) {
+  return (
+    <fieldset>
+      <legend className="text-sm font-medium">New shape</legend>
+      <div className="mt-2 grid grid-cols-4 gap-1.5">
+        {(Object.keys(REFRAME_ASPECTS) as ReframeAspect[]).map((option) => {
+          const off = disabled(option);
+          const ratio = REFRAME_ASPECTS[option].ratio;
+          return (
+            <label
+              key={option}
+              title={off ? "The take is already this shape" : undefined}
+              className={cn(
+                "flex flex-col items-center gap-1.5 rounded-lg border px-1 py-2 transition-colors has-focus-visible:ring-2 has-focus-visible:ring-ring",
+                off
+                  ? "cursor-not-allowed border-border opacity-50"
+                  : aspect === option
+                    ? "cursor-pointer border-tungsten/70 bg-surface"
+                    : "cursor-pointer border-border hover:bg-surface",
+              )}
+            >
+              <input
+                type="radio"
+                name="reframe-aspect"
+                className="sr-only"
+                checked={aspect === option}
+                disabled={off}
+                onChange={() => onAspect(option)}
+              />
+              <span className="grid h-7 place-items-center" aria-hidden="true">
+                <span
+                  className={cn(
+                    "rounded-[3px] border",
+                    aspect === option ? "border-tungsten" : "border-current",
+                  )}
+                  style={{
+                    width: `${ratio >= 1 ? 28 : 28 * ratio}px`,
+                    height: `${ratio >= 1 ? 28 / ratio : 28}px`,
+                  }}
+                />
+              </span>
+              <span className="text-xs">{REFRAME_ASPECTS[option].label}</span>
+              <span className="tabular text-[11px] text-muted-foreground">
+                {option}
+              </span>
+            </label>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
+
+function ExtendMethod({
+  pipeline,
+  onPipeline,
+  seconds,
+  onSeconds,
+}: {
+  pipeline: ExtendPipeline;
+  onPipeline: (pipeline: ExtendPipeline) => void;
+  seconds: (typeof EXTEND_SECONDS)[number];
+  onSeconds: (seconds: (typeof EXTEND_SECONDS)[number]) => void;
+}) {
+  return (
+    <fieldset className="min-w-0">
+      <legend className="text-sm font-medium">How</legend>
+      <div className="mt-2 flex flex-col gap-1">
+        {(Object.keys(EXTEND_PIPELINES) as ExtendPipeline[]).map((option) => (
+          <label
+            key={option}
+            className="flex cursor-pointer gap-3 rounded-lg px-2 py-2 hover:bg-surface has-focus-visible:ring-2 has-focus-visible:ring-ring"
+          >
+            <input
+              type="radio"
+              name="extend-pipeline"
+              checked={pipeline === option}
+              onChange={() => onPipeline(option)}
+              className="mt-1 accent-(--tungsten)"
+            />
+            <span>
+              <span className="block text-sm">
+                {EXTEND_PIPELINES[option].label}
+              </span>
+              <span className="block text-xs leading-5 text-muted-foreground">
+                {EXTEND_PIPELINES[option].description}
+              </span>
+            </span>
+          </label>
+        ))}
+      </div>
+      {pipeline === "seedance" && (
+        <div
+          role="radiogroup"
+          aria-label="Seconds to add"
+          className="revision-reveal mt-2 flex items-center gap-1.5 pl-2"
+        >
+          <span className="mr-1 text-xs text-muted-foreground">Add</span>
+          {EXTEND_SECONDS.map((option) => (
+            <button
+              key={option}
+              type="button"
+              role="radio"
+              aria-checked={seconds === option}
+              onClick={() => onSeconds(option)}
+              className="tabular inline-flex h-7 items-center rounded-full border border-border px-3 text-xs text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring aria-checked:border-tungsten/70 aria-checked:text-foreground"
+            >
+              {option} s
+            </button>
+          ))}
+        </div>
+      )}
     </fieldset>
   );
 }

@@ -42,7 +42,7 @@ function failureMessage(errorType: string) {
     case "forbidden":
       return "Comfy Router rejected these credentials. Check the jobs Worker API key.";
     case "content_policy_violation":
-      return "Comfy could not generate this prompt under its content policy. Try a different prompt.";
+      return "The model refused this request under its content policy, and nothing was charged. Seedance refuses takes with close, clear faces: for Make it longer, choose LTX 2.3. Otherwise try different words.";
     case "invalid_input":
       return "The model rejected these inputs. Check the clip and references, then try again.";
     // The provider (Kling, BFL, LTX) refused or failed on the inputs. Seen live

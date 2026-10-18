@@ -63,6 +63,27 @@
     "models": []
   },
   {
+    "file": "media/append.api.json",
+    "title": "Append a continuation after the source",
+    "usedBy": "video.extend on Seedance 2.5 (append stage)",
+    "inputs": [
+      {
+        "node": "source",
+        "field": "file",
+        "file": "source.mp4"
+      },
+      {
+        "node": "edit",
+        "field": "video",
+        "file": "edit.mp4"
+      }
+    ],
+    "outputs": [
+      "save"
+    ],
+    "models": []
+  },
+  {
     "file": "background/ltx-alpha-gen-image.api.json",
     "title": "Background replacement with LTX 2.5 Alpha Gen, image plate",
     "usedBy": "video.background-replace, LTX path (comfy-cloud/ltx-2.5-alpha-gen)",
@@ -579,6 +600,115 @@
       "ltx-2.3-22b-distilled-lora-384-1.1.safetensors",
       "ltx-2.3-22b-ic-lora-clean-plate-1.0.safetensors",
       "sam3.1_multiplex_fp16.safetensors"
+    ]
+  },
+  {
+    "file": "take-edits/area.api.json",
+    "title": "Fix an area: clear it (LTX 2.3)",
+    "usedBy": "video.area (comfy-cloud/ltx-2.3-fill)",
+    "inputs": [
+      {
+        "node": "source",
+        "field": "file",
+        "file": "source.mp4"
+      },
+      {
+        "node": "mask",
+        "field": "image",
+        "file": "mask.png"
+      }
+    ],
+    "outputs": [
+      "save_result"
+    ],
+    "models": [
+      "gemma_3_12B_it_fp4_mixed.safetensors",
+      "ltx-2.3-22b-distilled-fp8.safetensors",
+      "ltx-2.3-22b-ic-lora-in-outpainting-0.9.safetensors"
+    ]
+  },
+  {
+    "file": "take-edits/area-add.api.json",
+    "title": "Fix an area: draw something new (Wan 2.1 VACE)",
+    "usedBy": "video.area with words (comfy-cloud/wan-2.1-vace)",
+    "inputs": [
+      {
+        "node": "source",
+        "field": "file",
+        "file": "source.mp4"
+      },
+      {
+        "node": "mask",
+        "field": "image",
+        "file": "mask.png"
+      }
+    ],
+    "outputs": [
+      "save_result"
+    ],
+    "models": [
+      "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "wan2.1_vace_14B_fp16.safetensors",
+      "wan_2.1_vae.safetensors"
+    ]
+  },
+  {
+    "file": "take-edits/moment.api.json",
+    "title": "Redo a moment",
+    "usedBy": "video.moment (comfy-cloud/ltx-2.3-fill)",
+    "inputs": [
+      {
+        "node": "source",
+        "field": "file",
+        "file": "source.mp4"
+      }
+    ],
+    "outputs": [
+      "save_result"
+    ],
+    "models": [
+      "gemma_3_12B_it_fp4_mixed.safetensors",
+      "ltx-2.3-22b-distilled-fp8.safetensors"
+    ]
+  },
+  {
+    "file": "take-edits/reframe-9x16.api.json",
+    "title": "Reframe to vertical",
+    "usedBy": "video.reframe (comfy-cloud/ltx-2.3-fill)",
+    "inputs": [
+      {
+        "node": "source",
+        "field": "file",
+        "file": "source.mp4"
+      }
+    ],
+    "outputs": [
+      "save_result"
+    ],
+    "models": [
+      "gemma_3_12B_it_fp4_mixed.safetensors",
+      "ltx-2.3-22b-dev-fp8.safetensors",
+      "ltx-2.3-22b-distilled-lora-384-1.1.safetensors",
+      "ltx-2.3-22b-ic-lora-outpaint.safetensors"
+    ]
+  },
+  {
+    "file": "take-edits/extend.api.json",
+    "title": "Make it longer (LTX 2.3)",
+    "usedBy": "video.extend (comfy-cloud/ltx-2.3-fill)",
+    "inputs": [
+      {
+        "node": "source",
+        "field": "file",
+        "file": "source.mp4"
+      }
+    ],
+    "outputs": [
+      "save_result"
+    ],
+    "models": [
+      "gemma_3_12B_it_fp4_mixed.safetensors",
+      "ltx-2.3-22b-distilled-fp8.safetensors"
     ]
   },
   {

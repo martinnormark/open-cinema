@@ -1,9 +1,11 @@
 import type {
   BackgroundPipelineChoice,
+  ExtendPipeline,
   GenerationEstimate,
 } from "@open-cinema/contracts";
 import {
   cloudEstimate,
+  seedanceExtendEstimate,
   seedanceRelocateEstimate,
   sourceEditEstimate,
   sourceEditRate,
@@ -18,8 +20,24 @@ export function estimateReplacement(
   kind: ReplacementKind,
   sourceSeconds: number | null,
   pipeline: BackgroundPipelineChoice = "kling",
+  extend: {
+    extendPipeline: ExtendPipeline;
+    extendSeconds: number;
+    areaAdds?: boolean;
+  } = {
+    extendPipeline: "seedance",
+    extendSeconds: 4,
+  },
 ): GenerationEstimate {
   if (kind === "object") return cloudEstimate("swap");
+  if (kind === "area")
+    return cloudEstimate(extend.areaAdds ? "area-add" : "area");
+  if (kind === "moment") return cloudEstimate("moment");
+  if (kind === "reframe") return cloudEstimate("reframe");
+  if (kind === "extend")
+    return extend.extendPipeline === "seedance"
+      ? seedanceExtendEstimate(extend.extendSeconds, sourceSeconds)
+      : cloudEstimate("extend");
   if (kind === "restyle") return cloudEstimate("restyle");
   if (kind === "camera") return cloudEstimate("restage");
   if (kind === "effect") return cloudEstimate("vfx");

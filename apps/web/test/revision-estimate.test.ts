@@ -26,8 +26,30 @@ const shared = (
 test("matches the shared estimate for every replacement kind", () => {
   for (const { kind, workflowKind } of Object.values(replacementKinds))
     expect(numbers(estimateReplacement(kind, null))).toEqual(
-      shared(workflowKind, { pipeline: "kling" }),
+      shared(
+        workflowKind,
+        kind === "extend"
+          ? { pipeline: "seedance", seconds: 4 }
+          : { pipeline: "kling" },
+      ),
     );
+  expect(
+    numbers(
+      estimateReplacement("extend", null, "kling", {
+        extendPipeline: "ltx",
+        extendSeconds: 4,
+      }),
+    ),
+  ).toEqual(shared("video.extend", { pipeline: "ltx" }));
+  expect(
+    numbers(
+      estimateReplacement("area", null, "kling", {
+        extendPipeline: "seedance",
+        extendSeconds: 4,
+        areaAdds: true,
+      }),
+    ),
+  ).toEqual(shared("video.area", { prompt: "A vase of tulips" }));
   expect(numbers(estimateReplacement("background", null, "ltx-alpha"))).toEqual(
     shared("video.background-replace", { pipeline: "ltx-alpha" }),
   );

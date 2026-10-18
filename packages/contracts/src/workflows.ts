@@ -7,6 +7,12 @@ import {
 } from "./elements";
 import { cameraMoveSchema, restageAngleSchema } from "./camera";
 import { vfxEffectSchema } from "./vfx";
+import {
+  extendPipelineSchema,
+  extendSecondsSchema,
+  momentRangeSchema,
+  reframeAspectSchema,
+} from "./take-edits";
 import { assetRefSchema, type AssetRef } from "./media";
 import { directionSnapshotSchema } from "./direction";
 import { preservationIntentSchema, targetSelectionSchema } from "./replacement";
@@ -230,6 +236,59 @@ export const vfxInputsSchema = z.object({
 });
 export type VfxInputs = z.infer<typeof vfxInputsSchema>;
 
+/** Make it longer: new seconds after the take's last frame. */
+export const extendInputsSchema = z.object({
+  source: assetRefSchema,
+  pipeline: extendPipelineSchema.default("seedance"),
+  /** Seedance only; LTX adds about three seconds. */
+  seconds: extendSecondsSchema.default(4),
+  /** What happens next; @mentions bring in Elements. */
+  prompt: prompt.optional(),
+  mentions,
+  preservation: preservationIntentSchema,
+});
+export type ExtendInputs = z.infer<typeof extendInputsSchema>;
+
+/** A small PNG of the brushed area: white is redone, black is kept. */
+const maskDataUri = z
+  .string()
+  .max(400_000)
+  .regex(/^data:image\/png;base64,[A-Za-z0-9+/=]+$/);
+
+/**
+ * Fix an area: a brushed region of the take's first seconds, rebuilt. Empty
+ * words clear it (LTX 2.3); words put something there (Wan VACE).
+ */
+export const areaInputsSchema = z.object({
+  source: assetRefSchema,
+  mask: maskDataUri,
+  /** What the area should show instead; empty clears it. */
+  prompt: prompt.optional(),
+  preservation: preservationIntentSchema,
+});
+export type AreaInputs = z.infer<typeof areaInputsSchema>;
+
+/** Redo a moment: up to three seconds anywhere in the take, acted again. */
+export const momentInputsSchema = z.object({
+  source: assetRefSchema,
+  range: momentRangeSchema,
+  /** What happens in the moment instead. */
+  prompt,
+  mentions,
+  preservation: preservationIntentSchema,
+});
+export type MomentInputs = z.infer<typeof momentInputsSchema>;
+
+/** Reframe: the take on a new aspect, the new edges drawn in. */
+export const reframeInputsSchema = z.object({
+  source: assetRefSchema,
+  aspect: reframeAspectSchema,
+  /** What is around the shot, for the new edges. */
+  prompt: prompt.optional(),
+  preservation: preservationIntentSchema,
+});
+export type ReframeInputs = z.infer<typeof reframeInputsSchema>;
+
 export const workflowInputsSchemas = {
   "image.flux": fluxImageInputsSchema,
   "image.flux-reference": fluxReferenceInputsSchema,
@@ -242,6 +301,10 @@ export const workflowInputsSchemas = {
   "video.restyle": restyleInputsSchema,
   "video.restage": restageInputsSchema,
   "video.vfx": vfxInputsSchema,
+  "video.extend": extendInputsSchema,
+  "video.area": areaInputsSchema,
+  "video.moment": momentInputsSchema,
+  "video.reframe": reframeInputsSchema,
 } as const satisfies Record<WorkflowKind, z.ZodType>;
 
 export type WorkflowInputs<K extends WorkflowKind = WorkflowKind> = z.infer<
@@ -293,6 +356,22 @@ export const generationRequestSchema = z.discriminatedUnion("workflowKind", [
   z.object({
     workflowKind: z.literal("video.vfx"),
     inputs: vfxInputsSchema,
+  }),
+  z.object({
+    workflowKind: z.literal("video.extend"),
+    inputs: extendInputsSchema,
+  }),
+  z.object({
+    workflowKind: z.literal("video.area"),
+    inputs: areaInputsSchema,
+  }),
+  z.object({
+    workflowKind: z.literal("video.moment"),
+    inputs: momentInputsSchema,
+  }),
+  z.object({
+    workflowKind: z.literal("video.reframe"),
+    inputs: reframeInputsSchema,
   }),
 ]);
 export type GenerationRequest = z.infer<typeof generationRequestSchema>;
@@ -347,6 +426,10 @@ export function requestAssetRefs(request: GenerationRequest): AssetRef[] {
     case "video.object-swap":
     case "video.restage":
     case "video.vfx":
+    case "video.extend":
+    case "video.area":
+    case "video.moment":
+    case "video.reframe":
       return [request.inputs.source];
     case "video.restyle":
       return [
@@ -388,6 +471,9 @@ export function requestMentions(request: GenerationRequest) {
       return request.inputs.style ? [request.inputs.style] : [];
     case "video.restage":
     case "video.vfx":
+      return [];
+    case "video.area":
+    case "video.reframe":
       return [];
     default:
       return request.inputs.mentions;
@@ -491,6 +577,33 @@ export const WORKFLOW_DESCRIPTORS = {
     label: "Add an effect",
     output: "video",
     models: ["comfy-cloud/ltx-2.3-vfx"],
+  },
+  "video.extend": {
+    kind: "video.extend",
+    label: "Make it longer",
+    output: "video",
+    models: [
+      "byteplus/dreamina-seedance-2-5-260628",
+      "comfy-cloud/ltx-2.3-fill",
+    ],
+  },
+  "video.area": {
+    kind: "video.area",
+    label: "Fix an area",
+    output: "video",
+    models: ["comfy-cloud/ltx-2.3-fill", "comfy-cloud/wan-2.1-vace"],
+  },
+  "video.moment": {
+    kind: "video.moment",
+    label: "Redo a moment",
+    output: "video",
+    models: ["comfy-cloud/ltx-2.3-fill"],
+  },
+  "video.reframe": {
+    kind: "video.reframe",
+    label: "Reframe",
+    output: "video",
+    models: ["comfy-cloud/ltx-2.3-fill"],
   },
 } as const satisfies Record<WorkflowKind, WorkflowDescriptor>;
 

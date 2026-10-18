@@ -11,6 +11,11 @@
  *     target="the woman on the left" name=Mara identity="..." wardrobe="..." action="..." [pose=0.9]
  *   bun scripts/ltx-graph.ts <server> <out-dir> performance source=<clip> prompt="..." [keyframe=<img>] [control=edges|edges-detailed] [strength=0.9]
  *   bun scripts/ltx-graph.ts <server> <out-dir> vfx source=<clip> effect=water|night|clean-plate [prompt="..."] [keep="the couple"] [frames=121] [side=960]
+ *   bun scripts/ltx-graph.ts <server> <out-dir> area source=<clip> mask=<png> prompt="..." [frames=97] [side=768]
+ *   bun scripts/ltx-graph.ts <server> <out-dir> area-add source=<clip> mask=<png> prompt="..." [ref=<img>] [frames=81] [side=832]
+ *   bun scripts/ltx-graph.ts <server> <out-dir> moment source=<clip> start=2.0 end=3.5 prompt="..."
+ *   bun scripts/ltx-graph.ts <server> <out-dir> extend source=<clip> prompt="..."
+ *   bun scripts/ltx-graph.ts <server> <out-dir> reframe source=<clip> aspect=9:16 [fit=whole|halfway] [prompt="..."]
  *
  * Add submit-only=1 to stop once the server has accepted the graph (a check
  * against a local ComfyUI with placeholder model files).
@@ -27,6 +32,7 @@ import {
   ltxEditPrompts,
 } from "../packages/comfy/src/workflows/ltx-edit";
 import type { Graph } from "../packages/comfy/src/workflows/ltx-graph";
+import { wanAreaGraph } from "../packages/comfy/src/workflows/wan-vace";
 import {
   ltxPerformanceGraph,
   type PerformanceControl,
@@ -36,6 +42,7 @@ import {
   ltxRecastPrompts,
 } from "../packages/comfy/src/workflows/ltx-recast";
 import { ltxVfxGraph } from "../packages/comfy/src/workflows/ltx-vfx";
+import { ltxFillGraph } from "../packages/comfy/src/workflows/ltx-fill";
 import type {
   CameraMove,
   RestageAngle,
@@ -174,6 +181,47 @@ if (kind === "camera") {
         : undefined,
   });
   files.push(["source", "file", args.source!]);
+} else if (
+  kind === "area" ||
+  kind === "moment" ||
+  kind === "reframe" ||
+  kind === "extend"
+) {
+  const [aw, ah] = (args.aspect ?? "9:16").split(":").map(Number);
+  graph = ltxFillGraph({
+    mode: kind,
+    prompt: args.prompt ?? "",
+    seed,
+    range: args.start
+      ? { start: Number(args.start), end: Number(args.end) }
+      : undefined,
+    aspect: aw! / ah!,
+    fit: args.fit === "halfway" ? "halfway" : "whole",
+    limits:
+      args.frames || args.side
+        ? {
+            maxFrames: Number(args.frames ?? 97),
+            maxSide: Number(args.side ?? 768),
+          }
+        : undefined,
+  });
+  files.push(["source", "file", args.source!]);
+  if (kind === "area") files.push(["mask", "image", args.mask!]);
+} else if (kind === "area-add") {
+  graph = wanAreaGraph({
+    prompt: args.prompt ?? "",
+    seed,
+    reference: !!args.ref,
+    limits:
+      args.frames || args.side
+        ? {
+            maxFrames: Number(args.frames ?? 81),
+            maxSide: Number(args.side ?? 832),
+          }
+        : undefined,
+  });
+  files.push(["source", "file", args.source!], ["mask", "image", args.mask!]);
+  if (args.ref) files.push(["reference", "image", args.ref]);
 } else throw new Error(`unknown graph ${kind}`);
 
 for (const [node, field, path] of files) {

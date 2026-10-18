@@ -43,7 +43,7 @@ export interface StageContext extends BuildContext {
 }
 
 /** Media steps that run as Comfy Cloud graphs (./media-graphs.ts). The browser squares pixels at upload; `square` covers clips it could not. */
-export type MediaOperation = "lock" | "conform" | "square";
+export type MediaOperation = "lock" | "conform" | "square" | "append";
 /** One media step that produces one output from named media parts. */
 export interface MediaTask {
   /** Stored as `{stage id}:{output}`. */

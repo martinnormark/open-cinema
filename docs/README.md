@@ -34,6 +34,7 @@ Primary entry points: [developer documentation](https://docs.comfy.org/developme
 - [Character recast on LTX 2.5](recast-ltx.md): an all-Lightricks open-weights recast graph, its live comparison with Kling, and the proposal for our own recast IC-LoRA.
 - [Character recast on MiniMax H3](recast-minimax-h3.md): H3 Reference to Video as a recast engine for the MiniMax H3 prize, measured against Kling on the two real takes.
 - [Task map](task-map.md): the goals on the front page, the best workflow behind each today, what is missing and which Elements feed it.
+- [Take edits](take-edits.md): Make it longer, Redo a moment, Fix an area and Reframe; the workflows, the test runs behind each, costs and licences.
 - [Camera moves, Object Swap, Restyle and re-staging](revision-modes.md): the FLUX and LTX graphs on Comfy Cloud, their guardrails, check runs and limits.
 - [Effects on a real take, built on LTX](vfx-ltx.md): the LTX VFX survey, the three effects (clear the set, add water, day for night), the graph, check runs and limits; our VFX-with-LTX entry.
 - [Third-party IP](third-party-ip.md): every model and LoRA the app uses, its provider and licence, and what the no-borrowed-IP rule removed.

@@ -12,6 +12,10 @@ import type { MediaOperation } from "./types";
  *   lock     source, edit, matte -> the source foreground over the edit
  *   conform  source, edit        -> the edit on the source's frame grid
  *   square   source              -> the source with square pixels
+ *   append   source, edit        -> the source, then the edit on its grid
+ *
+ * `append` is the one exception to the frame count: it is the source's frames
+ * followed by every frame of the edit (a continuation of the take).
  */
 
 /** API-graph loader node per part; the client fills in the uploaded file name. */
@@ -32,6 +36,7 @@ export const MEDIA_GRAPH_PARTS: Record<
   lock: ["source", "edit", "matte"],
   conform: ["source", "edit"],
   square: ["source"],
+  append: ["source", "edit"],
 };
 
 export interface MediaGraphOptions {
@@ -160,6 +165,27 @@ export function mediaGraph(options: MediaGraphOptions): Graph {
       inputs: { image: ["edit_held", 0], batch_index: 0, length: count },
     },
   });
+  if (operation === "append") {
+    // The continuation in full, after the take: nothing is held or trimmed.
+    graph.result = {
+      class_type: "ImageBatch",
+      inputs: {
+        image1: squarePixels ? frames : ["source_fit", 0],
+        image2: ["edit_fit", 0],
+      },
+    };
+    for (const id of [
+      "edit_size",
+      "edit_last_index",
+      "edit_hold_count",
+      "edit_last",
+      "edit_hold",
+      "edit_held",
+      "conformed",
+    ])
+      delete graph[id];
+    return graph;
+  }
   if (operation === "conform") {
     graph.result = graph.conformed!;
     delete graph.conformed;

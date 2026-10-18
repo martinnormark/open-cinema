@@ -1,0 +1,124 @@
+{
+  "source": {
+    "class_type": "LoadVideo",
+    "inputs": {
+      "file": "source.mp4"
+    }
+  },
+  "source_frames": {
+    "class_type": "GetVideoComponents",
+    "inputs": {
+      "video": [
+        "source",
+        0
+      ]
+    }
+  },
+  "source_size": {
+    "class_type": "GetImageSize",
+    "inputs": {
+      "image": [
+        "source_frames",
+        0
+      ]
+    }
+  },
+  "width": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(2, round(a * 1 / 2) * 2)",
+      "values.a": [
+        "source_size",
+        0
+      ]
+    }
+  },
+  "height": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(2, round(a / 2) * 2)",
+      "values.a": [
+        "source_size",
+        1
+      ]
+    }
+  },
+  "video": {
+    "class_type": "CreateVideo",
+    "inputs": {
+      "images": [
+        "result",
+        0
+      ],
+      "fps": [
+        "source_frames",
+        2
+      ],
+      "audio": [
+        "source_frames",
+        1
+      ]
+    }
+  },
+  "save": {
+    "class_type": "SaveVideo",
+    "inputs": {
+      "video": [
+        "video",
+        0
+      ],
+      "filename_prefix": "open_cinema/append",
+      "format": "mp4",
+      "format.codec": "h264",
+      "format.codec.encoding": "re-encode",
+      "format.codec.encoding.crf": 16
+    }
+  },
+  "edit": {
+    "class_type": "VHS_LoadVideoFFmpeg",
+    "inputs": {
+      "video": "edit.mp4",
+      "force_rate": [
+        "source_frames",
+        2
+      ],
+      "custom_width": 0,
+      "custom_height": 0,
+      "frame_load_cap": 0,
+      "start_time": 0,
+      "format": "None"
+    }
+  },
+  "edit_fit": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "edit",
+        0
+      ],
+      "upscale_method": "bicubic",
+      "width": [
+        "width",
+        1
+      ],
+      "height": [
+        "height",
+        1
+      ],
+      "crop": "disabled"
+    }
+  },
+  "result": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "source_frames",
+        0
+      ],
+      "image2": [
+        "edit_fit",
+        0
+      ]
+    }
+  }
+}

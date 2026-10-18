@@ -1,8 +1,10 @@
 import {
   CAMERA_MOVES,
+  REFRAME_ASPECTS,
   RESTAGE_ANGLES,
   VFX_EFFECTS,
   type CameraMove,
+  type ReframeAspect,
   type RestageAngle,
   type VfxEffect,
 } from "@open-cinema/contracts";
@@ -52,6 +54,19 @@ import {
   LTX_VFX_OUTPUT_NODES,
   ltxVfxGraph,
 } from "./ltx-vfx";
+import {
+  LTX_FILL_MEDIA_INPUTS,
+  LTX_FILL_MODEL_ID,
+  LTX_FILL_OUTPUT_NODES,
+  ltxFillGraph,
+  type FillMode,
+} from "./ltx-fill";
+import {
+  WAN_VACE_MEDIA_INPUTS,
+  WAN_VACE_MODEL_ID,
+  WAN_VACE_OUTPUT_NODES,
+  wanAreaGraph,
+} from "./wan-vace";
 import {
   MEDIA_GRAPH_INPUTS,
   MEDIA_GRAPH_OUTPUT,
@@ -127,12 +142,14 @@ function media(operation: MediaOperation): WorkflowExport {
       lock: "Lock the performers: source foreground over the edit",
       conform: "Conform an edit to the source's frame grid",
       square: "Square a clip's pixels",
+      append: "Append a continuation after the source",
     }[operation],
     usedBy: {
       lock: "video.background-replace, as-shot variant (lock stage)",
       conform:
         "video.background-replace and video.character-replace (conform stage)",
       square: "uploads whose pixels the browser could not square",
+      append: "video.extend on Seedance 2.5 (append stage)",
     }[operation],
     ...withFiles(
       graph,
@@ -264,6 +281,53 @@ function vfx(effect: VfxEffect, keep?: string): WorkflowExport {
   };
 }
 
+function fill(
+  mode: FillMode,
+  extra: { title: string; prompt: string; aspect?: ReframeAspect },
+): WorkflowExport {
+  const graph = ltxFillGraph({
+    mode,
+    prompt: extra.prompt,
+    seed: SEED,
+    range: mode === "moment" ? { start: 2, end: 3.5 } : undefined,
+    aspect: extra.aspect ? REFRAME_ASPECTS[extra.aspect].ratio : undefined,
+    fit: "whole",
+  });
+  return {
+    file: `take-edits/${mode}${extra.aspect ? `-${extra.aspect.replace(":", "x")}` : ""}.api.json`,
+    title: extra.title,
+    usedBy: `video.${mode} (${LTX_FILL_MODEL_ID})`,
+    ...withFiles(
+      graph,
+      mode === "area"
+        ? [
+            [LTX_FILL_MEDIA_INPUTS.source, "source.mp4"],
+            [LTX_FILL_MEDIA_INPUTS.mask, "mask.png"],
+          ]
+        : [[LTX_FILL_MEDIA_INPUTS.source, "source.mp4"]],
+    ),
+    outputs: LTX_FILL_OUTPUT_NODES,
+  };
+}
+
+function wanArea(): WorkflowExport {
+  const graph = wanAreaGraph({
+    prompt: "A small glass vase of white tulips stands on the wooden table.",
+    seed: SEED,
+    reference: false,
+  });
+  return {
+    file: "take-edits/area-add.api.json",
+    title: "Fix an area: draw something new (Wan 2.1 VACE)",
+    usedBy: `video.area with words (${WAN_VACE_MODEL_ID})`,
+    ...withFiles(graph, [
+      [WAN_VACE_MEDIA_INPUTS.source, "source.mp4"],
+      [WAN_VACE_MEDIA_INPUTS.mask, "mask.png"],
+    ]),
+    outputs: WAN_VACE_OUTPUT_NODES,
+  };
+}
+
 function performance(control: PerformanceControl): WorkflowExport {
   const graph = ltxPerformanceGraph({
     prompt:
@@ -323,6 +387,7 @@ export function workflowExports(): WorkflowExport[] {
     media("lock"),
     media("conform"),
     media("square"),
+    media("append"),
     alphaBackground("image"),
     alphaBackground("video"),
     ...(Object.keys(CAMERA_MOVES) as CameraMove[]).map((m) => camera(m, true)),
@@ -332,6 +397,21 @@ export function workflowExports(): WorkflowExport[] {
     ...(Object.keys(RESTAGE_ANGLES) as RestageAngle[]).map(restage),
     ...(Object.keys(VFX_EFFECTS) as VfxEffect[]).map((e) => vfx(e)),
     vfx("clean-plate", "the couple in front"),
+    fill("area", { title: "Fix an area: clear it (LTX 2.3)", prompt: "" }),
+    wanArea(),
+    fill("moment", {
+      title: "Redo a moment",
+      prompt: "He looks up and smiles, then nods.",
+    }),
+    fill("reframe", {
+      title: "Reframe to vertical",
+      prompt: "",
+      aspect: "9:16",
+    }),
+    fill("extend", {
+      title: "Make it longer (LTX 2.3)",
+      prompt: "The action carries on naturally.",
+    }),
     performance("edges"),
     performance("edges-detailed"),
     recast(),

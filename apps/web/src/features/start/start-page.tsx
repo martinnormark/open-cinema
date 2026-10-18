@@ -1,11 +1,16 @@
 import { useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
+  Brush,
+  ChevronDown,
+  Expand,
+  FastForward,
   Film,
   Mountain,
   Package,
   Palette,
   PenLine,
+  RotateCcw,
   Sparkles,
   Upload,
   UserRound,
@@ -49,6 +54,10 @@ const GOAL_ICONS: Record<GoalId, LucideIcon> = {
   move: Mountain,
   recast: UserRound,
   swap: Package,
+  fix: Brush,
+  redo: RotateCcw,
+  longer: FastForward,
+  reframe: Expand,
   effect: Sparkles,
   look: Palette,
   camera: Video,
@@ -121,65 +130,112 @@ function GoalList({
   goal: Goal;
   onGoal: (id: GoalId) => void;
 }) {
-  const groups = [
-    { title: "Change a take", source: "take" },
-    { title: "Make from your Elements", source: "world" },
-  ] as const;
+  const [moreOpen, setMoreOpen] = useState(false);
+  // A goal chosen from a link stays visible even while "More" is closed.
+  const open = moreOpen || ("more" in goal && !!goal.more);
+  const take = goals.filter((g) => g.source === "take");
+  const more = take.filter((g) => "more" in g && g.more);
+  const option = (g: Goal) => (
+    <GoalOption
+      key={g.id}
+      option={g}
+      checked={g.id === goal.id}
+      onGoal={onGoal}
+    />
+  );
   return (
     <div className="flex flex-col gap-5">
-      {groups.map((group) => (
-        <fieldset key={group.source}>
-          <legend className="px-3 text-xs font-medium text-muted-foreground">
-            {group.title}
-          </legend>
-          <div className="mt-2 flex flex-col gap-0.5">
-            {goals
-              .filter((g) => g.source === group.source)
-              .map((option) => {
-                const Icon = GOAL_ICONS[option.id];
-                const checked = option.id === goal.id;
-                return (
-                  <label
-                    key={option.id}
-                    data-checked={checked || undefined}
-                    className="start-goal group flex cursor-pointer items-start gap-3 rounded-lg px-3 py-2 has-focus-visible:ring-2 has-focus-visible:ring-ring"
-                  >
-                    <input
-                      type="radio"
-                      name="goal"
-                      className="sr-only"
-                      checked={checked}
-                      onChange={() => onGoal(option.id)}
-                    />
-                    <Icon
-                      aria-hidden="true"
-                      className={cn(
-                        "mt-0.5 size-4 shrink-0 transition-colors",
-                        checked
-                          ? "text-tungsten"
-                          : "text-subtle-foreground group-hover:text-muted-foreground",
-                      )}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-2 text-sm font-medium">
-                        {option.title}
-                        {"caution" in option && (
-                          <span className="rounded-sm bg-muted px-1.5 py-px text-[0.6875rem] font-normal text-muted-foreground">
-                            Experimental
-                          </span>
-                        )}
-                      </span>
-                      <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">
-                        {option.promise}
-                      </span>
-                    </span>
-                  </label>
-                );
-              })}
+      <fieldset>
+        <legend className="px-3 text-xs font-medium text-muted-foreground">
+          Change a take
+        </legend>
+        <div className="mt-2 flex flex-col gap-0.5">
+          {take.filter((g) => !("more" in g && g.more)).map(option)}
+          <div className="start-more" data-open={open || undefined}>
+            <button
+              type="button"
+              aria-expanded={open}
+              aria-controls="more-take-goals"
+              onClick={() => setMoreOpen(!open)}
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <ChevronDown
+                aria-hidden="true"
+                className="start-more-chevron size-4 shrink-0"
+              />
+              {open
+                ? "Fewer"
+                : `More: ${more.map((g) => g.title.toLowerCase()).join(", ")}`}
+            </button>
+            <div
+              id="more-take-goals"
+              className="start-more-panel"
+              inert={!open || undefined}
+            >
+              <div className="start-more-inner flex flex-col gap-0.5">
+                {more.map(option)}
+              </div>
+            </div>
           </div>
-        </fieldset>
-      ))}
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend className="px-3 text-xs font-medium text-muted-foreground">
+          Make from your Elements
+        </legend>
+        <div className="mt-2 flex flex-col gap-0.5">
+          {goals.filter((g) => g.source === "world").map(option)}
+        </div>
+      </fieldset>
     </div>
+  );
+}
+
+function GoalOption({
+  option,
+  checked,
+  onGoal,
+}: {
+  option: Goal;
+  checked: boolean;
+  onGoal: (id: GoalId) => void;
+}) {
+  const Icon = GOAL_ICONS[option.id as GoalId];
+  return (
+    <label
+      data-checked={checked || undefined}
+      className="start-goal group flex cursor-pointer items-start gap-3 rounded-lg px-3 py-2 has-focus-visible:ring-2 has-focus-visible:ring-ring"
+    >
+      <input
+        type="radio"
+        name="goal"
+        className="sr-only"
+        checked={checked}
+        onChange={() => onGoal(option.id as GoalId)}
+      />
+      <Icon
+        aria-hidden="true"
+        className={cn(
+          "mt-0.5 size-4 shrink-0 transition-colors",
+          checked
+            ? "text-tungsten"
+            : "text-subtle-foreground group-hover:text-muted-foreground",
+        )}
+      />
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-2 text-sm font-medium">
+          {option.title}
+          {"caution" in option && option.caution && (
+            <span className="rounded-sm bg-muted px-1.5 py-px text-[0.6875rem] font-normal text-muted-foreground">
+              Experimental
+            </span>
+          )}
+        </span>
+        <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">
+          {option.promise}
+        </span>
+      </span>
+    </label>
   );
 }
 

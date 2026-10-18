@@ -4,21 +4,13 @@ import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { parseAssetRefKey } from "@/features/library";
 import { ReplacementStudio } from "@/features/revision/replacement-studio";
+import { replacementKindSchema } from "@/features/revision/model";
 import { getProjectHome, getRevisionView } from "@/server/revisions";
 
 export const Route = createFileRoute("/revisions/new")({
   validateSearch: z.object({
     source: z.string().max(400).optional(),
-    kind: z
-      .enum([
-        "background",
-        "character",
-        "object",
-        "restyle",
-        "camera",
-        "effect",
-      ])
-      .optional(),
+    kind: replacementKindSchema.optional(),
     project: z.string().max(100).optional(),
     /** An Element chosen on the front page for this mode. */
     element: z.string().max(100).optional(),

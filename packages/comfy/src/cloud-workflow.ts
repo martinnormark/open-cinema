@@ -110,6 +110,14 @@ function isCloudRequest(
 }
 
 async function download(url: string, signal: AbortSignal) {
+  // A brushed mask travels inline in the request; Workers cannot fetch data: URLs.
+  const inline = /^data:[^;,]+;base64,(.*)$/.exec(url);
+  if (inline) {
+    const bytes = Uint8Array.from(atob(inline[1]!), (c) => c.charCodeAt(0));
+    if (bytes.byteLength > MAX_MEDIA_BYTES)
+      throw new Error("This mask is too large to send to Comfy Cloud");
+    return bytes;
+  }
   const response = await fetch(url, { signal });
   if (!response.ok)
     throw new Error(`Media download failed: ${response.status}`);

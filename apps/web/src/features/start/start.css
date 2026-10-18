@@ -82,3 +82,33 @@
     animation: none;
   }
 }
+
+/* "More ways to change a take": an accordion (transitions.dev 21). Height
+   rides grid rows so nothing is measured; the inner list fades and unblurs. */
+.start-more-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--duration-fast) var(--ease-smooth-out);
+}
+.start-more[data-open] .start-more-panel {
+  grid-template-rows: 1fr;
+}
+.start-more-inner {
+  min-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  filter: blur(2px);
+  transition:
+    opacity var(--duration-fast) var(--ease-smooth-out),
+    filter var(--duration-fast) var(--ease-smooth-out);
+}
+.start-more[data-open] .start-more-inner {
+  opacity: 1;
+  filter: blur(0);
+}
+.start-more-chevron {
+  transition: transform var(--duration-fast) var(--ease-smooth-out);
+}
+.start-more[data-open] .start-more-chevron {
+  transform: scaleY(-1);
+}

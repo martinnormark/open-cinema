@@ -101,7 +101,7 @@ export function ltxVideoOutputs(data: unknown): ProviderOutput[] {
 }
 
 /** One mention's approved references, a Character's close portrait first. */
-function referencesOf(mention: BuildContext["mentions"][number]) {
+export function referencesOf(mention: BuildContext["mentions"][number]) {
   return mention.type === "character"
     ? characterReferences(mention)
     : mention.references;

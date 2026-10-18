@@ -151,6 +151,10 @@ export interface LtxSamplerOptions {
   firstFrame?: { image: Link; strength: number } | undefined;
   /** An IC-LoRA guide clip, aligned with the output from frame 0. */
   guide?: { image: Link; strength: number } | undefined;
+  /** Single frames pinned at their place in the clip (no IC-LoRA). */
+  keyframes?:
+    | readonly { image: Link; frame: Link | number; strength: number }[]
+    | undefined;
   /** Defaults to `euler_ancestral`. */
   sampler?: string;
   /**
@@ -266,6 +270,23 @@ export function ltxSamplerNodes(o: LtxSamplerOptions) {
     negative = [n("guide"), 1];
     latent = [n("guide"), 2];
   }
+  o.keyframes?.forEach((key, i) => {
+    nodes[n(`key_${i}`)] = {
+      class_type: "LTXVAddGuide",
+      inputs: {
+        positive,
+        negative,
+        vae,
+        latent,
+        image: key.image,
+        frame_idx: key.frame,
+        strength: key.strength,
+      },
+    };
+    positive = [n(`key_${i}`), 0];
+    negative = [n(`key_${i}`), 1];
+    latent = [n(`key_${i}`), 2];
+  });
   Object.assign(nodes, {
     [n("empty_audio")]: {
       class_type: "LTXVEmptyLatentAudio",

@@ -14,6 +14,12 @@ import {
   restyleWorkflow,
   vfxWorkflow,
 } from "./revision-modes";
+import {
+  areaWorkflow,
+  extendWorkflow,
+  momentWorkflow,
+  reframeWorkflow,
+} from "./take-edits";
 import type { WorkflowDefinition, WorkflowStage } from "./types";
 
 export type {
@@ -108,6 +114,18 @@ export {
 export { ltxCameraGraph } from "./ltx-camera";
 export { ltxRestageGraph, LTX_RESTAGE_LIMITS } from "./ltx-restage";
 export { ltxVfxGraph, ltxVfxPrompts, LTX_VFX_LIMITS } from "./ltx-vfx";
+export { ltxFillGraph, LTX_FILL_LIMITS, LTX_FILL_MODELS } from "./ltx-fill";
+export { wanAreaGraph, WAN_VACE_LIMITS, WAN_VACE_MODELS } from "./wan-vace";
+export {
+  areaAdds,
+  areaWorkflow,
+  extendWorkflow,
+  leadReferences,
+  momentWorkflow,
+  reframeWorkflow,
+  seedanceExtendPrompt,
+  SEEDANCE_EXTEND_MODEL,
+} from "./take-edits";
 
 type Registry = { [K in WorkflowKind]?: WorkflowDefinition<K> };
 
@@ -128,6 +146,10 @@ const registry: Registry = {
   "video.restyle": restyleWorkflow,
   "video.restage": restageWorkflow,
   "video.vfx": vfxWorkflow,
+  "video.extend": extendWorkflow,
+  "video.area": areaWorkflow,
+  "video.moment": momentWorkflow,
+  "video.reframe": reframeWorkflow,
 };
 
 export function getWorkflowDefinition<K extends WorkflowKind>(

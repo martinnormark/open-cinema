@@ -1,16 +1,22 @@
 import { expect, it } from "vitest";
 import {
+  areaInputsSchema,
+  extendInputsSchema,
   ltxVideoInputsSchema,
+  momentInputsSchema,
+  reframeInputsSchema,
   objectSwapInputsSchema,
   restageInputsSchema,
   restyleInputsSchema,
   vfxInputsSchema,
+  type ExtendInputs,
   type ResolvedMention,
 } from "@open-cinema/contracts";
 import {
   getWorkflowDefinition,
   type BuildContext,
   type CloudWorkflowRequest,
+  type WorkflowDefinition,
 } from "@open-cinema/comfy";
 
 const lantern: ResolvedMention = {
@@ -255,4 +261,147 @@ it("runs a camera move on Cloud and leaves free-camera LTX on Router", async () 
   );
   expect(loras.some((name) => /dolly-in/i.test(name))).toBe(true);
   expect(request.input.media).toHaveLength(0);
+});
+
+const maya: ResolvedMention = {
+  ...lantern,
+  elementId: "char-maya",
+  handle: "Maya",
+  name: "Maya",
+  type: "character",
+  description: "A woman in her thirties with short dark hair.",
+  references: [
+    {
+      asset: { type: "media-asset", assetId: "maya-portrait" },
+      view: "front",
+      roles: ["identity"],
+    },
+  ],
+};
+const MASK = "data:image/png;base64,iVBORw0KGgo=";
+
+it("clears a painted area with LTX, and draws new words in it with Wan VACE", async () => {
+  const definition = getWorkflowDefinition("video.area")!;
+  const clear = areaInputsSchema.parse({
+    source,
+    mask: MASK,
+    preservation: { preserve: ["camera"] },
+  });
+  const add = areaInputsSchema.parse({ ...clear, prompt: "A vase of tulips" });
+  expect(definition.model(clear)).toBe("comfy-cloud/ltx-2.3-fill");
+  expect(definition.model(add)).toBe("comfy-cloud/wan-2.1-vace");
+  for (const inputs of [clear, add]) {
+    const request = (await definition.build(
+      inputs,
+      context,
+    )) as CloudWorkflowRequest;
+    expectWired(request, definition.cloudOutputNodes!);
+    expect(request.input.media.map((m) => m.url)).toEqual([
+      "https://comfy-storage.test/take",
+      MASK,
+    ]);
+    // The take's own pixels go back outside the painted area.
+    const composite = graphOf(request).result!;
+    expect(composite.inputs.destination).toEqual(["source_clip", 0]);
+  }
+  const wan = (await definition.build(add, context)) as CloudWorkflowRequest;
+  expect(ofType(wan, "WanVaceToVideo")).toHaveLength(1);
+  // The template's CausVid LoRA is non-commercial; it stays out.
+  expect(ofType(wan, "LoraLoaderModelOnly")).toHaveLength(0);
+});
+
+const stagesOf = (
+  definition: WorkflowDefinition<"video.extend">,
+  inputs: ExtendInputs,
+) =>
+  typeof definition.stages === "function"
+    ? definition.stages(inputs)
+    : (definition.stages ?? []);
+
+it("redoes a moment with keyframes either side and splices it into the take", async () => {
+  const definition = getWorkflowDefinition("video.moment")!;
+  const inputs = momentInputsSchema.parse({
+    source,
+    range: { start: 2, end: 3.4 },
+    prompt: "@Maya looks up and smiles",
+    mentions: [{ elementId: "char-maya" }],
+    preservation: { preserve: ["framing"] },
+  });
+  const request = (await definition.build(inputs, {
+    ...context,
+    mentions: [maya],
+  })) as CloudWorkflowRequest;
+  expectWired(request, definition.cloudOutputNodes!);
+  expect(ofType(request, "LTXVAddGuide").length).toBeGreaterThanOrEqual(4);
+  expect(ofType(request, "ReplaceImagesInBatch")).toHaveLength(1);
+  const prompts = ofType(request, "CLIPTextEncode").map((n) => n.inputs.text);
+  expect(prompts.some((p) => String(p).includes("short dark hair"))).toBe(true);
+  expect(() =>
+    momentInputsSchema.parse({ ...inputs, range: { start: 1, end: 5 } }),
+  ).toThrow();
+});
+
+it("reframes to a new aspect with the outpaint IC-LoRA", async () => {
+  const definition = getWorkflowDefinition("video.reframe")!;
+  const inputs = reframeInputsSchema.parse({
+    source,
+    aspect: "9:16",
+    preservation: { preserve: ["performance"] },
+  });
+  const request = (await definition.build(
+    inputs,
+    context,
+  )) as CloudWorkflowRequest;
+  expectWired(request, definition.cloudOutputNodes!);
+  const loras = ofType(request, "LoraLoaderModelOnly").map(
+    (n) => n.inputs.lora_name,
+  );
+  expect(loras).toContain("ltx-2.3-22b-ic-lora-outpaint.safetensors");
+});
+
+it("makes a take longer with Seedance extend, sending the Character's portrait", async () => {
+  const definition = getWorkflowDefinition("video.extend")!;
+  const inputs = extendInputsSchema.parse({
+    source,
+    seconds: 6,
+    prompt: "@Maya walks in from the left",
+    mentions: [{ elementId: "char-maya" }],
+    preservation: { preserve: ["performance"] },
+  });
+  expect(definition.provider?.(inputs)).toBe("router");
+  const request = await definition.build(inputs, {
+    ...context,
+    mentions: [maya],
+  });
+  const input = request.input as {
+    content: { type: string; role?: string; text?: string }[];
+    omni_reference_task_type: string;
+    duration: number;
+  };
+  expect(input.omni_reference_task_type).toBe("extend");
+  expect(input.duration).toBe(6);
+  expect(input.content.map((c) => c.role ?? c.type)).toEqual([
+    "text",
+    "reference_video",
+    "reference_image",
+  ]);
+  expect(input.content[0]!.text).toContain("[Image 1]");
+  expect(stagesOf(definition, inputs).map((s) => s.id)).toEqual(["conform"]);
+});
+
+it("makes a take longer with LTX as one Cloud graph", async () => {
+  const definition = getWorkflowDefinition("video.extend")!;
+  const inputs = extendInputsSchema.parse({
+    source,
+    pipeline: "ltx",
+    preservation: { preserve: ["performance"] },
+  });
+  expect(definition.provider?.(inputs)).toBe("cloud-workflow");
+  const request = (await definition.build(
+    inputs,
+    context,
+  )) as CloudWorkflowRequest;
+  expectWired(request, definition.cloudOutputNodes!);
+  expect(ofType(request, "ImageBatch").length).toBeGreaterThanOrEqual(1);
+  expect(stagesOf(definition, inputs)).toHaveLength(0);
 });
