@@ -5,7 +5,10 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { useGeneration } from "@/features/generation/store";
 import { JobList } from "@/features/generation/job-list";
-export const Route = createFileRoute("/activity")({ component: Activity });
+export const Route = createFileRoute("/activity")({
+  head: () => ({ meta: [{ title: "Activity · Open Cinema" }] }),
+  component: Activity,
+});
 function Activity() {
   const { snapshot, connection } = useGeneration();
   return (
@@ -18,7 +21,9 @@ function Activity() {
         description={
           connection === "live"
             ? "Live updates across all your generations."
-            : "Connecting to your jobs. Existing jobs keep running."
+            : !snapshot && connection === "unavailable"
+              ? "Connect a session in Studio to follow your generations."
+              : "Connecting to your jobs. Existing jobs keep running."
         }
       />
       {snapshot?.jobs.length ? (
@@ -28,7 +33,9 @@ function Activity() {
       ) : (
         <EmptyState
           icon={ActivityIcon}
-          title="Nothing is running"
+          title={
+            !snapshot ? "Your activity starts in Studio" : "Nothing is running"
+          }
           className="mt-8"
           actions={
             <Button asChild>

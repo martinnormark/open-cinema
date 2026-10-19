@@ -78,7 +78,7 @@ function AppLayout() {
       </a>
       <AppSidebar />
       <SidebarInset>
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-3 md:px-4">
+        <header className="studio-header flex h-14 shrink-0 items-center gap-3 border-b border-border px-3 md:px-4">
           <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
         </header>
         <main id="main-content" tabIndex={-1} className="flex-1 outline-none">

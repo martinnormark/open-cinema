@@ -19,37 +19,38 @@ export function GenerationOrb() {
     ? activity === "thinking"
       ? "Thinking"
       : "Idle"
-    : "Syncing";
+    : connection === "unavailable"
+      ? "Not connected"
+      : "Connecting";
   const status = snapshot?.jobs.some((j) => j.state === "needs_attention")
     ? "Needs attention"
-    : connection === "live"
-      ? "View activity"
-      : connection === "reconnecting"
-        ? "Reconnecting"
-        : connection === "unavailable"
-          ? "Offline"
-          : "Connecting";
+    : !snapshot && connection === "unavailable"
+      ? "Start in Studio"
+      : connection === "live"
+        ? "View activity"
+        : connection === "reconnecting"
+          ? "Reconnecting"
+          : connection === "unavailable"
+            ? "Offline"
+            : "Connecting";
+  const fallback = (
+    <span aria-hidden="true" className="orb-static">
+      <span className="orb-fallback" />
+    </span>
+  );
   return (
     <Link
-      to="/activity"
+      to={!snapshot && connection === "unavailable" ? "/studio" : "/activity"}
       className="generation-orb"
       aria-label={`${label}. ${status}`}
     >
-      <Suspense
-        fallback={
-          <span
-            className="orb-fallback"
-            style={{ position: "relative", width: 56, height: 56 }}
-          />
-        }
-      >
-        <StudioOrb
-          size={56}
-          state={activity}
-          paused={paused || !snapshot}
-          maxDpr={1.5}
-        />
-      </Suspense>
+      {snapshot && !paused ? (
+        <Suspense fallback={fallback}>
+          <StudioOrb size={56} state={activity} paused={false} maxDpr={1.5} />
+        </Suspense>
+      ) : (
+        fallback
+      )}
       <span>
         <span className="block text-sm font-medium" role="status">
           {label}

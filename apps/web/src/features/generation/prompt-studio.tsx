@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import {
   CAMERA_MOVES,
   WORKFLOW_DESCRIPTORS,
@@ -12,7 +12,15 @@ import {
   type WorkflowCommandInput,
 } from "@open-cinema/contracts";
 import { estimateGeneration } from "@open-cinema/comfy/estimates";
-import { Shuffle, ArrowUp, Image as ImageIcon } from "lucide-react";
+import {
+  Shuffle,
+  ArrowUp,
+  ArrowRight,
+  ChevronDown,
+  CircleHelp,
+  X,
+  Image as ImageIcon,
+} from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -71,6 +79,8 @@ export function PromptStudio({
   projectId?: string;
 }) {
   const { snapshot, connection } = useGeneration();
+  const form = useRef<HTMLFormElement>(null);
+  const [ideasOpen, setIdeasOpen] = useState(false);
   const [draft] = useState<StudioDraft | null>(takeStudioDraft);
   const [prompt, setPrompt] = useState(draft?.prompt ?? "");
   const [medium, setMedium] = useState<Medium>(draft?.medium ?? "image");
@@ -133,7 +143,13 @@ export function PromptStudio({
     }
   }
   async function generate() {
-    if (busy || (!uncertain && blockingMentionProblem(mentions))) return;
+    if (
+      busy ||
+      !snapshot ||
+      (!uncertain &&
+        (prompt.trim().length < 3 || blockingMentionProblem(mentions)))
+    )
+      return;
     const command: WorkflowCommandInput = uncertain ?? {
       idempotencyKey: crypto.randomUUID(),
       request,
@@ -164,6 +180,17 @@ export function PromptStudio({
       setBusy(false);
     }
   }
+  function choosePrompt(value: string) {
+    setPrompt(value);
+    form.current
+      ?.querySelector<HTMLTextAreaElement>("#generation-prompt")
+      ?.focus();
+  }
+  const canGenerate =
+    !!snapshot &&
+    !busy &&
+    (!!uncertain ||
+      (prompt.trim().length >= 3 && !blockingMentionProblem(mentions)));
   return (
     <section
       className="mx-auto w-full max-w-6xl px-6 pt-10 pb-32 md:px-12 md:pt-14"
@@ -172,32 +199,146 @@ export function PromptStudio({
       <div className="max-w-4xl">
         {introduction}
         <form
+          ref={form}
           className="mt-8"
           onSubmit={(event) => {
             event.preventDefault();
             void generate();
           }}
         >
-          <label
-            htmlFor="generation-prompt"
-            className="mb-2 block text-sm font-medium"
+          <div className="studio-composer">
+            <label
+              htmlFor="generation-prompt"
+              className="mb-2 flex items-center gap-2 text-sm font-medium"
+            >
+              <ImageIcon aria-hidden="true" className="size-4" /> Your prompt
+            </label>
+            <MentionTextarea
+              id="generation-prompt"
+              value={prompt}
+              onValueChange={setPrompt}
+              onKeyDown={(event) => {
+                if (
+                  event.key === "Enter" &&
+                  (event.metaKey || event.ctrlKey) &&
+                  !event.nativeEvent.isComposing
+                ) {
+                  event.preventDefault();
+                  if (canGenerate) event.currentTarget.form?.requestSubmit();
+                }
+              }}
+              // Opened from an Element or a recipe: keep writing after it.
+              focusAtEnd={!!draft}
+              disabled={!!uncertain}
+              maxLength={2000}
+              minLength={3}
+              required
+              rows={5}
+              placeholder="A place, a subject, a moment. Type @ to bring in your Elements."
+              aria-describedby="generation-estimate prompt-hint"
+            />
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={!!uncertain}
+                onClick={() => {
+                  const alternatives = prompts.filter((p) => p !== prompt);
+                  choosePrompt(
+                    alternatives[
+                      Math.floor(Math.random() * alternatives.length)
+                    ]!,
+                  );
+                }}
+              >
+                <Shuffle aria-hidden="true" /> Surprise me
+              </Button>
+              <div className="flex items-center gap-2">
+                <span className="tabular text-xs text-muted-foreground">
+                  {prompt.length.toLocaleString()} / 2,000
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Clear prompt"
+                  disabled={!prompt || !!uncertain}
+                  onClick={() => choosePrompt("")}
+                >
+                  <X aria-hidden="true" />
+                </Button>
+              </div>
+            </div>
+          </div>
+          <p
+            id="prompt-hint"
+            className="mt-3 text-xs leading-5 text-muted-foreground"
           >
-            Your prompt
-          </label>
-          <MentionTextarea
-            id="generation-prompt"
-            value={prompt}
-            onValueChange={setPrompt}
-            // Opened from an Element or a recipe: keep writing after it.
-            focusAtEnd={!!draft}
-            disabled={!!uncertain}
-            maxLength={2000}
-            minLength={3}
-            required
-            rows={5}
-            placeholder="A place, a subject, a moment. Type @ to bring in your Elements."
-            aria-describedby="generation-estimate"
-          />
+            {uncertain
+              ? "Your prompt is kept safe. Retry to check this request."
+              : !snapshot
+                ? "Start a local session below to generate. Your prompt stays here."
+                : "Describe your scene, then generate. Ctrl / ⌘ + Enter to send."}
+          </p>
+          <div className="t-acc prompt-ideas" data-open={ideasOpen}>
+            <button
+              type="button"
+              className="t-acc-head ideas-trigger"
+              aria-expanded={ideasOpen}
+              aria-controls="prompt-ideas"
+              onClick={() => setIdeasOpen(!ideasOpen)}
+            >
+              <span className="flex items-center gap-2">
+                <CircleHelp aria-hidden="true" className="size-4" /> Need a
+                starting point?
+              </span>
+              <span
+                className="t-icon-swap"
+                data-state={ideasOpen ? "b" : "a"}
+                aria-hidden="true"
+              >
+                <ChevronDown className="t-icon size-4" data-icon="a" />
+                <X className="t-icon size-4" data-icon="b" />
+              </span>
+            </button>
+            <div
+              id="prompt-ideas"
+              className="t-acc-panel"
+              inert={!ideasOpen}
+              aria-hidden={!ideasOpen}
+            >
+              <div className="t-acc-panel-inner">
+                <div className="ideas-content">
+                  <p className="mb-3 text-sm text-muted-foreground">
+                    Choose a scene, then make it your own. This replaces your
+                    prompt.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {prompts.map((idea, index) => (
+                      <button
+                        type="button"
+                        key={idea}
+                        className="prompt-choice"
+                        disabled={!!uncertain}
+                        onClick={() => choosePrompt(idea)}
+                      >
+                        {
+                          [
+                            "Wildlife at sunrise",
+                            "Rainy Copenhagen",
+                            "A lunar greenhouse",
+                            "An editorial still life",
+                            "A coastal observatory",
+                          ][index]
+                        }
+                        <ArrowRight aria-hidden="true" className="size-3.5" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
           <MentionSummary mentions={mentions} className="mt-3" />
           <StudioDirection
             projects={projects.projects}
@@ -289,42 +430,33 @@ export function PromptStudio({
                   ))}
                 </ToggleGroup>
               )}
+            </div>
+            {!snapshot ? (
               <Button
                 type="button"
-                variant="ghost"
-                disabled={!!uncertain}
-                onClick={() => {
-                  const alternatives = prompts.filter((p) => p !== prompt);
-                  setPrompt(
-                    alternatives[
-                      Math.floor(Math.random() * alternatives.length)
-                    ]!,
-                  );
-                }}
+                className="max-sm:w-full"
+                disabled={busy}
+                onClick={() => void start()}
               >
-                <Shuffle aria-hidden="true" /> Surprise me
+                {busy ? "Connecting…" : "Start local session"}
+                <ArrowRight aria-hidden="true" />
               </Button>
-            </div>
-            <Button
-              type="submit"
-              className="max-sm:w-full"
-              disabled={
-                !snapshot ||
-                busy ||
-                (!uncertain &&
-                  (prompt.trim().length < 3 ||
-                    !!blockingMentionProblem(mentions)))
-              }
-            >
-              {busy
-                ? "Sending…"
-                : uncertain
-                  ? "Retry request"
-                  : medium === "video"
-                    ? "Generate video"
-                    : "Generate image"}
-              <ArrowUp aria-hidden="true" />
-            </Button>
+            ) : (
+              <Button
+                type="submit"
+                className="max-sm:w-full"
+                disabled={!canGenerate}
+              >
+                {busy
+                  ? "Sending…"
+                  : uncertain
+                    ? "Retry request"
+                    : medium === "video"
+                      ? "Generate video"
+                      : "Generate image"}
+                <ArrowUp aria-hidden="true" />
+              </Button>
+            )}
           </div>
           <p
             id="generation-estimate"
@@ -351,22 +483,6 @@ export function PromptStudio({
               ` · GPU time, about ${Math.round(estimate.seconds.min / 60)}–${Math.round(estimate.seconds.max / 60)} min`}
           </p>
         </form>
-        {(!snapshot || connection === "unavailable") && (
-          <div className="mt-6 rounded-lg bg-muted p-4">
-            <p className="text-sm leading-6">
-              Start a local test session to generate images. Jobs stay with this
-              browser session.
-            </p>
-            <Button
-              variant="outline"
-              className="mt-3"
-              disabled={busy}
-              onClick={() => void start()}
-            >
-              Start local session
-            </Button>
-          </div>
-        )}
         {error && (
           <p role="alert" className="mt-4 text-sm leading-6 text-destructive">
             {error}

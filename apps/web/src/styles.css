@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "./motion.css";
 @import "@fontsource-variable/inter/opsz.css";
 
 /*
@@ -239,21 +240,37 @@
 .generation-orb:hover {
   background: var(--hover);
 }
-/* On phones the Orb keeps only its sphere so it never covers the controls;
-   its words stay available to assistive technology. */
-@media (max-width: 39.99rem) {
-  .generation-orb {
-    right: 1rem;
-    min-width: 0;
-    padding: 0.25rem;
+.orb-static {
+  display: inline-block;
+  position: relative;
+  width: 56px;
+  height: 56px;
+}
+/* Keep activity visible without covering the mobile creative controls. */
+@media (max-width: 767px) {
+  .studio-header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--background);
   }
-  .generation-orb > span:last-child {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
+  .generation-orb {
+    right: 12px;
+    top: 3px;
+    bottom: auto;
+    min-width: 0;
+    padding: 3px 12px 3px 3px;
+    gap: 4px;
+  }
+  .generation-orb > span:first-child {
+    width: 40px !important;
+    height: 40px !important;
+  }
+  .generation-orb > span:last-child > span:first-child {
+    font-size: 0.75rem;
+  }
+  .generation-orb > span:last-child > span:last-child {
+    font-size: 0.6875rem;
   }
 }
 .orb-fallback {
@@ -373,5 +390,68 @@ textarea::selection {
 @keyframes job-live {
   50% {
     opacity: 0.35;
+  }
+}
+
+/* Prompt tools inherit the current screening-room tokens. */
+.studio-composer {
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.prompt-ideas {
+  margin-top: 20px;
+  border-block: 1px solid var(--border);
+  --icon-swap-blur: 0px;
+}
+.ideas-trigger {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 52px;
+  text-align: left;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.ideas-trigger:focus-visible,
+.prompt-choice:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+.ideas-trigger:hover {
+  color: var(--muted-foreground);
+}
+.ideas-content {
+  padding: 0 0 20px;
+}
+.prompt-choice {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+.prompt-choice:hover {
+  background: var(--hover);
+}
+.prompt-choice:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+/* Blur setup stalled the GPU in the recorded mobile test. */
+.prompt-ideas .t-acc-panel-inner {
+  filter: none;
+}
+@media (max-width: 767px) {
+  .studio-composer {
+    padding: 16px;
   }
 }

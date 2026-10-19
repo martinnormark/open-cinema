@@ -24,7 +24,10 @@ export function acceptSnapshot(snapshot: JobSnapshot) {
 async function refresh(currentEpoch: number): Promise<boolean> {
   try {
     const snapshot = await getJobSnapshot();
-    if (currentEpoch === epoch && snapshot) acceptSnapshot(snapshot);
+    if (currentEpoch === epoch) {
+      if (snapshot) acceptSnapshot(snapshot);
+      else update({ ...state, connection: "unavailable" });
+    }
     return !!snapshot;
   } catch {
     if (currentEpoch === epoch) update({ ...state, connection: "unavailable" });
