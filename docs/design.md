@@ -49,6 +49,10 @@ Radii: 6px controls, 12px cards and dialogs (`rounded-xl`), full pills only for 
 
 Every empty surface uses [`EmptyState`](../apps/web/src/components/empty-state.tsx): a 2.39:1 frame with crop marks, the place the work will appear. It always names what will live there and offers one next step. [`PageHeader`](../apps/web/src/components/page-header.tsx) gives pages a consistent title block with optional actions.
 
+## Real work on screen
+
+Nothing a creator opens first should be empty or abstract. Each take goal on the front page plays a short loop of that mode done on real footage (`apps/web/public/examples`, a wipe from take to result where both exist), behind the drop controls and with a caption saying what changed. With reduced motion it is a still. Where the studio has no Elements or sequences yet, it offers **the Tide Mill**, a starter world (Cal, the Tide Mill, the storm lantern, a project look and a four-shot scene) that imports through the ordinary world bundle path ([`starter-world.ts`](../apps/web/src/features/start/starter-world.ts)), so everything it creates belongs to the creator. Use media the studio actually made; never stock.
+
 ## Motion
 
 Motion tokens follow the transitions.dev scale (`--duration-*`, `--ease-smooth-out`) and are matched by purpose, not nearest number:

@@ -60,7 +60,7 @@ export function ElementCover({
   return (
     <div className={cn("relative overflow-hidden bg-surface", className)}>
       {move && (
-        <span className="absolute right-2 bottom-2 z-10 flex items-center gap-1 rounded-sm bg-background/90 px-1.5 py-0.5 text-xs font-medium">
+        <span className="absolute top-2 right-2 z-10 flex items-center gap-1 rounded-sm bg-background/90 px-1.5 py-0.5 text-xs font-medium">
           <Film aria-hidden="true" className="size-3" />
           Moving reference
         </span>

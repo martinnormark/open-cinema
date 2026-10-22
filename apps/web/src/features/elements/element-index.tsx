@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
-import { Plus, Shapes } from "lucide-react";
-import { EmptyState } from "@/components/empty-state";
+import { Plus } from "lucide-react";
+import { CropMarks } from "@/components/empty-state";
+import { StarterWorld } from "@/features/start/starter-card";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -80,11 +81,16 @@ function IndexSkeleton() {
 function FirstElement() {
   return (
     <div className="mt-10">
-      <EmptyState icon={Shapes} title="Start your world">
+      <div className="relative rounded-sm bg-surface/60 p-6 md:p-8">
+        <CropMarks />
+        <StarterWorld signedOut={false} className="mx-auto max-w-3xl" />
+      </div>
+      <h2 className="mt-14 text-lg font-medium">Or start your own</h2>
+      <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
         Most stories begin with someone, somewhere, holding something. Each type
         guides you to the views that keep it recognizable in every shot.
-      </EmptyState>
-      <ul className="mt-10 grid gap-x-10 gap-y-8 md:grid-cols-3">
+      </p>
+      <ul className="mt-8 grid gap-x-10 gap-y-8 md:grid-cols-3">
         {elementTypeOrder.map((type) => {
           const info = elementTypes[type];
           const Icon = typeIcons[type];
@@ -95,7 +101,7 @@ function FirstElement() {
                 className="size-5 text-subtle-foreground"
                 strokeWidth={1.5}
               />
-              <h2 className="mt-3 text-base font-medium">{info.label}</h2>
+              <h3 className="mt-3 text-base font-medium">{info.label}</h3>
               <p className="mt-1 flex-1 text-sm leading-6 text-muted-foreground">
                 {info.establishes}
               </p>

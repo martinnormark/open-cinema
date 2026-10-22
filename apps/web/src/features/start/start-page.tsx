@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type CSSProperties } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   Brush,
@@ -23,6 +23,7 @@ import {
   type ElementType,
 } from "@open-cinema/contracts";
 import { CropMarks } from "@/components/empty-state";
+import { LoopingClip } from "@/components/looping-clip";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -49,6 +50,8 @@ import {
   type TakeGoal,
   type WorldGoal,
 } from "./goals";
+import { bringSampleTake } from "./starter";
+import { StarterWorld } from "./starter-card";
 import "./start.css";
 
 const GOAL_ICONS: Record<GoalId, LucideIcon> = {
@@ -64,6 +67,23 @@ const GOAL_ICONS: Record<GoalId, LucideIcon> = {
   camera: Video,
   shot: PenLine,
   scene: Film,
+};
+
+/**
+ * What each take goal looks like done, on real footage: a short loop in
+ * public/examples, a wipe from the take to the result where both exist.
+ */
+const EXAMPLES: Record<Exclude<GoalId, "shot" | "scene">, string> = {
+  move: "the kitchen table take, moved to a cottage by the sea",
+  recast: "the young man at the table, played by another Character",
+  swap: "the table lamp swapped for the storm lantern",
+  fix: "the glass on the table painted out",
+  redo: "a second and a half of his answer, acted again",
+  longer: "the kitchen take, carried on three seconds past its end",
+  reframe: "a wide take made vertical, the ceiling and floor drawn in",
+  effect: "day for night on a street-side take",
+  look: "a daytime café take restyled to evening",
+  camera: "the café take, filmed from a step further back",
 };
 
 /**
@@ -136,10 +156,13 @@ function GoalList({
   const open = moreOpen || ("more" in goal && !!goal.more);
   const take = goals.filter((g) => g.source === "take");
   const more = take.filter((g) => "more" in g && g.more);
+  // One entrance for the page: the goals rise in, in reading order.
+  const order = new Map<string, number>(goals.map((g, i) => [g.id, i + 1]));
   const option = (g: Goal) => (
     <GoalOption
       key={g.id}
       option={g}
+      order={order.get(g.id) ?? 0}
       checked={g.id === goal.id}
       onGoal={onGoal}
     />
@@ -194,10 +217,12 @@ function GoalList({
 
 function GoalOption({
   option,
+  order,
   checked,
   onGoal,
 }: {
   option: Goal;
+  order: number;
   checked: boolean;
   onGoal: (id: GoalId) => void;
 }) {
@@ -205,7 +230,8 @@ function GoalOption({
   return (
     <label
       data-checked={checked || undefined}
-      className="start-goal group flex cursor-pointer items-start gap-3 rounded-lg px-3 py-2 has-focus-visible:ring-2 has-focus-visible:ring-ring"
+      style={{ "--i": order } as CSSProperties}
+      className="start-goal start-rise group flex cursor-pointer items-start gap-3 rounded-lg px-3 py-2 has-focus-visible:ring-2 has-focus-visible:ring-ring"
     >
       <input
         type="radio"
@@ -305,6 +331,19 @@ function TakeStage({ goal }: { goal: TakeGoal }) {
       setUploading(null);
     }
   }
+  async function trySample() {
+    setError("");
+    setUploading("the kitchen table take");
+    try {
+      const item = await bringSampleTake(session.signedOut);
+      if (item) open(item);
+      else setError("The sample take could not be added. Try again.");
+    } catch {
+      setError("The sample take could not be added. Try again.");
+    } finally {
+      setUploading(null);
+    }
+  }
   const drop = useFileDrop((files) => void upload(files));
 
   return (
@@ -312,53 +351,71 @@ function TakeStage({ goal }: { goal: TakeGoal }) {
       <div
         {...drop.handlers}
         data-active={drop.active || undefined}
-        className="start-drop relative flex min-h-72 flex-col items-center justify-center rounded-sm px-6 py-10 text-center sm:aspect-video sm:min-h-0 sm:py-0"
+        className="start-drop relative isolate flex min-h-80 flex-col justify-end overflow-hidden rounded-sm sm:aspect-video sm:min-h-0"
       >
+        <div key={goal.id} aria-hidden="true" className="start-example">
+          <LoopingClip
+            src={`/examples/${goal.id}.mp4`}
+            poster={`/examples/${goal.id}.jpg`}
+          />
+        </div>
+        <div aria-hidden="true" className="start-scrim" />
         <CropMarks />
-        <Upload
-          aria-hidden="true"
-          strokeWidth={1.5}
-          className="start-drop-icon size-6 text-subtle-foreground"
-        />
-        <h2 key={goal.id} className="start-swap mt-4 text-lg font-medium">
-          {goal.title}
-        </h2>
-        <p className="mt-1.5 max-w-sm text-sm leading-6 text-muted-foreground">
-          {uploading ? (
-            <span role="status" className="start-pending">
-              Uploading {uploading}…
-            </span>
-          ) : (
-            "Drop a take here. MP4, MOV or WebM, up to two minutes."
-          )}
-        </p>
-        <Button
-          className="mt-5"
-          disabled={!!uploading}
-          onClick={() => input.current?.click()}
+        <p
+          key={`example-${goal.id}`}
+          className="start-swap absolute top-3 left-3 max-w-[calc(100%-1.5rem)] truncate rounded-sm bg-background/80 px-2 py-1 text-xs text-foreground/85"
         >
-          Choose a take
-        </Button>
-        <input
-          ref={input}
-          type="file"
-          accept={UPLOAD_ACCEPT.split(",")
-            .filter((t) => t.startsWith("video/"))
-            .join(",")}
-          className="sr-only"
-          tabIndex={-1}
-          aria-hidden="true"
-          onChange={(event) => {
-            const files = Array.from(event.currentTarget.files ?? []);
-            event.currentTarget.value = "";
-            if (files.length) void upload(files);
-          }}
-        />
-        {error && (
-          <p role="alert" className="mt-3 text-sm text-destructive">
-            {error}
-          </p>
-        )}
+          Example: {EXAMPLES[goal.id as keyof typeof EXAMPLES]}
+        </p>
+        <div className="relative flex flex-wrap items-end justify-between gap-x-6 gap-y-4 p-5 sm:p-6">
+          <div className="min-w-0 max-w-sm">
+            <h2
+              key={goal.id}
+              className="start-swap flex items-center gap-2 text-lg font-medium"
+            >
+              <Upload
+                aria-hidden="true"
+                strokeWidth={1.75}
+                className="start-drop-icon size-4 shrink-0"
+              />
+              {goal.title}
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-foreground/80">
+              {uploading ? (
+                <span role="status" className="start-pending">
+                  Uploading {uploading}…
+                </span>
+              ) : drop.active ? (
+                "Let go to start with this take."
+              ) : (
+                "Drop a take here. MP4, MOV or WebM, up to two minutes."
+              )}
+            </p>
+          </div>
+          <Button disabled={!!uploading} onClick={() => input.current?.click()}>
+            Choose a take
+          </Button>
+          <input
+            ref={input}
+            type="file"
+            accept={UPLOAD_ACCEPT.split(",")
+              .filter((t) => t.startsWith("video/"))
+              .join(",")}
+            className="sr-only"
+            tabIndex={-1}
+            aria-hidden="true"
+            onChange={(event) => {
+              const files = Array.from(event.currentTarget.files ?? []);
+              event.currentTarget.value = "";
+              if (files.length) void upload(files);
+            }}
+          />
+          {error && (
+            <p role="alert" className="w-full text-sm text-destructive">
+              {error}
+            </p>
+          )}
+        </div>
       </div>
 
       <p key={goal.id} className="start-swap -mt-2 text-sm leading-6">
@@ -376,6 +433,20 @@ function TakeStage({ goal }: { goal: TakeGoal }) {
           required={goal.kind === "character" || goal.kind === "object"}
           onChoose={(e) => setChosen({ ...chosen, [goal.id]: e?.id ?? null })}
         />
+      )}
+
+      {clips.length === 0 && (
+        <p className="text-sm leading-6 text-muted-foreground">
+          No footage to hand?{" "}
+          <button
+            type="button"
+            disabled={!!uploading}
+            onClick={() => void trySample()}
+            className="font-medium text-foreground underline decoration-border underline-offset-[0.2em] outline-none hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+          >
+            Try it on the kitchen table take
+          </button>
+        </p>
       )}
 
       {clips.length > 0 && (
@@ -483,6 +554,36 @@ function WorldStage({ goal }: { goal: WorldGoal }) {
     });
     void navigate({ to: "/studio" });
   }
+  // Nothing of their own yet: offer a world to start from, the way the
+  // Elements and Sequences pages do.
+  if (!cast.length && status !== "loading")
+    return (
+      <div className="flex flex-col gap-6">
+        <div className="relative rounded-sm bg-surface/60 p-5 sm:p-6">
+          <CropMarks />
+          <StarterWorld signedOut={session.signedOut} compact />
+        </div>
+        <p className="text-sm leading-6 text-muted-foreground">
+          Or begin with your own:{" "}
+          {session.signedOut ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                setBusy(true);
+                void session.start().finally(() => setBusy(false));
+              }}
+              className="font-medium text-foreground underline decoration-border underline-offset-[0.2em] outline-none hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {busy ? "starting…" : "start a local session"}
+            </button>
+          ) : (
+            <Link to="/elements/new">make an Element</Link>
+          )}
+          {session.signedOut ? " and make an Element." : "."}
+        </p>
+      </div>
+    );
   return (
     <div className="flex flex-col gap-6">
       <div className="relative flex min-h-72 flex-col justify-end rounded-sm bg-surface/60 p-6 sm:aspect-video sm:min-h-0">

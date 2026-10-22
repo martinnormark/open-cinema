@@ -79,7 +79,7 @@ bun run setup
 bun run dev
 ```
 
-Open the URL Vite prints (normally <http://127.0.0.1:5173>). The front page lists what you can do: bring a take to revise, or start from your Elements. To make a first image, open **Studio**, choose **Start local session**, write a prompt or pick **Surprise me**, and select **Generate image**. **Settings** shows whether your Comfy key and sign-in are configured.
+Open the URL Vite prints (normally <http://127.0.0.1:5173>). The front page lists what you can do: bring a take to revise, or start from your Elements. With an empty studio, **Bring in the Tide Mill** adds a starter world (a Character, a Location, a Thing, a project look and a four-shot scene), and **Try it on the kitchen table take** gives every take goal a clip to work on. To make a first image, open **Studio**, choose **Start local session**, write a prompt or pick **Surprise me**, and select **Generate image**. **Settings** shows whether your Comfy key and sign-in are configured.
 
 If something is off:
 

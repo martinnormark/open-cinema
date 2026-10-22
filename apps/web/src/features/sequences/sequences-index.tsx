@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Clapperboard, FolderOpen, Sparkles } from "lucide-react";
+import { FolderOpen, Sparkles } from "lucide-react";
 import { lookPrompt } from "@open-cinema/contracts";
 import type { Project, SequenceSummary } from "@open-cinema/contracts";
 import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/empty-state";
+import { CropMarks } from "@/components/empty-state";
+import { StarterWorld } from "@/features/start/starter-card";
 import { PageHeader } from "@/components/page-header";
 import {
   Select,
@@ -53,17 +54,7 @@ export function SequencesIndex({
           Your sequences
         </h2>
         {sequences.length === 0 ? (
-          <EmptyState
-            className="mt-4"
-            icon={Clapperboard}
-            title="No sequences yet"
-          >
-            <p>
-              Describe a moment above, a few sentences or a rough script. The
-              studio proposes shots; you change any of them before making a
-              single frame.
-            </p>
-          </EmptyState>
+          <SequencesEmpty />
         ) : (
           <ul className="mt-4 grid gap-x-5 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
             {sequences.map((sequence) => {
@@ -239,5 +230,26 @@ function IdeaComposer({
         </p>
       )}
     </form>
+  );
+}
+
+/** No scenes yet: say how one starts, and offer a scene already under way. */
+function SequencesEmpty() {
+  const { status } = useElements();
+  return (
+    <div className="mt-4">
+      <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+        Describe a moment above, a few sentences or a rough script. The studio
+        proposes shots; you change any of them before making a single frame. Or
+        pick up a scene that is already under way.
+      </p>
+      <div className="relative mt-6 rounded-sm bg-surface/60 p-6 md:p-8">
+        <CropMarks />
+        <StarterWorld
+          signedOut={status === "signed-out"}
+          className="mx-auto max-w-3xl"
+        />
+      </div>
+    </div>
   );
 }
