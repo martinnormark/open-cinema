@@ -295,22 +295,22 @@ it("swaps tagged people, each shown to Wan by a cut-out from the clip", async ()
     input: { prompt: string; media: { type: string; url: string }[] };
     parameters: Record<string, unknown>;
   };
+  // Six images by URL: each cut-out, then two views per Character.
   expect(input.input.media.map((m) => m.url)).toEqual([
     "https://comfy-storage.test/dance",
-    "data:image/jpeg;base64,cut-1",
-    "data:image/jpeg;base64,cal-face",
-    "data:image/jpeg;base64,cal-sheet",
-    "data:image/jpeg;base64,cut-3",
-    "data:image/jpeg;base64,dot-face",
-    "data:image/jpeg;base64,dot-sheet",
-    "data:image/jpeg;base64,dot-smile",
+    "https://comfy-storage.test/cut-1",
+    "https://comfy-storage.test/cal-face",
+    "https://comfy-storage.test/cal-sheet",
+    "https://comfy-storage.test/cut-3",
+    "https://comfy-storage.test/dot-face",
+    "https://comfy-storage.test/dot-sheet",
   ]);
   const { prompt } = input.input;
   expect(prompt).toContain(
     "Person 1, the person shown in Image 1 (in the middle of the frame at 4.0 s), becomes Cal, shown in Image 2 and Image 3",
   );
   expect(prompt).toContain(
-    "Person 3, the person shown in Image 4 (on the right of the frame at 8.7 s), becomes Grandma Dot, shown in Image 5, Image 6 and Image 7",
+    "Person 3, the person shown in Image 4 (on the right of the frame at 8.7 s), becomes Grandma Dot, shown in Image 5 and Image 6",
   );
   // The cut-outs point people out; their looks must not leak into the result.
   expect(prompt).toContain("Image 1 and Image 4 are stills from Video 1");
@@ -326,7 +326,7 @@ it("swaps tagged people, each shown to Wan by a cut-out from the clip", async ()
   ).toEqual(["char-cal", "char-dot"]);
 });
 
-it("keeps Wan 3.0 within ten reference images", async () => {
+it("sends three swaps as a cut-out and a sheet each", async () => {
   const many = inputs({
     location: { elementId: "loc-lighthouse" },
     cast: [1, 2, 3].map((person) => ({
@@ -337,8 +337,17 @@ it("keeps Wan 3.0 within ten reference images", async () => {
     })),
   });
   const request = (await definition.build(many, context)) as ProviderRequest;
-  const media = (request.input as { input: { media: unknown[] } }).input.media;
-  expect(media.length - 1).toBeLessThanOrEqual(10);
+  const media = (request.input as { input: { media: { url: string }[] } }).input
+    .media;
+  expect(media.map((m) => m.url.split("/").at(-1))).toEqual([
+    "dance",
+    "cut-1",
+    "dot-sheet",
+    "cut-2",
+    "dot-sheet",
+    "cut-3",
+    "dot-sheet",
+  ]);
 });
 
 it("leaves tagged people to Wan 3.0", async () => {

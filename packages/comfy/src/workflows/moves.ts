@@ -36,8 +36,12 @@ export const WAN3_MODEL = MOTION_ENGINES["wan-3"].modelId;
 /** Character views first (portrait, then sheet), then the Location's. */
 const MAX_CHARACTER_IMAGES = 3;
 const MAX_LOCATION_IMAGES = 2;
-/** Wan 3.0 reads at most ten reference images. */
-const MAX_IMAGES = 10;
+/**
+ * Wan 3.0 reads up to ten reference images, but Router timed out every
+ * three-swap run that sent nine inline (2026-10-22); six by URL finished in
+ * six minutes. Swaps send at most this many.
+ */
+const MAX_CAST_IMAGES = 6;
 
 const clean = (text: string) => text.trim().replace(/[.\s]+$/, "");
 const sentence = (text: string) => {
@@ -261,21 +265,28 @@ async function wan3CastMedia(
         0,
         Math.max(
           0,
-          Math.min(MAX_LOCATION_IMAGES, MAX_IMAGES - crops - swaps.length * 2),
+          Math.min(MAX_LOCATION_IMAGES, MAX_CAST_IMAGES - crops - swaps.length),
         ),
       )
     : [];
-  // Ten images in all: the cut-outs, then as many views per Character as fit.
+  // The cut-outs, then as many views per Character as fit.
   const perCharacter = Math.max(
     1,
     Math.min(
       MAX_CHARACTER_IMAGES,
-      Math.floor((MAX_IMAGES - crops - placeRefs.length) / swaps.length),
+      Math.floor((MAX_CAST_IMAGES - crops - placeRefs.length) / swaps.length),
     ),
   );
   const refs: AssetRef[] = [];
   const planned = swaps.map((swap) => {
-    const views = characterReferences(swap.character).slice(0, perCharacter);
+    const ordered = characterReferences(swap.character);
+    // One view each: the sheet, whose large portrait also carries the face.
+    const views =
+      perCharacter === 1
+        ? [ordered.find((r) => r.view === "sheet") ?? ordered[0]].filter(
+            (r) => r !== undefined,
+          )
+        : ordered.slice(0, perCharacter);
     if (!views.length)
       throw new Error(
         `${swap.character.name} needs an approved reference first`,
@@ -295,7 +306,13 @@ async function wan3CastMedia(
     refs.push(ref);
     return refs.length;
   });
-  const images = await Promise.all(refs.map((ref) => imageUrl(context, ref)));
+  // By URL: inline sheets made the request tens of megabytes.
+  const images = await Promise.all(
+    refs.map(async (ref) => {
+      const asset = await context.asset(ref);
+      return asset.publicUrl ?? (await asset.fetchableUrl());
+    }),
+  );
   const prompt = wan3CastPrompt({
     swaps: planned,
     location,
