@@ -36,6 +36,15 @@ It frames the result exactly as the clip and works best with one person in frame
 
 All its weights are Apache 2.0 (Wan Animate 2, the distill LoRA, UMT5-XXL, Wan VAE) or MIT (CLIP ViT-H), plus FLUX 3 Klein under the FLUX licence, so it meets [third-party-ip.md](third-party-ip.md).
 
+## Sound
+
+The result keeps the clip's own soundtrack, untouched and in step:
+
+- **The cut** copies the stretch's audio packets as they are (no re-encode), so a 12.3 to 20.3 s stretch carries exactly that sound. A browser pass that would drop the audio is never used.
+- **Wan 3.0** makes silent video. The `dub` stage then lays the stretch's audio under Wan's frames on Comfy Cloud, at Wan's frame rate and length. Checked on 2026-10-22: 8.0 s of video and 8.0 s of audio, correlating 0.998 with the source's sound. Wan makes whole seconds only, so the studio cuts a clip of 7.6 s to 7 s rather than let Wan stretch it to 8 s out of step with the sound.
+- **Wan Animate 2** renders exactly the stretch's frames and muxes its audio in the same graph (8.0 s and 8.0 s on the live run).
+- A silent clip skips the `dub` stage and gives a silent result.
+
 ## Runs (2026-10-22)
 
 All with Cal from the starter world. TikTok clips were downloaded with `scripts/tiktok-download.py` for internal testing only; they belong to their creators and are kept out of the repository ([footage-sources.md](footage-sources.md)).

@@ -382,7 +382,7 @@ export function ReplacementStudio({
     Math.abs(REFRAME_ASPECTS[option].ratio / sourceRatio - 1) < 0.03;
   const range =
     kind === "moves"
-      ? movesRange(clipSeconds, momentStart, movesLength)
+      ? movesRange(clipSeconds, momentStart, movesLength, engine)
       : momentRange(clipSeconds, momentStart, momentLength);
   const resolution = MOVES_RESOLUTIONS[engine].includes(resolutionChoice)
     ? resolutionChoice
@@ -2752,17 +2752,27 @@ function momentRange(
 }
 
 /**
- * The stretch of a long clip one Copy the moves run takes; null when the
- * whole clip fits, or until its length is known. It starts at the top.
+ * The stretch one Copy the moves run takes; null when the whole clip is sent
+ * as it is, or until its length is known. It starts at the top. Wan 3.0 makes
+ * whole seconds only, so a clip of 7.6 s is cut to 7 s rather than stretched
+ * to 8 s out of step with its own sound.
  */
 function movesRange(
   seconds: number | null,
   start: number | null,
   length: number,
+  engine: MotionEngine,
 ) {
-  if (seconds === null || seconds <= MOTION_LIMITS.maxSeconds + 0.05)
-    return null;
-  const span = Math.min(length, MOTION_LIMITS.maxSeconds);
+  if (seconds === null) return null;
+  const whole =
+    engine === "wan-3" && Math.abs(seconds - Math.round(seconds)) > 0.05;
+  if (seconds <= MOTION_LIMITS.maxSeconds + 0.05 && !whole) return null;
+  const span = Math.min(
+    length,
+    MOTION_LIMITS.maxSeconds,
+    whole ? Math.max(MOTION_LIMITS.minSeconds, Math.floor(seconds)) : seconds,
+  );
+  if (span > seconds) return null;
   const from = Math.min(Math.max(start ?? 0, 0), seconds - span);
   const round = (n: number) => Math.round(n * 100) / 100;
   return { start: round(from), end: round(from + span) };
@@ -3028,7 +3038,9 @@ function MovesStretch({
       <legend className="text-sm font-medium">The moves</legend>
       <p className="mt-1 text-xs leading-5 text-muted-foreground">
         {range
-          ? `${formatTimecode(range.start)} to ${formatTimecode(range.end)}. One run copies up to ${MOTION_LIMITS.maxSeconds} seconds; drag the band under the clip to choose them.`
+          ? clipSeconds !== null && clipSeconds <= MOTION_LIMITS.maxSeconds
+            ? `${formatTimecode(range.start)} to ${formatTimecode(range.end)}. Wan 3.0 makes whole seconds, so the clip is cut to keep its sound in step; drag the band to choose them.`
+            : `${formatTimecode(range.start)} to ${formatTimecode(range.end)}. One run copies up to ${MOTION_LIMITS.maxSeconds} seconds; drag the band under the clip to choose them.`
           : clipSeconds !== null
             ? `The whole clip, ${clipSeconds.toFixed(1)} seconds, step for step.`
             : "Choose a clip: a dance, a stunt, a gesture. Up to ten seconds are copied."}
@@ -3039,7 +3051,9 @@ function MovesStretch({
           aria-label="How long"
           className="mt-2 flex gap-1.5"
         >
-          {MOVES_LENGTHS.map((option) => (
+          {MOVES_LENGTHS.filter(
+            (option) => clipSeconds === null || option <= clipSeconds,
+          ).map((option) => (
             <button
               key={option}
               type="button"

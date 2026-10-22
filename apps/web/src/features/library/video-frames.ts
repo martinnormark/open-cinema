@@ -257,21 +257,24 @@ export async function trimClip(
               forceTranscode: true,
             }
           : {},
-        audio: exact ? { codec: "aac" } : {},
+        // Copied as is: AAC frames need no keyframe, so the sound is cut
+        // exactly, and no AAC encoder is needed (Chrome on Linux has none).
+        audio: {},
         trim: { start, end },
         showWarnings: false,
       });
-      const lost = conversion.discardedTracks.find(
-        (t) => t.track.type === "video",
-      );
-      if (!conversion.isValid || lost) continue;
+      // Every track is kept or this pass is not used: Copy the moves lays the
+      // stretch's sound under the result, so losing it is not a fallback.
+      if (!conversion.isValid || conversion.discardedTracks.length) continue;
       if (onProgress) conversion.onProgress = onProgress;
       await conversion.execute();
       const bytes = output.target.buffer;
       if (!bytes) throw new SquarePixelsError("The cut produced no file.");
       return new File([bytes], name, { type: "video/mp4" });
     }
-    throw new SquarePixelsError("This browser cannot cut the clip.");
+    throw new SquarePixelsError(
+      "This browser cannot cut the clip and keep its sound.",
+    );
   } finally {
     input.dispose();
   }
