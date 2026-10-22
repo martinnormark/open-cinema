@@ -13,9 +13,12 @@ import type { MediaOperation } from "./types";
  *   conform  source, edit        -> the edit on the source's frame grid
  *   square   source              -> the source with square pixels
  *   append   source, edit        -> the source, then the edit on its grid
+ *   dub      source, edit        -> the edit as made, with the source's audio
  *
  * `append` is the one exception to the frame count: it is the source's frames
- * followed by every frame of the edit (a continuation of the take).
+ * followed by every frame of the edit (a continuation of the take). `dub`
+ * keeps the edit's own size and frame rate: a new shot that only borrows the
+ * source's sound, such as a Character copying a dance to its music.
  */
 
 /** API-graph loader node per part; the client fills in the uploaded file name. */
@@ -37,6 +40,7 @@ export const MEDIA_GRAPH_PARTS: Record<
   conform: ["source", "edit"],
   square: ["source"],
   append: ["source", "edit"],
+  dub: ["source", "edit"],
 };
 
 export interface MediaGraphOptions {
@@ -67,7 +71,7 @@ const fit = (image: Link, width: Link, height: Link, method = "bicubic") => ({
   inputs: { image, upscale_method: method, width, height, crop: "disabled" },
 });
 /** VideoHelperSuite's ffmpeg loader, resampled to `rate` (nearest frame in time). */
-const loadOnGrid = (video: string, rate: Link) => ({
+const loadOnGrid = (video: string, rate: Link | 0) => ({
   class_type: "VHS_LoadVideoFFmpeg",
   inputs: {
     video,
@@ -95,6 +99,8 @@ export function mediaGraph(options: MediaGraphOptions): Graph {
   const count: Link = ["source_size", 2];
   const width: Link = ["width", 1];
   const height: Link = ["height", 1];
+
+  if (operation === "dub") return dubGraph(files.source!, files.edit!);
 
   const graph: Graph = {
     source: { class_type: "LoadVideo", inputs: { file: files.source } },
@@ -211,4 +217,40 @@ export function mediaGraph(options: MediaGraphOptions): Graph {
     },
   });
   return graph;
+}
+
+/** The edit at its own size and frame rate, carrying the source's audio. */
+function dubGraph(source: string, edit: string): Graph {
+  return {
+    source: { class_type: "LoadVideo", inputs: { file: source } },
+    source_frames: {
+      class_type: "GetVideoComponents",
+      inputs: { video: ["source", 0] },
+    },
+    // force_rate 0 keeps the edit's own frame rate.
+    edit: loadOnGrid(edit, 0),
+    edit_info: {
+      class_type: "VHS_VideoInfoLoaded",
+      inputs: { video_info: ["edit", 3] },
+    },
+    video: {
+      class_type: "CreateVideo",
+      inputs: {
+        images: ["edit", 0],
+        fps: ["edit_info", 0],
+        audio: ["source_frames", 1],
+      },
+    },
+    [MEDIA_GRAPH_OUTPUT]: {
+      class_type: "SaveVideo",
+      inputs: {
+        video: ["video", 0],
+        filename_prefix: "open_cinema/dub",
+        format: "mp4",
+        "format.codec": "h264",
+        "format.codec.encoding": "re-encode",
+        "format.codec.encoding.crf": 16,
+      },
+    },
+  };
 }

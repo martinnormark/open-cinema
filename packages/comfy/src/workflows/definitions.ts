@@ -1,5 +1,6 @@
 import {
   KLING_EDIT_LIMITS,
+  MOTION_ENGINES,
   withDirection,
   type AssetRef,
   type WorkflowInputs,
@@ -36,6 +37,13 @@ import {
   REFERENCE_KEYFRAME_STRENGTH,
 } from "./ltx-performance-transfer";
 import { ltxVideoModel, ltxVideoRequest } from "./ltx-video";
+import {
+  movesDubStage,
+  wan3MovesOutputs,
+  wan3MovesRequest,
+  wanAnimateMovesRequest,
+} from "./moves";
+import { WAN_ANIMATE_OUTPUT_NODES } from "./wan-animate";
 import {
   planReferences,
   REFERENCE_VIDEO_MODEL,
@@ -400,69 +408,96 @@ export const backgroundReplaceWorkflow: WorkflowDefinition<"video.background-rep
 /**
  * LTX 2.3 Union Control on Comfy Cloud: the source's pose drives a new clip
  * that opens on the given keyframe, or leans on the Character's reference.
+ * Runs made before the Wan engines; no longer offered.
+ */
+async function ltxPerformanceRequest(
+  inputs: WorkflowInputs<"video.performance-transfer">,
+  context: BuildContext,
+): Promise<CloudWorkflowRequest> {
+  const find = (id: string | undefined) =>
+    id ? context.mentions.find((m) => m.elementId === id) : undefined;
+  const character = find(inputs.character?.elementId);
+  const location = find(inputs.location?.elementId);
+  if (inputs.character && character?.type !== "character")
+    throw new Error("Choose a Character to perform the shot");
+  const keyframeRef = inputs.firstFrame ?? characterKeyframe(character);
+  const [source, keyframe] = await Promise.all([
+    context.asset(inputs.source),
+    keyframeRef ? context.asset(keyframeRef) : null,
+  ]);
+  if (!source.mediaType.startsWith("video/"))
+    throw new Error("Choose a video clip whose performance to reuse");
+  const media: CloudMediaInput[] = [
+    {
+      ...LTX_PERFORMANCE_MEDIA_INPUTS.source,
+      url: await source.fetchableUrl(),
+      filename: mediaFilename("source", source.mediaType),
+      contentType: source.mediaType,
+    },
+  ];
+  if (keyframe)
+    media.push({
+      ...LTX_PERFORMANCE_MEDIA_INPUTS.keyframe,
+      url: await keyframe.fetchableUrl(),
+      filename: mediaFilename("keyframe", keyframe.mediaType),
+      contentType: keyframe.mediaType,
+    });
+  return {
+    model: LTX_PERFORMANCE_MODEL_ID,
+    input: {
+      graph: ltxPerformanceGraph({
+        prompt: performancePrompt(
+          inputs.prompt,
+          context.mentions,
+          character,
+          location,
+        ),
+        control: inputs.control,
+        strength: inputs.strength,
+        keyframeStrength: !keyframe
+          ? null
+          : inputs.firstFrame
+            ? 1
+            : REFERENCE_KEYFRAME_STRENGTH,
+        seed: seedFrom(JSON.stringify([inputs.source, inputs.prompt])),
+      }),
+      media,
+    },
+  };
+}
+
+/**
+ * Copy the moves: the clip's motion, performed by a Character. Each engine is
+ * named by the model that runs it (contracts/moves.ts): Wan 3.0 on Router
+ * with the clip's sound laid back on, Wan Animate 2 on Comfy Cloud, or the
+ * LTX 2.3 graph older runs used.
  */
 export const performanceTransferWorkflow: WorkflowDefinition<"video.performance-transfer"> =
   {
     kind: "video.performance-transfer",
-    displayModel: "LTX 2.3 Union Control",
+    displayModel: (inputs) => MOTION_ENGINES[inputs.engine].jobModel,
     deadlineMs: 60 * 60_000,
-    model: () => LTX_PERFORMANCE_MODEL_ID,
-    provider: () => "cloud-workflow",
-    cloudOutputNodes: LTX_PERFORMANCE_OUTPUT_NODES,
-    async build(inputs, context) {
-      const find = (id: string | undefined) =>
-        id ? context.mentions.find((m) => m.elementId === id) : undefined;
-      const character = find(inputs.character?.elementId);
-      const location = find(inputs.location?.elementId);
-      if (inputs.character && character?.type !== "character")
-        throw new Error("Choose a Character to perform the shot");
-      const keyframeRef = inputs.firstFrame ?? characterKeyframe(character);
-      const [source, keyframe] = await Promise.all([
-        context.asset(inputs.source),
-        keyframeRef ? context.asset(keyframeRef) : null,
-      ]);
-      if (!source.mediaType.startsWith("video/"))
-        throw new Error("Choose a video clip whose performance to reuse");
-      const media: CloudMediaInput[] = [
-        {
-          ...LTX_PERFORMANCE_MEDIA_INPUTS.source,
-          url: await source.fetchableUrl(),
-          filename: mediaFilename("source", source.mediaType),
-          contentType: source.mediaType,
-        },
-      ];
-      if (keyframe)
-        media.push({
-          ...LTX_PERFORMANCE_MEDIA_INPUTS.keyframe,
-          url: await keyframe.fetchableUrl(),
-          filename: mediaFilename("keyframe", keyframe.mediaType),
-          contentType: keyframe.mediaType,
-        });
-      return {
-        model: LTX_PERFORMANCE_MODEL_ID,
-        input: {
-          graph: ltxPerformanceGraph({
-            prompt: performancePrompt(
-              inputs.prompt,
-              context.mentions,
-              character,
-              location,
-            ),
-            control: inputs.control,
-            strength: inputs.strength,
-            keyframeStrength: !keyframe
-              ? null
-              : inputs.firstFrame
-                ? 1
-                : REFERENCE_KEYFRAME_STRENGTH,
-            seed: seedFrom(JSON.stringify([inputs.source, inputs.prompt])),
-          }),
-          media,
-        },
-      };
+    model: (inputs) => MOTION_ENGINES[inputs.engine].modelId,
+    provider: (inputs) =>
+      inputs.engine === "wan-3" ? "router" : "cloud-workflow",
+    // Both pipelines save their result as "save_result"; each node is read once.
+    cloudOutputNodes: [
+      ...new Set([
+        ...WAN_ANIMATE_OUTPUT_NODES,
+        ...LTX_PERFORMANCE_OUTPUT_NODES,
+      ]),
+    ],
+    build(inputs, context) {
+      if (inputs.engine === "wan-3") return wan3MovesRequest(inputs, context);
+      if (inputs.engine === "wan-animate")
+        return wanAnimateMovesRequest(inputs, context);
+      return ltxPerformanceRequest(inputs, context);
     },
     // Cloud outputs are read from the SaveVideo nodes, not a Router document.
-    outputs: () => [],
+    outputs: wan3MovesOutputs,
+    label: "Copying the moves",
+    stages: (inputs) =>
+      inputs.engine === "wan-3" && inputs.sound ? [movesDubStage] : [],
   };
 
 export const characterReplaceWorkflow: WorkflowDefinition<"video.character-replace"> =

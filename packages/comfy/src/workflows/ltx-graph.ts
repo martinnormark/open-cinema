@@ -31,10 +31,11 @@ export const LTX23_MODELS = {
 /**
  * FLUX 3 Image Klein (distilled), the files Comfy-Org's
  * image_flux3_klein_distilled_image_edit template loads. Cloud's catalogue
- * did not list them on 2026-10-17, yet they ran there that day.
+ * did not list them on 2026-10-17, yet they ran there that day. By 2026-10-22
+ * the transformer had been renamed and the old name failed validation.
  */
 export const FLUX3_KLEIN_MODELS = {
-  unet: "flux3_image_klein_sd_int8_convrot.safetensors",
+  unet: "flux3-image-klein-int8-convrot.safetensors",
   textEncoder: "qwen3vl_4b_int8_convrot.safetensors",
   vae: "flux2-vae.safetensors",
 } as const;

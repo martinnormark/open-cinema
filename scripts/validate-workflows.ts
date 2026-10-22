@@ -39,12 +39,13 @@ interface ManifestEntry {
  * Model files Cloud runs although its catalogue does not list them. The Alpha
  * Gen IC-LoRA is missing from Cloud's `object_info` on 2026-10-17, yet the
  * exported graph ran with it there that day (jobs f30bd530 and a32a3cf1); so
- * did FLUX 3 Klein and its encoder (job baf43ad0). Reported as a note, not a
- * failure.
+ * did FLUX 3 Klein and its encoder (job baf43ad0). Cloud renamed the Klein
+ * file on 2026-10-22; the new name ran in Wan Animate 2's keyframe that day
+ * (prompt 1d581236). Reported as a note, not a failure.
  */
 const UNLISTED_ON_CLOUD = new Set([
   "ltx-2.5-22b-ic-lora-alpha-gen-0.9.safetensors",
-  "flux3_image_klein_sd_int8_convrot.safetensors",
+  "flux3-image-klein-int8-convrot.safetensors",
   "qwen3vl_4b_int8_convrot.safetensors",
 ]);
 const notes: string[] = [];
@@ -75,9 +76,17 @@ function options(spec: Spec): unknown[] | null {
   return null;
 }
 
-function typesMatch(want: unknown, have: string) {
+/** A V3 node whose input takes any of `allowed_types` and whose output follows it. */
+const MATCH_TYPE = "COMFY_MATCHTYPE_V3";
+
+function typesMatch(spec: Spec, have: string) {
+  const template = (spec[1] as { template?: { allowed_types?: string } })
+    ?.template;
+  const want =
+    spec[0] === MATCH_TYPE ? (template?.allowed_types ?? "*") : spec[0];
   if (typeof want !== "string") return true; // a combo fed by a link
-  if (want === "*" || have === "*") return true;
+  // The output's type is whatever reached the node's matching input.
+  if (want === "*" || have === "*" || have === MATCH_TYPE) return true;
   const wanted = want.split(",");
   return have.split(",").some((t) => wanted.includes(t));
 }
@@ -178,7 +187,7 @@ function check(
         const type = fromInfo.output[value[1]];
         if (type === undefined)
           errors.push(`${id}.${name}: ${value[0]} has no output ${value[1]}`);
-        else if (!typesMatch(spec[0], type))
+        else if (!typesMatch(spec, type))
           errors.push(`${id}.${name}: wants ${spec[0]}, gets ${type}`);
         continue;
       }

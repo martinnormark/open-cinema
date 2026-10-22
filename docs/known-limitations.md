@@ -7,6 +7,11 @@ new work on them waits until a better model, node set or workflow is found.
 
 ## Character performance transfer and character replacement (deferred)
 
+> **Update 2026-10-22:** performance transfer is no longer deferred. It ships as
+> [Copy the moves](copy-the-moves.md) on Wan 3.0 (Router) and Wan Animate 2
+> (open weights on Cloud), which hold a Character's face through turns. The
+> notes below still describe the LTX attempt and character replacement.
+
 Decided by the project owner on 2026-10-17: the results are not good enough.
 Finding a better model, node set or workflow is deferred to later.
 On the same evening the owner also took character replacement out of the MVP

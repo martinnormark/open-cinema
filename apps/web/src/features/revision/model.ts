@@ -6,13 +6,19 @@ import {
   backgroundPipelineSchema,
   extendPipelineSchema,
   KLING_EDIT_LIMITS,
+  MOTION_ENGINES,
+  motionEngineSchema,
+  motionResolutionSchema,
   reframeAspectSchema,
   restageAngleSchema,
   vfxEffectSchema,
   preservedAspectSchema,
   resultOutputs,
   type AssetRef,
+  type BackgroundPipelineChoice,
   type Element,
+  type ExtendPipeline,
+  type MotionEngine,
   type ElementType,
   type GenerationEstimate,
   type GenerationRequest,
@@ -35,6 +41,7 @@ export const replacementKindSchema = z.enum([
   "restyle",
   "camera",
   "effect",
+  "moves",
 ]);
 export type ReplacementKind = z.infer<typeof replacementKindSchema>;
 
@@ -110,6 +117,14 @@ export const replacementKinds = {
     verb: "Add an effect",
     changes: "Rain or a flood, day for night, or a cleared set, on LTX.",
   },
+  moves: {
+    kind: "moves",
+    workflowKind: "video.performance-transfer",
+    label: "Copy the moves",
+    verb: "Copy these moves",
+    changes:
+      "A Character of yours performs the clip: every step, gesture and camera move, up to ten seconds.",
+  },
 } as const satisfies Record<
   ReplacementKind,
   {
@@ -135,6 +150,7 @@ export const kindElementTypes = {
   moment: "character",
   extend: "character",
   reframe: null,
+  moves: "character",
 } as const satisfies Record<ReplacementKind, ElementType | null>;
 
 /**
@@ -145,6 +161,7 @@ const ELEMENT_LED: readonly ReplacementKind[] = [
   "background",
   "character",
   "object",
+  "moves",
 ];
 export function defaultElement(
   kind: ReplacementKind,
@@ -271,6 +288,10 @@ export const revisionDecisionsSchema = z.object({
         .optional(),
       /** Reframe: the new shape. */
       aspect: reframeAspectSchema.nullable().optional(),
+      /** Copy the moves: the engine, the output size, and a Location for the new place. */
+      engine: motionEngineSchema.nullable().optional(),
+      resolution: motionResolutionSchema.nullable().optional(),
+      locationId: z.string().max(200).nullable().optional(),
     })
     .optional(),
 });
@@ -310,6 +331,8 @@ export function revisionKindOf(
       return "moment";
     case "video.reframe":
       return "reframe";
+    case "video.performance-transfer":
+      return "moves";
     default:
       return "background";
   }
@@ -481,4 +504,49 @@ export function checkKlingSource(source: SourceFacts) {
       "This clip has non-square pixels, which Kling cannot read. It is converted to square pixels first, keeping the shot's shape.",
     );
   return { problems, notes };
+}
+
+/**
+ * The model a revision runs on, named as the job will record it (each
+ * workflow definition's `displayModel` in @open-cinema/comfy), so the studio
+ * says which model makes the result before anything runs.
+ */
+export function studioModel(
+  kind: ReplacementKind,
+  choices: {
+    pipeline: BackgroundPipelineChoice;
+    extendPipeline: ExtendPipeline;
+    areaAdds: boolean;
+    engine: MotionEngine;
+  },
+): string {
+  switch (kind) {
+    case "background":
+      return choices.pipeline === "ltx-alpha"
+        ? "LTX 2.5 Alpha Gen"
+        : choices.pipeline === "seedance"
+          ? "Seedance 2.5"
+          : "Kling 3.0 Omni";
+    case "character":
+      return "Kling 3.0 Omni";
+    case "object":
+    case "restyle":
+      return "FLUX 3 Klein + LTX 2.3";
+    case "camera":
+      return "MoGe-2 + LTX 2.3 In-Outpainting";
+    case "effect":
+      return "LTX 2.3 + Lightricks effect IC-LoRA";
+    case "area":
+      return choices.areaAdds
+        ? "Wan 2.1 VACE"
+        : "LTX 2.3 In-Outpainting IC-LoRA";
+    case "moment":
+      return "LTX 2.3";
+    case "extend":
+      return choices.extendPipeline === "seedance" ? "Seedance 2.5" : "LTX 2.3";
+    case "reframe":
+      return "LTX 2.3 outpainting IC-LoRA";
+    case "moves":
+      return MOTION_ENGINES[choices.engine].jobModel;
+  }
 }

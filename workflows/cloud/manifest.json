@@ -84,6 +84,27 @@
     "models": []
   },
   {
+    "file": "media/dub.api.json",
+    "title": "Lay the source's sound under a new shot",
+    "usedBy": "video.performance-transfer on Wan 3.0 (dub stage)",
+    "inputs": [
+      {
+        "node": "source",
+        "field": "file",
+        "file": "source.mp4"
+      },
+      {
+        "node": "edit",
+        "field": "video",
+        "file": "edit.mp4"
+      }
+    ],
+    "outputs": [
+      "save"
+    ],
+    "models": []
+  },
+  {
     "file": "background/ltx-alpha-gen-image.api.json",
     "title": "Background replacement with LTX 2.5 Alpha Gen, image plate",
     "usedBy": "video.background-replace, LTX path (comfy-cloud/ltx-2.5-alpha-gen)",
@@ -320,7 +341,7 @@
     ],
     "models": [
       "flux2-vae.safetensors",
-      "flux3_image_klein_sd_int8_convrot.safetensors",
+      "flux3-image-klein-int8-convrot.safetensors",
       "gemma_3_12B_it_fp4_mixed.safetensors",
       "ltx-2.3-22b-distilled-fp8.safetensors",
       "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors",
@@ -356,7 +377,7 @@
     ],
     "models": [
       "flux2-vae.safetensors",
-      "flux3_image_klein_sd_int8_convrot.safetensors",
+      "flux3-image-klein-int8-convrot.safetensors",
       "gemma_3_12B_it_fp4_mixed.safetensors",
       "ltx-2.3-22b-distilled-fp8.safetensors",
       "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors",
@@ -764,6 +785,42 @@
     ]
   },
   {
+    "file": "moves/wan-animate-2.api.json",
+    "title": "Copy the moves on Wan Animate 2 (FLUX 3 Klein keyframe, 8 s at 24 fps)",
+    "usedBy": "video.performance-transfer (comfy-cloud/wan-animate-2)",
+    "inputs": [
+      {
+        "node": "source",
+        "field": "file",
+        "file": "source.mp4"
+      },
+      {
+        "node": "reference_0",
+        "field": "image",
+        "file": "reference-0.png"
+      },
+      {
+        "node": "reference_1",
+        "field": "image",
+        "file": "reference-1.png"
+      }
+    ],
+    "outputs": [
+      "save_result",
+      "save_keyframe"
+    ],
+    "models": [
+      "Wan2_1_VAE_bf16.safetensors",
+      "clip_vision_h.safetensors",
+      "flux2-vae.safetensors",
+      "flux3-image-klein-int8-convrot.safetensors",
+      "lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
+      "qwen3vl_4b_int8_convrot.safetensors",
+      "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "wan_animate_2_int8_convrot.safetensors"
+    ]
+  },
+  {
     "file": "experiments/ltx-recast.api.json",
     "title": "Recast on LTX 2.5 (experiment, not in the Worker)",
     "usedBy": null,
@@ -796,7 +853,7 @@
     ],
     "models": [
       "flux2-vae.safetensors",
-      "flux3_image_klein_sd_int8_convrot.safetensors",
+      "flux3-image-klein-int8-convrot.safetensors",
       "gemma4-12b-with-proj-ltx-2.5-bf16.safetensors",
       "ltx-2.3-22b-ic-lora-ingredients-0.9.safetensors",
       "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors",

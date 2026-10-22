@@ -42,7 +42,8 @@ Primary entry points: [developer documentation](https://docs.comfy.org/developme
 - [Location reference IC-LoRA](location-reference-ic-lora.md): the plan for our own LTX adapter that takes a Location's moving reference, so reference shots can leave Kling: data, pilot, trainer and cost.
 - [Recasting and relocating a moving scene](moving-scenes.md): the app's Kling recast, Seedance 2.5 relocation and Wan Animate on a fast-moving street take, and what the app lacks.
 - [Known limitations](known-limitations.md): capabilities deferred because they are not good enough yet, starting with character performance transfer and replacement.
-- [Reuse a performance](performance-transfer.md): the LTX 2.3 Union Control pose graph on Comfy Cloud, its limits and the live run.
+- [Copy the moves](copy-the-moves.md): a clip's dance or stunt performed by your Character, on Wan 3.0 (Router) or Wan Animate 2 (Cloud), with the runs, prices and Seedance's refusals.
+- [Reuse a performance](performance-transfer.md): the first attempt, an LTX 2.3 Union Control graph on Comfy Cloud, replaced by Copy the moves.
 - [Location references and reference shots](location-references.md): empty-location moves as a Location's primary reference, the checklist that prefers them, and text-to-video from references with the staging in words.
 - [Sequences](sequences.md): planning shots from an idea, keyframe and motion approval per shot, continuing from the last frame, playback and the shot list.
 - [World bundles](world-bundles.md): saving Elements, recipes, a project's look and its sequences as one file, and bringing it into another studio.

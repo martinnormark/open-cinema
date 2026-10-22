@@ -222,3 +222,57 @@ async function convert(
     height,
   };
 }
+
+/**
+ * Cuts `start`–`end` seconds out of a clip as MP4, re-encoded as H.264 so the
+ * stretch starts on its first frame, or copied from the keyframe before it
+ * when the browser has no H.264 encoder. Audio is kept when there is any. Copy the moves sends only this stretch, so the
+ * model reads, and bills, only what the creator chose.
+ */
+export async function trimClip(
+  source: Blob | string,
+  start: number,
+  end: number,
+  name: string,
+  onProgress?: (progress: number) => void,
+): Promise<File> {
+  const input = open(source);
+  try {
+    // Re-encoded when this browser can, so the stretch starts on its frame;
+    // otherwise copied from the keyframe before it, which needs no codec
+    // (Chromium without proprietary codecs cannot encode H.264 or AAC).
+    for (const exact of [true, false]) {
+      const output = new Output({
+        format: new Mp4OutputFormat({ fastStart: "in-memory" }),
+        target: new BufferTarget(),
+      });
+      const conversion = await Conversion.init({
+        input,
+        output,
+        video: exact
+          ? {
+              codec: "avc",
+              quality: QUALITY_HIGH,
+              allowTransformationMetadata: false,
+              forceTranscode: true,
+            }
+          : {},
+        audio: exact ? { codec: "aac" } : {},
+        trim: { start, end },
+        showWarnings: false,
+      });
+      const lost = conversion.discardedTracks.find(
+        (t) => t.track.type === "video",
+      );
+      if (!conversion.isValid || lost) continue;
+      if (onProgress) conversion.onProgress = onProgress;
+      await conversion.execute();
+      const bytes = output.target.buffer;
+      if (!bytes) throw new SquarePixelsError("The cut produced no file.");
+      return new File([bytes], name, { type: "video/mp4" });
+    }
+    throw new SquarePixelsError("This browser cannot cut the clip.");
+  } finally {
+    input.dispose();
+  }
+}

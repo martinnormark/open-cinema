@@ -104,6 +104,35 @@ export async function convertToSquarePixels(
 }
 
 /**
+ * Cuts `start`–`end` seconds out of a stored or local clip as H.264 MP4 (see
+ * video-frames.ts), in the worker.
+ */
+export async function trimClip(
+  source: Blob | string,
+  start: number,
+  end: number,
+  name: string,
+  onProgress?: (progress: number) => void,
+): Promise<File> {
+  const response = await call(
+    {
+      type: "trim",
+      source:
+        typeof source === "string"
+          ? new URL(source, window.location.href).href
+          : source,
+      start,
+      end,
+      name,
+    },
+    onProgress,
+  );
+  if (!response.ok) throw new SquarePixelsError(response.error);
+  if (response.type !== "trim") throw new Error("Unexpected worker answer");
+  return new File([response.bytes], response.name, { type: "video/mp4" });
+}
+
+/**
  * Poster for a stored video, by URL. Falls back to the browser's own decoder
  * when WebCodecs cannot decode the codec (e.g. HEVC on some systems).
  */

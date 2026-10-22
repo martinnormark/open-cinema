@@ -1,5 +1,7 @@
 # Reuse a performance (`video.performance-transfer`)
 
+> **Replaced (2026-10-22):** this kind now ships as [Copy the moves](copy-the-moves.md) on Wan 3.0 and Wan Animate 2. The LTX graph below stays for runs made with it (`engine: "ltx-edges"`, the default when a stored request has no engine) but is no longer offered.
+
 > **Deferred (2026-10-17):** results are not good enough yet; finding a better model, nodes or workflow is deferred. See [known-limitations.md](known-limitations.md).
 
 Roadmap issue #10. The creator picks a clip, uploaded or generated, whose acting, choreography and timing they like, and gets a new clip in which a different Character performs it, optionally somewhere else. The source supplies only motion. Appearance comes from the keyframe and the prompt.

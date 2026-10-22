@@ -20,7 +20,7 @@ const shared = (
   workflowKind: GenerationRequest["workflowKind"],
   inputs: Record<string, unknown> = {},
 ) =>
-  // Only the kind and the background pipeline decide these estimates.
+  // Only the kind, the background pipeline and the moves engine decide these estimates.
   numbers(estimateGeneration({ workflowKind, inputs } as GenerationRequest));
 
 test("matches the shared estimate for every replacement kind", () => {
@@ -30,7 +30,9 @@ test("matches the shared estimate for every replacement kind", () => {
         workflowKind,
         kind === "extend"
           ? { pipeline: "seedance", seconds: 4 }
-          : { pipeline: "kling" },
+          : kind === "moves"
+            ? { engine: "wan-3", resolution: "720p" }
+            : { pipeline: "kling" },
       ),
     );
   expect(
@@ -77,4 +79,22 @@ test("prices Router edits per source second once the clip length is known", () =
   expect(estimateReplacement("background", null).note).toBe(
     "About 38 credits per second of source video.",
   );
+});
+
+test("Copy the moves quotes Wan 3.0 on the seconds it reads and makes", () => {
+  const wan = estimateReplacement("moves", 30, "kling", undefined, {
+    engine: "wan-3",
+    seconds: 8,
+    resolution: "720p",
+  });
+  // 21.1 credits a second at 720p, for 8 seconds read plus 8 made.
+  expect(wan.credits).toEqual({ min: 337.6, max: 337.6 });
+  expect(wan.basis).toBe("published-pricing");
+  const open = estimateReplacement("moves", 8, "kling", undefined, {
+    engine: "wan-animate",
+    seconds: 8,
+    resolution: "720p",
+  });
+  expect(open.credits).toBeNull();
+  expect(open.basis).toBe("observed");
 });

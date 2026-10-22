@@ -6,6 +6,7 @@ import {
   type CameraMove,
   type ReframeAspect,
   type RestageAngle,
+  type ResolvedMention,
   type VfxEffect,
 } from "@open-cinema/contracts";
 import {
@@ -74,6 +75,13 @@ import {
   mediaGraph,
 } from "./media-graphs";
 import type { MediaOperation } from "./types";
+import {
+  WAN_ANIMATE_MEDIA_INPUTS,
+  WAN_ANIMATE_MODEL_ID,
+  WAN_ANIMATE_OUTPUT_NODES,
+  wanAnimateGraph,
+} from "./wan-animate";
+import { moveKeyframePrompt, wanAnimatePrompt } from "./moves";
 
 /**
  * Every ComfyUI graph the app runs on Comfy Cloud, built by the same functions
@@ -143,6 +151,7 @@ function media(operation: MediaOperation): WorkflowExport {
       conform: "Conform an edit to the source's frame grid",
       square: "Square a clip's pixels",
       append: "Append a continuation after the source",
+      dub: "Lay the source's sound under a new shot",
     }[operation],
     usedBy: {
       lock: "video.background-replace, as-shot variant (lock stage)",
@@ -150,6 +159,7 @@ function media(operation: MediaOperation): WorkflowExport {
         "video.background-replace and video.character-replace (conform stage)",
       square: "uploads whose pixels the browser could not square",
       append: "video.extend on Seedance 2.5 (append stage)",
+      dub: "video.performance-transfer on Wan 3.0 (dub stage)",
     }[operation],
     ...withFiles(
       graph,
@@ -349,6 +359,56 @@ function performance(control: PerformanceControl): WorkflowExport {
   };
 }
 
+function moves(): WorkflowExport {
+  const graph = wanAnimateGraph({
+    startSeconds: 0,
+    seconds: 8,
+    fps: 24,
+    size: "standard",
+    keyframePrompt: moveKeyframePrompt({
+      performer: "the dancer",
+      character: EXAMPLE_CHARACTER,
+      images: 2,
+      location: undefined,
+      locationImages: 0,
+    }),
+    references: 2,
+    prompt: wanAnimatePrompt(EXAMPLE_CHARACTER, undefined, ""),
+    motionPrompt: "",
+    likeness: 1,
+    seed: SEED,
+  });
+  return {
+    file: "moves/wan-animate-2.api.json",
+    title:
+      "Copy the moves on Wan Animate 2 (FLUX 3 Klein keyframe, 8 s at 24 fps)",
+    usedBy: `video.performance-transfer (${WAN_ANIMATE_MODEL_ID})`,
+    ...withFiles(graph, [
+      [WAN_ANIMATE_MEDIA_INPUTS.source, "source.mp4"],
+      [WAN_ANIMATE_MEDIA_INPUTS.reference(0), "reference-0.png"],
+      [WAN_ANIMATE_MEDIA_INPUTS.reference(1), "reference-1.png"],
+    ]),
+    outputs: WAN_ANIMATE_OUTPUT_NODES,
+  };
+}
+
+/** A Character as a resolved mention, for the exported examples. */
+const EXAMPLE_CHARACTER = {
+  elementId: "example",
+  handle: "Cal",
+  name: "Cal",
+  type: "character",
+  version: 1,
+  description:
+    "A man in his late sixties with swept-back silver hair, in a charcoal wool overcoat, navy sweater, dark trousers and black shoes",
+  stateId: null,
+  stateName: null,
+  stateDescription: null,
+  states: [],
+  references: [],
+  motion: [],
+} satisfies ResolvedMention;
+
 function recast(): WorkflowExport {
   const references = 2;
   const prompts = ltxRecastPrompts({
@@ -388,6 +448,7 @@ export function workflowExports(): WorkflowExport[] {
     media("conform"),
     media("square"),
     media("append"),
+    media("dub"),
     alphaBackground("image"),
     alphaBackground("video"),
     ...(Object.keys(CAMERA_MOVES) as CameraMove[]).map((m) => camera(m, true)),
@@ -414,6 +475,7 @@ export function workflowExports(): WorkflowExport[] {
     }),
     performance("edges"),
     performance("edges-detailed"),
+    moves(),
     recast(),
   ];
 }

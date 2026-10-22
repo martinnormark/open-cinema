@@ -10,11 +10,11 @@ Open Cinema is an early preview and our entry to Comfy's [Open Source Higgsfield
 - **Build Elements**: Characters, Locations and Things, each made one step at a time from an anchor view (a close portrait, an establishing view, a hero view) into a reference sheet, with Character sheets, Thing turnarounds, and states such as `@Cal:wet` that a prompt can mention.
 - **Keep a media library** of uploads and results, all copied into your own R2 storage before a job is marked ready.
 - **Revise a take** in the revision studio: replace its background, recast a person as a Character (experimental and outside the MVP; see [known limitations](docs/known-limitations.md)), swap an object (Object Swap), restyle it, or re-stage the camera, then compare original and result before keeping it.
+- **Copy the moves** from any clip, a dance, a stunt or a gesture, onto one of your Characters, in the clip's place or one of your Locations, with Wan 3.0 on Comfy Router or the open-weights Wan Animate 2 on Comfy Cloud ([docs/copy-the-moves.md](docs/copy-the-moves.md)).
+- **See which model made what.** Every mode names its model, maker, open or hosted weights and where it runs before you generate, and every result and Activity entry says "Made with" the same.
 - **Direct a project** with a persistent look and per-shot direction, and save what works as **Recipes**.
 - **Plan Sequences** of shots from a rough idea, and move Elements, Recipes, a project's look and Sequences between projects or installations as a **World** bundle.
 - **Follow every job** in Activity or from the floating Orb, cancel work in flight and recover jobs that need attention.
-
-Performance transfer runs as a graph but has no composer in the studio yet; see the roadmap for status.
 
 ## Example outputs
 
@@ -46,7 +46,7 @@ Every result below is a real Comfy generation from this repository's workflows, 
 
 ![Source dancer, the pose control, and a new character performing the same motion](docs/media/examples/performance-transfer.webp)
 
-**Performance transfer (experimental).** A FLUX 3 keyframe of a new character driven by the source's pose, with LTX 2.3 Union Control on Comfy Cloud. The graph ran on its own; the composer for it is not built yet. See [docs/performance-transfer.md](docs/performance-transfer.md).
+**Performance transfer, first attempt.** A FLUX 3 keyframe of a new character driven by the source's pose, with LTX 2.3 Union Control on Comfy Cloud. Faces drifted, so it was replaced by [Copy the moves](docs/copy-the-moves.md) on Wan 3.0 and Wan Animate 2. See [docs/performance-transfer.md](docs/performance-transfer.md).
 
 ## Run it locally
 

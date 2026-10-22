@@ -12,6 +12,7 @@ import {
   RESTAGE_ANGLES,
   approvedReferences,
   assetRefKey,
+  modelCard,
   outputVariant,
   resultOutputs,
   type AssetRef,
@@ -63,6 +64,7 @@ const GENERATING: Record<ReplacementKind, string> = {
   restyle: "Restyling the shot…",
   camera: "Re-staging the camera…",
   effect: "Adding the effect…",
+  moves: "Copying the moves…",
 };
 
 /** What the chosen Element is to this kind of revision. */
@@ -77,6 +79,7 @@ const ELEMENT_ROLE: Record<ReplacementKind, string> = {
   restyle: "Style",
   camera: "Element",
   effect: "Element",
+  moves: "Performs",
 };
 
 const kindOf = (revision: Pick<Revision, "workflowKind">): ReplacementKind =>
@@ -417,7 +420,11 @@ export function RevisionView({
         </div>
 
         <aside className="flex flex-col gap-8" aria-label="Revision details">
-          <DecisionList revision={revision} decisions={decisions} />
+          <DecisionList
+            revision={revision}
+            decisions={decisions}
+            model={job?.model ?? null}
+          />
           <History currentId={revision.id} history={history} jobs={jobs} />
         </aside>
       </div>
@@ -550,11 +557,15 @@ function PendingStage({
 function DecisionList({
   revision,
   decisions,
+  model,
 }: {
   revision: Revision;
   decisions: RevisionDecisions | null;
+  /** The model the job ran on, as it recorded it. */
+  model: string | null;
 }) {
   const kind = kindOf(revision);
+  const card = model ? modelCard(model) : null;
   return (
     <section aria-labelledby="decisions-title">
       <h2 id="decisions-title" className="text-sm font-medium">
@@ -562,6 +573,21 @@ function DecisionList({
       </h2>
       {decisions ? (
         <dl className="mt-3 flex flex-col gap-3 text-sm">
+          {model && (
+            <div>
+              <dt className="text-xs text-muted-foreground">Made with</dt>
+              <dd className="mt-0.5">
+                {model}
+                {card && (
+                  <span className="block text-xs text-muted-foreground">
+                    {card.maker} ·{" "}
+                    {card.weights === "open" ? "open weights" : "hosted model"}{" "}
+                    · {card.runsOn}
+                  </span>
+                )}
+              </dd>
+            </div>
+          )}
           {decisions.element && (
             <div>
               <dt className="text-xs text-muted-foreground">
@@ -600,6 +626,12 @@ function DecisionList({
                   {RESTAGE_ANGLES[decisions.draft.angle].description}
                 </span>
               </dd>
+            </div>
+          )}
+          {kind === "moves" && decisions.target && (
+            <div>
+              <dt className="text-xs text-muted-foreground">Moves from</dt>
+              <dd className="mt-0.5">{decisions.target}</dd>
             </div>
           )}
           {kind === "character" && decisions.target && (

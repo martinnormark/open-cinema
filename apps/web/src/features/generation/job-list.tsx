@@ -1,7 +1,12 @@
 import { useId, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { BookOpen, ExternalLink } from "lucide-react";
-import { isActiveJob, resultOutputs, type Job } from "@open-cinema/contracts";
+import {
+  isActiveJob,
+  modelCredit,
+  resultOutputs,
+  type Job,
+} from "@open-cinema/contracts";
 import { cancelGeneration, reconcileGeneration } from "@/server/functions";
 import { Button } from "@/components/ui/button";
 import { repairVideoPoster } from "@/features/library";
@@ -89,7 +94,7 @@ function JobRow({ job }: { job: Job }) {
         </span>
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
-        {job.model}
+        {modelCredit(job.model)}
         {job.seed !== null ? ` · Seed ${job.seed}` : ""}
       </p>
       {live && !results.length && (

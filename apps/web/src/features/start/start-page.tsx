@@ -6,6 +6,7 @@ import {
   Expand,
   FastForward,
   Film,
+  Footprints,
   Mountain,
   Package,
   Palette,
@@ -57,6 +58,7 @@ import "./start.css";
 const GOAL_ICONS: Record<GoalId, LucideIcon> = {
   move: Mountain,
   recast: UserRound,
+  moves: Footprints,
   swap: Package,
   fix: Brush,
   redo: RotateCcw,
@@ -76,6 +78,7 @@ const GOAL_ICONS: Record<GoalId, LucideIcon> = {
 const EXAMPLES: Record<Exclude<GoalId, "shot" | "scene">, string> = {
   move: "the kitchen table take, moved to a cottage by the sea",
   recast: "the young man at the table, played by another Character",
+  moves: "a studio dance, performed by Cal at the Tide Mill",
   swap: "the table lamp swapped for the storm lantern",
   fix: "the glass on the table painted out",
   redo: "a second and a half of his answer, acted again",

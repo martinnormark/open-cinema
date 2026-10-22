@@ -7,7 +7,7 @@ export function fluxKleinWorkflow(prompt: string, seed: number) {
     "1": {
       class_type: "UNETLoader",
       inputs: {
-        unet_name: "flux3_image_klein_sd_int8_convrot.safetensors",
+        unet_name: "flux3-image-klein-int8-convrot.safetensors",
         weight_dtype: "default",
       },
     },

@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 import {
   convertToSquarePixels,
+  trimClip,
   readVideo,
   type PosterFrame,
   type VideoFacts,
@@ -12,7 +13,15 @@ import {
  */
 export type VideoWorkerRequest =
   | { id: number; type: "read"; source: Blob | string }
-  | { id: number; type: "square"; file: File };
+  | { id: number; type: "square"; file: File }
+  | {
+      id: number;
+      type: "trim";
+      source: Blob | string;
+      start: number;
+      end: number;
+      name: string;
+    };
 
 export type VideoWorkerResponse =
   | {
@@ -31,6 +40,7 @@ export type VideoWorkerResponse =
       width: number;
       height: number;
     }
+  | { id: number; ok: true; type: "trim"; bytes: ArrayBuffer; name: string }
   | { id: number; type: "progress"; progress: number }
   | { id: number; ok: false; type: "error"; error: string };
 
@@ -47,13 +57,34 @@ async function handle(request: VideoWorkerRequest) {
       } satisfies VideoWorkerResponse);
       return;
     }
-    const squared = await convertToSquarePixels(request.file, (progress) =>
+    const progress = (progress: number) =>
       self.postMessage({
         id: request.id,
         type: "progress",
         progress,
-      } satisfies VideoWorkerResponse),
-    );
+      } satisfies VideoWorkerResponse);
+    if (request.type === "trim") {
+      const file = await trimClip(
+        request.source,
+        request.start,
+        request.end,
+        request.name,
+        progress,
+      );
+      const bytes = await file.arrayBuffer();
+      self.postMessage(
+        {
+          id: request.id,
+          ok: true,
+          type: "trim",
+          bytes,
+          name: file.name,
+        } satisfies VideoWorkerResponse,
+        [bytes],
+      );
+      return;
+    }
+    const squared = await convertToSquarePixels(request.file, progress);
     const bytes = await squared.file.arrayBuffer();
     self.postMessage(
       {

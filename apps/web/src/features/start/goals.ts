@@ -56,6 +56,16 @@ export const goals = [
       "Experimental. Holds while the face stays clear and medium or larger.",
   },
   {
+    id: "moves",
+    source: "take",
+    kind: "moves",
+    title: replacementKinds.moves.label,
+    promise:
+      "A dance, a stunt or a gesture from any clip, performed by one of your Characters.",
+    element: "character",
+    keeps: "Keeps every step, the timing, the camera and the sound.",
+  },
+  {
     id: "swap",
     source: "take",
     kind: "object",

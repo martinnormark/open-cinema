@@ -2,9 +2,12 @@ import type {
   BackgroundPipelineChoice,
   ExtendPipeline,
   GenerationEstimate,
+  MotionEngine,
+  MotionResolution,
 } from "@open-cinema/contracts";
 import {
   cloudEstimate,
+  movesEstimate,
   seedanceExtendEstimate,
   seedanceRelocateEstimate,
   sourceEditEstimate,
@@ -28,7 +31,14 @@ export function estimateReplacement(
     extendPipeline: "seedance",
     extendSeconds: 4,
   },
+  moves: {
+    engine: MotionEngine;
+    seconds: number | null;
+    resolution: MotionResolution;
+  } = { engine: "wan-3", seconds: sourceSeconds, resolution: "720p" },
 ): GenerationEstimate {
+  if (kind === "moves")
+    return movesEstimate(moves.engine, moves.seconds, moves.resolution);
   if (kind === "object") return cloudEstimate("swap");
   if (kind === "area")
     return cloudEstimate(extend.areaAdds ? "area-add" : "area");

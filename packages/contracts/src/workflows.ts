@@ -7,6 +7,7 @@ import {
 } from "./elements";
 import { cameraMoveSchema, restageAngleSchema } from "./camera";
 import { vfxEffectSchema } from "./vfx";
+import { motionEngineSchema, motionResolutionSchema } from "./moves";
 import {
   extendPipelineSchema,
   extendSecondsSchema,
@@ -21,6 +22,8 @@ import { workflowKindSchema, type WorkflowKind } from "./workflow-kinds";
 export { workflowKindSchema, type WorkflowKind } from "./workflow-kinds";
 
 const prompt = z.string().trim().min(3).max(2000);
+/** A short noun phrase for something in the frame, e.g. "the dancer on the left". */
+const objectPhraseSchema = z.string().trim().min(3).max(200);
 const mentions = z.array(elementMentionSchema).max(8).default([]);
 /** The project look, shot overrides and recipe this generation was directed with. */
 const direction = directionSnapshotSchema.optional();
@@ -150,16 +153,24 @@ export const performanceControlSchema = z.enum(["edges", "edges-detailed"]);
 export type PerformanceControl = z.infer<typeof performanceControlSchema>;
 
 /**
- * "Reuse a performance": the source clip supplies acting, choreography and
- * timing; the result shows the intended Character and setting instead.
+ * "Copy the moves" (once "Reuse a performance"): the source clip supplies the
+ * acting, choreography and timing; the result shows the intended Character
+ * and setting instead. `engine` names the model that runs (contracts/moves.ts).
  */
 export const performanceTransferInputsSchema = z.object({
   /** The performance clip, uploaded or generated. */
   source: assetRefSchema,
+  /**
+   * The model that copies the moves. Runs made before the engines existed
+   * were all LTX 2.3 Union Control, so that stays the default when absent.
+   */
+  engine: motionEngineSchema.default("ltx-edges"),
   /** Who performs in the new shot. */
   character: elementMentionSchema.optional(),
-  /** Where the new shot takes place. */
+  /** Where the new shot takes place; without one the clip's own place stays. */
   location: elementMentionSchema.optional(),
+  /** Which person in the clip the Character replaces, in words. */
+  performer: objectPhraseSchema.optional(),
   /**
    * The new shot's opening frame, e.g. a FLUX keyframe of the Character in the
    * source's first pose. Without it the Character's reference is used.
@@ -168,14 +179,26 @@ export const performanceTransferInputsSchema = z.object({
   /** What the new shot shows. */
   prompt,
   /**
-   * Motion is read as edges traced from each frame, with no third-party
-   * weights. `edges` softens the frame first so mostly outlines and large
-   * shapes guide the motion, leaving the Character's look to the keyframe;
-   * `edges-detailed` keeps finer lines (folds, fingers) for tighter blocking,
-   * at the cost of carrying more of the original performer's look.
+   * The clip's length in seconds, as the composer measured it. Wan 3.0 makes
+   * a clip this long, and Wan Animate 2 samples its frames over it.
+   */
+  seconds: z.number().positive().max(60).optional(),
+  /**
+   * Wan 3.0: lay the clip's own sound under the result. Off for a silent clip,
+   * which has none to lay.
+   */
+  sound: z.boolean().default(true),
+  /** Wan engines: the output's resolution tier. */
+  resolution: motionResolutionSchema.default("720p"),
+  /**
+   * LTX only. Motion is read as edges traced from each frame, with no
+   * third-party weights. `edges` softens the frame first so mostly outlines
+   * and large shapes guide the motion, leaving the Character's look to the
+   * keyframe; `edges-detailed` keeps finer lines (folds, fingers) for tighter
+   * blocking, at the cost of carrying more of the original performer's look.
    */
   control: performanceControlSchema.default("edges"),
-  /** How closely the new clip follows the source's motion. */
+  /** LTX only: how closely the new clip follows the source's motion. */
   strength: z.number().min(0.3).max(1).default(0.9),
   mentions,
 });
@@ -183,7 +206,7 @@ export type PerformanceTransferInputs = z.infer<
   typeof performanceTransferInputsSchema
 >;
 /** Short descriptions SAM 3 can find in every frame, e.g. "the table lamp". */
-const objectPhrase = z.string().trim().min(3).max(200);
+const objectPhrase = objectPhraseSchema;
 
 export const objectSwapInputsSchema = z.object({
   source: assetRefSchema,
@@ -550,9 +573,13 @@ export const WORKFLOW_DESCRIPTORS = {
   },
   "video.performance-transfer": {
     kind: "video.performance-transfer",
-    label: "Reuse performance",
+    label: "Copy the moves",
     output: "video",
-    models: ["comfy-cloud/ltx-2.3-union-edges"],
+    models: [
+      "wan/wan3.0-video",
+      "comfy-cloud/wan-animate-2",
+      "comfy-cloud/ltx-2.3-union-edges",
+    ],
   },
   "video.object-swap": {
     kind: "video.object-swap",

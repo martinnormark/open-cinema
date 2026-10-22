@@ -70,6 +70,19 @@ export {
   performancePrompt,
 } from "./ltx-performance-transfer";
 export {
+  DUB_STAGE,
+  WAN3_MODEL,
+  wan3Duration,
+  wan3MovesOutputs,
+  wan3MovesPrompt,
+} from "./moves";
+export {
+  WAN_ANIMATE_MODEL_ID,
+  WAN_ANIMATE_OUTPUT_NODES,
+  wanFrameCount,
+  wanWindows,
+} from "./wan-animate";
+export {
   CHARACTER_REPLACE_MODEL,
   characterReferences,
   characterReplacePrompt,

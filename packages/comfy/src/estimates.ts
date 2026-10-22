@@ -2,6 +2,8 @@ import type {
   GenerationEstimate,
   GenerationRequest,
   LtxVideoInputs,
+  MotionEngine,
+  MotionResolution,
 } from "@open-cinema/contracts";
 import { requestedDuration } from "./workflows/ltx-video";
 
@@ -101,6 +103,56 @@ export const CLOUD_GRAPH_ESTIMATES = {
     note: "Re-projects the take with MoGe-2 and fills the gaps with LTX 2.3 on Comfy Cloud, billed by GPU time. Uses the first 4 seconds of the take.",
   },
 } as const;
+
+/**
+ * Wan 3.0 bills every second it reads and every second it makes, by output
+ * resolution (Router pricing, read 2026-10-22: 10.55, 21.1 and 42.2 credits a
+ * second). An 8-second dance at 720p took about 6 minutes on 2026-10-22.
+ */
+export const WAN3_CREDITS_PER_SECOND = {
+  "480p": 10.55,
+  "720p": 21.1,
+  "1080p": 42.2,
+} as const satisfies Record<MotionResolution, number>;
+
+export function movesEstimate(
+  engine: MotionEngine,
+  seconds: number | null,
+  resolution: MotionResolution,
+): GenerationEstimate {
+  if (engine === "wan-3") {
+    const rate = WAN3_CREDITS_PER_SECOND[resolution];
+    const length = seconds === null ? null : Math.max(2, Math.round(seconds));
+    const credits = length === null ? null : rate * length * 2;
+    return {
+      credits: credits === null ? null : round(credits, credits),
+      seconds: round(180, 900),
+      basis: credits === null ? "heuristic" : "published-pricing",
+      note:
+        length === null
+          ? `About ${Math.round(rate * 2)} credits per second of clip: Wan 3.0 bills the seconds it reads and the seconds it makes.`
+          : "Wan 3.0 bills the seconds it reads and the seconds it makes.",
+    };
+  }
+  if (engine === "wan-animate")
+    return {
+      credits: null,
+      // Observed 2026-10-22: 8 s at 544 × 960 and 24 fps (three windows plus
+      // the keyframe) ran in 165 s on Cloud, after a short queue.
+      seconds: round(150, 1200),
+      basis: "observed",
+      note: "Runs FLUX 3 Klein and Wan Animate 2 on Comfy Cloud, billed by GPU time.",
+    };
+  return {
+    // One 8-step distilled pass of LTX 2.3 22B plus edge tracing over every
+    // frame, on a Cloud GPU billed by time. Observed once: 73 frames at
+    // 640×384 in 28 s end to end on a warm worker (checkpoint cached).
+    credits: null,
+    seconds: round(30, 900),
+    basis: "heuristic",
+    note: "Runs LTX 2.3 Union Control on Comfy Cloud, billed by GPU time. Reuses the first 4 seconds (97 frames) of the take, at most 768 px wide.",
+  };
+}
 
 export function cloudEstimate(
   graph: keyof typeof CLOUD_GRAPH_ESTIMATES,
@@ -280,17 +332,11 @@ export function estimateGeneration(
         note: `About ${sourceEditRate(request.workflowKind)} credits per second of source video (Kling 3.0 Omni, 1080p).`,
       };
     case "video.performance-transfer":
-      return {
-        // One 8-step distilled pass of LTX 2.3 22B plus edge tracing over every
-        // frame, on a Cloud GPU billed by time. Observed once: 73 frames at
-        // 640×384 in 28 s end to end on a warm worker (checkpoint cached).
-        // A cold worker loads ~35 GB of weights first, which is not measured.
-        // Cloud reports no per-job charge to the API.
-        credits: null,
-        seconds: round(30, 900),
-        basis: "heuristic",
-        note: "Runs LTX 2.3 Union Control on Comfy Cloud, billed by GPU time. Reuses the first 4 seconds (97 frames) of the take, at most 768 px wide.",
-      };
+      return movesEstimate(
+        request.inputs.engine,
+        request.inputs.seconds ?? null,
+        request.inputs.resolution,
+      );
     case "video.object-swap":
       return cloudEstimate("swap");
     case "video.restyle":

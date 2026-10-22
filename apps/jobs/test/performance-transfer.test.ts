@@ -91,7 +91,11 @@ it("is a Cloud graph with no follow-up stages", () => {
   expect(definition.provider?.(inputs())).toBe("cloud-workflow");
   expect(definition.model(inputs())).toBe("comfy-cloud/ltx-2.3-union-edges");
   expect(workflowStages("video.performance-transfer", inputs())).toEqual([]);
-  expect(definition.cloudOutputNodes).toEqual(["save_result", "save_control"]);
+  expect(definition.cloudOutputNodes).toEqual([
+    "save_result",
+    "save_keyframe",
+    "save_control",
+  ]);
 });
 
 it("drives LTX 2.3 Union Control with the source's edges and holds a given keyframe", async () => {

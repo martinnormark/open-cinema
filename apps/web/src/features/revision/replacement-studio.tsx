@@ -8,6 +8,7 @@ import {
   Expand,
   FastForward,
   Film,
+  Footprints,
   ImageOff,
   Lock,
   Library,
@@ -28,15 +29,20 @@ import {
   EXTEND_PIPELINES,
   EXTEND_SECONDS,
   MOMENT_LIMITS,
+  MOTION_ENGINES,
+  MOTION_LIMITS,
   REFRAME_ASPECTS,
   RESTAGE_ANGLES,
   VFX_EFFECTS,
   approvedReferences,
   assetRefKey,
+  modelCard,
   type AssetRef,
   type BackgroundPipelineChoice,
   type ExtendPipeline,
   type GenerationRequestInput,
+  type MotionEngine,
+  type MotionResolution,
   type PreservedAspect,
   type ReframeAspect,
   type RestageAngle,
@@ -49,6 +55,8 @@ import {
   DurationBadge,
   MediaPicker,
   Thumbnail,
+  trimClip,
+  uploadFiles,
   useLibrary,
   type MediaItem,
 } from "@/features/library";
@@ -80,6 +88,7 @@ import {
   formatTimecode,
   preservedLabels,
   replacementKinds,
+  studioModel,
   wardrobeIntents,
   type ReplacementKind,
   type RevisionDecisions,
@@ -119,6 +128,8 @@ const LOCKED: Record<ReplacementKind, readonly PreservedAspect[]> = {
   extend: ["performance", "timing", "camera", "framing", "audio"],
   // The take sits whole inside the new frame.
   reframe: ["performance", "timing", "camera"],
+  // The clip is the choreography; its sound is laid back under the new shot.
+  moves: ["performance", "timing", "camera", "audio"],
 };
 const OFFERED: Record<ReplacementKind, readonly PreservedAspect[]> = {
   background: [
@@ -157,6 +168,7 @@ const OFFERED: Record<ReplacementKind, readonly PreservedAspect[]> = {
   moment: ["framing", "audio"],
   extend: ["performance", "timing", "camera", "framing", "audio"],
   reframe: ["performance", "timing", "camera", "audio"],
+  moves: ["performance", "timing", "camera", "audio"],
 };
 /** The shared defaults where a kind has them; the take edits keep all they offer. */
 const DEFAULT_KEPT: Record<ReplacementKind, readonly PreservedAspect[]> = {
@@ -170,6 +182,7 @@ const DEFAULT_KEPT: Record<ReplacementKind, readonly PreservedAspect[]> = {
   moment: OFFERED.moment,
   extend: OFFERED.extend,
   reframe: OFFERED.reframe,
+  moves: OFFERED.moves,
 };
 
 /** What runs where, so the composer reads the right limits. */
@@ -178,6 +191,7 @@ const KLING_KINDS: readonly ReplacementKind[] = ["background", "character"];
 const KIND_ICONS = {
   background: Mountain,
   character: UserRound,
+  moves: Footprints,
   object: Package,
   area: Brush,
   moment: RotateCcw,
@@ -192,6 +206,16 @@ const KIND_ICONS = {
 const AREA_REVISION_SECONDS = 3;
 /** Moment lengths offered, in seconds, within `MOMENT_LIMITS`. */
 const MOMENT_LENGTHS = [1, 2, 3] as const;
+/** Stretch lengths offered for a clip longer than one run copies. */
+const MOVES_LENGTHS = [4, 6, 8, 10] as const;
+/** Each Wan engine's sizes; Wan Animate 2 renders the lower two. */
+const MOVES_RESOLUTIONS: Record<
+  Exclude<MotionEngine, "ltx-edges">,
+  readonly MotionResolution[]
+> = {
+  "wan-3": ["480p", "720p", "1080p"],
+  "wan-animate": ["480p", "720p"],
+};
 
 export function ReplacementStudio({
   initialSource,
@@ -307,6 +331,25 @@ export function ReplacementStudio({
         )
       : 2,
   );
+  /** Copy the moves: the stretch's length, the engine, its size and the new place. */
+  const [movesLength, setMovesLength] = useState<number>(
+    draft?.kind === "moves" && draft.draft?.range
+      ? draft.draft.range.end - draft.draft.range.start
+      : MOTION_LIMITS.maxSeconds,
+  );
+  const [engine, setEngine] = useState<Exclude<MotionEngine, "ltx-edges">>(
+    draft?.draft?.engine === "wan-animate" ? "wan-animate" : "wan-3",
+  );
+  const [resolutionChoice, setResolutionChoice] = useState<MotionResolution>(
+    draft?.draft?.resolution ?? "720p",
+  );
+  const [locationId, setLocationId] = useState<string | null>(
+    draft?.draft?.locationId ?? null,
+  );
+  /** Progress of cutting the stretch out of a long clip, 0 to 1. */
+  const [cutting, setCutting] = useState<number | null>(null);
+  /** Stretches already cut and uploaded, so a retry does not upload again. */
+  const cuts = useRef(new Map<string, MediaItem>());
   const [aspectChoice, setAspectChoice] = useState<ReframeAspect | null>(
     draft?.draft?.aspect ?? null,
   );
@@ -337,7 +380,23 @@ export function ReplacementStudio({
   const sameShape = (option: ReframeAspect) =>
     sourceRatio !== null &&
     Math.abs(REFRAME_ASPECTS[option].ratio / sourceRatio - 1) < 0.03;
-  const range = momentRange(clipSeconds, momentStart, momentLength);
+  const range =
+    kind === "moves"
+      ? movesRange(clipSeconds, momentStart, movesLength)
+      : momentRange(clipSeconds, momentStart, momentLength);
+  const resolution = MOVES_RESOLUTIONS[engine].includes(resolutionChoice)
+    ? resolutionChoice
+    : "720p";
+  const locations =
+    kind === "moves" ? elements.filter((e) => e.type === "location") : [];
+  const place = locations.find((e) => e.id === locationId) ?? null;
+  const placeReferences = place ? approvedReferences(place) : [];
+  /** What one run copies: the chosen stretch, or the whole clip when it fits. */
+  const movesSeconds = range
+    ? range.end - range.start
+    : clipSeconds === null
+      ? null
+      : Math.min(clipSeconds, MOTION_LIMITS.maxSeconds);
   const alpha = kind === "background" && pipeline === "ltx-alpha";
   // A composite never relights the matted people.
   const locked: readonly PreservedAspect[] = alpha
@@ -377,17 +436,26 @@ export function ReplacementStudio({
   const areaAdds = direction.trim().length >= 3;
   const preferences = useCostPreferences();
   const estimate = formatEstimate(
-    estimateReplacement(kind, clipSeconds, pipeline, {
-      extendPipeline,
-      extendSeconds,
-      areaAdds,
-    }),
+    estimateReplacement(
+      kind,
+      clipSeconds,
+      pipeline,
+      { extendPipeline, extendSeconds, areaAdds },
+      { engine, seconds: movesSeconds, resolution },
+    ),
     preferences.unit,
   );
+  const model = studioModel(kind, {
+    pipeline,
+    extendPipeline,
+    areaAdds,
+    engine,
+  });
+  const card = modelCard(model);
 
   // The open-weights modes revise the start of the take; the area graph makes 81 frames.
   const revisedSeconds =
-    kling || kind === "moment" || kind === "extend"
+    kling || kind === "moment" || kind === "extend" || kind === "moves"
       ? null
       : kind === "area"
         ? AREA_REVISION_SECONDS
@@ -472,6 +540,22 @@ export function ReplacementStudio({
     problems.push(`${element.name} needs an approved reference first.`);
   if (kind === "reframe" && sameShape(aspect))
     problems.push("The take is already this shape. Choose another.");
+  if (kind === "moves" && !element)
+    problems.push("Choose the Character who performs the moves.");
+  if (kind === "moves" && element && !references.length)
+    problems.push(`${element.name} needs an approved reference first.`);
+  if (kind === "moves" && place && !placeReferences.length)
+    problems.push(`${place.name} needs an approved reference first.`);
+  if (kind === "moves" && source && clipSeconds === null)
+    problems.push("Reading the clip’s length…");
+  if (
+    kind === "moves" &&
+    clipSeconds !== null &&
+    clipSeconds < MOTION_LIMITS.minSeconds
+  )
+    problems.push(
+      `Copying the moves needs a clip of at least ${MOTION_LIMITS.minSeconds} seconds.`,
+    );
 
   function chooseKind(next: ReplacementKind) {
     if (next === kind) return;
@@ -583,6 +667,21 @@ export function ReplacementStudio({
         mention && !note.includes(mention) ? ` ${mention} comes in.` : "";
       return `Carry this shot on for ${more}, straight from its last frame.${who}${after}`;
     }
+    if (kind === "moves") {
+      const who =
+        targetNote
+          .trim()
+          .replace(/[.\s]+$/, "")
+          .replace(/^(The|A|An) /, (article) => article.toLowerCase()) ||
+        "the performer";
+      const when = range
+        ? ` from ${formatTimecode(range.start)} to ${formatTimecode(range.end)}`
+        : "";
+      const where = place
+        ? `, in @${place.handle}`
+        : ", in the clip’s own place";
+      return `${mention ?? "A Character"} takes the place of ${who} and copies every move${when}${where}.${after}`;
+    }
     if (kind === "reframe")
       return `Reframe this shot to ${REFRAME_ASPECTS[aspect].label.toLowerCase()} ${aspect}, drawing in the new edges around the take as shot.${after}`;
     if (kind === "camera")
@@ -663,6 +762,69 @@ export function ReplacementStudio({
     return null;
   }
 
+  /**
+   * Copy the moves sends only the stretch: a long clip is cut in the browser
+   * and saved to the library first, so the model reads, and bills, just that.
+   */
+  async function movesRequest(): Promise<GenerationRequestInput | null> {
+    if (!source || !element || movesSeconds === null) return null;
+    let clip = source;
+    if (range) {
+      const key = `${assetRefKey(source.ref)}@${range.start}-${range.end}`;
+      const cut = cuts.current.get(key);
+      if (cut) clip = cut;
+      else {
+        setCutting(0);
+        try {
+          const file = await trimClip(
+            source.url,
+            range.start,
+            range.end,
+            `${source.title.replace(/\.[^.]+$/, "")} ${formatTimecode(range.start)}–${formatTimecode(range.end)}.mp4`,
+            setCutting,
+          );
+          const [item] = await uploadFiles([file]);
+          if (!item) {
+            setError(
+              "The stretch could not be saved to your library. Try again.",
+            );
+            return null;
+          }
+          cuts.current.set(key, item);
+          clip = item;
+        } catch (e) {
+          setError(
+            `${e instanceof Error ? e.message : "The clip could not be cut."} Trim it to ${MOTION_LIMITS.maxSeconds} seconds or less and upload it again.`,
+          );
+          return null;
+        } finally {
+          setCutting(null);
+        }
+      }
+    }
+    const character = {
+      elementId: element.id,
+      ...(state ? { stateId: state.id } : {}),
+    };
+    return {
+      workflowKind: "video.performance-transfer",
+      inputs: {
+        source: clip.ref,
+        engine,
+        character,
+        ...(place ? { location: { elementId: place.id } } : {}),
+        ...(targetNote.trim().length >= 3
+          ? { performer: targetNote.trim().slice(0, 200) }
+          : {}),
+        prompt: directed.length >= 3 ? directed : `${mention} copies the moves`,
+        seconds: Math.round(movesSeconds * 100) / 100,
+        resolution,
+        sound: clip.hasAudio !== false,
+        mentions: [],
+      },
+    };
+  }
+
   async function submit() {
     if (busy || problems.length || !source) return;
     setBusy(true);
@@ -694,7 +856,9 @@ export function ReplacementStudio({
       ]
         .filter(Boolean)
         .join(" ");
-      const takeEdit = takeEditRequest();
+      const takeEdit =
+        kind === "moves" ? await movesRequest() : takeEditRequest();
+      if (kind === "moves" && !takeEdit) return;
       const request: GenerationRequestInput = takeEdit
         ? takeEdit
         : kind === "object"
@@ -844,28 +1008,38 @@ export function ReplacementStudio({
                 ? range
                   ? `${formatTimecode(range.start)} to ${formatTimecode(range.end)}`
                   : "A moment"
-                : kind === "extend"
-                  ? extendPipeline === "seedance"
-                    ? `${extendSeconds} more seconds`
-                    : "About 3 more seconds"
-                  : kind === "reframe"
-                    ? `${REFRAME_ASPECTS[aspect].label} (${aspect})`
-                    : kind === "restyle"
-                      ? "The whole look"
-                      : kind === "effect"
-                        ? `Effect: ${VFX_EFFECTS[effect].label}`
-                        : kind === "camera"
-                          ? `New angle: ${RESTAGE_ANGLES[angle].label}`
-                          : kind === "character"
-                            ? [
-                                targetNote.trim(),
-                                target
-                                  ? `marked at ${formatTimecode(target.timeMs / 1000)}`
-                                  : "",
-                              ]
-                                .filter(Boolean)
-                                .join(", ")
-                            : "Background",
+                : kind === "moves"
+                  ? [
+                      targetNote.trim(),
+                      range
+                        ? `${formatTimecode(range.start)} to ${formatTimecode(range.end)}`
+                        : "The whole clip",
+                    ]
+                      .filter(Boolean)
+                      .join(", ")
+                      .slice(0, 300)
+                  : kind === "extend"
+                    ? extendPipeline === "seedance"
+                      ? `${extendSeconds} more seconds`
+                      : "About 3 more seconds"
+                    : kind === "reframe"
+                      ? `${REFRAME_ASPECTS[aspect].label} (${aspect})`
+                      : kind === "restyle"
+                        ? "The whole look"
+                        : kind === "effect"
+                          ? `Effect: ${VFX_EFFECTS[effect].label}`
+                          : kind === "camera"
+                            ? `New angle: ${RESTAGE_ANGLES[angle].label}`
+                            : kind === "character"
+                              ? [
+                                  targetNote.trim(),
+                                  target
+                                    ? `marked at ${formatTimecode(target.timeMs / 1000)}`
+                                    : "",
+                                ]
+                                  .filter(Boolean)
+                                  .join(", ")
+                              : "Background",
         wardrobe: kind === "character" ? wardrobe : null,
         wardrobeNote: kind === "character" ? wardrobeNote.trim() : "",
         preserve:
@@ -895,7 +1069,10 @@ export function ReplacementStudio({
               : null,
           extendPipeline: kind === "extend" ? extendPipeline : null,
           extendSeconds: kind === "extend" ? extendSeconds : null,
-          range: kind === "moment" ? range : null,
+          range: kind === "moment" || kind === "moves" ? range : null,
+          engine: kind === "moves" ? engine : null,
+          resolution: kind === "moves" ? resolution : null,
+          locationId: kind === "moves" ? (place?.id ?? null) : null,
           aspect: kind === "reframe" ? aspect : null,
         },
       };
@@ -956,8 +1133,12 @@ export function ReplacementStudio({
             setPendingKey(null);
           }}
           moment={
-            kind === "moment" && range && clipSeconds
-              ? { range, seconds: clipSeconds }
+            (kind === "moment" || kind === "moves") && range && clipSeconds
+              ? {
+                  range,
+                  seconds: clipSeconds,
+                  noun: kind === "moves" ? "stretch" : "moment",
+                }
               : null
           }
           onMomentStart={(start) => {
@@ -1091,6 +1272,16 @@ export function ReplacementStudio({
               setPendingKey(null);
             }}
           />
+        ) : kind === "moves" ? (
+          <MovesStretch
+            length={movesLength}
+            range={range}
+            clipSeconds={clipSeconds}
+            onLength={(next) => {
+              setMovesLength(next);
+              setPendingKey(null);
+            }}
+          />
         ) : kind === "moment" ? (
           <MomentLength
             length={momentLength}
@@ -1122,6 +1313,59 @@ export function ReplacementStudio({
             onChoose={(id, nextState) => {
               setElementId(id);
               setStateId(nextState);
+              setPendingKey(null);
+            }}
+          />
+        )}
+
+        {kind === "moves" && (
+          <div className="revision-reveal">
+            <label htmlFor="moves-performer" className="text-sm font-medium">
+              Whose moves (optional)
+            </label>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              Say who to copy when the clip has more than one person; everyone
+              else stays as they are.
+            </p>
+            <input
+              id="moves-performer"
+              value={targetNote}
+              onChange={(event) => {
+                setTargetNote(event.target.value);
+                setPendingKey(null);
+              }}
+              maxLength={200}
+              placeholder="The dancer in the middle, in the grey shirt"
+              className="mt-2 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          </div>
+        )}
+
+        {kind === "moves" && (
+          <ElementChoice
+            kind={kind}
+            place
+            loading={elementsStatus === "loading"}
+            candidates={locations}
+            elementId={place?.id ?? null}
+            stateId={null}
+            onChoose={(id) => {
+              setLocationId(id);
+              setPendingKey(null);
+            }}
+          />
+        )}
+
+        {kind === "moves" && (
+          <MovesEngine
+            engine={engine}
+            onEngine={(next) => {
+              setEngine(next);
+              setPendingKey(null);
+            }}
+            resolution={resolution}
+            onResolution={(next) => {
+              setResolutionChoice(next);
               setPendingKey(null);
             }}
           />
@@ -1291,15 +1535,17 @@ export function ReplacementStudio({
                       ? "What is in the shot (optional)"
                       : kind === "area"
                         ? "What goes there instead (optional)"
-                        : kind === "moment"
-                          ? "What happens instead"
-                          : kind === "extend"
-                            ? "What happens next (optional)"
-                            : kind === "reframe"
-                              ? "What is around the shot (optional)"
-                              : kind === "object"
-                                ? "How it sits in the shot (optional)"
-                                : "How they play it (optional)"}
+                        : kind === "moves"
+                          ? "Anything else about the shot (optional)"
+                          : kind === "moment"
+                            ? "What happens instead"
+                            : kind === "extend"
+                              ? "What happens next (optional)"
+                              : kind === "reframe"
+                                ? "What is around the shot (optional)"
+                                : kind === "object"
+                                  ? "How it sits in the shot (optional)"
+                                  : "How they play it (optional)"}
             </label>
             <MentionTextarea
               id="revision-direction"
@@ -1325,13 +1571,15 @@ export function ReplacementStudio({
                           ? "Two people talking across a kitchen table at night"
                           : kind === "area"
                             ? "Leave empty to clear it; or bare wooden table"
-                            : kind === "moment"
-                              ? "He looks up and smiles, then nods"
-                              : kind === "extend"
-                                ? "She turns and walks out of frame"
-                                : kind === "reframe"
-                                  ? "A high kitchen ceiling with a pendant lamp"
-                                  : "Slightly older, the same quiet intensity"
+                            : kind === "moves"
+                              ? "Keep the hand-held camera; a grin on the last beat"
+                              : kind === "moment"
+                                ? "He looks up and smiles, then nods"
+                                : kind === "extend"
+                                  ? "She turns and walks out of frame"
+                                  : kind === "reframe"
+                                    ? "A high kitchen ceiling with a pendant lamp"
+                                    : "Slightly older, the same quiet intensity"
               }
             />
             {elementType && (
@@ -1436,15 +1684,19 @@ export function ReplacementStudio({
                           ? "Where the camera stands"
                           : kind === "area"
                             ? "Only what you painted"
-                            : kind === "moment"
-                              ? range
-                                ? `Only ${formatTimecode(range.start)} to ${formatTimecode(range.end)}, blended in at both ends`
-                                : "Only the chosen moment"
-                              : kind === "extend"
-                                ? "Nothing in the take; new seconds follow it"
-                                : kind === "reframe"
-                                  ? "Only the new edges around the take"
-                                  : "Only the marked person"}
+                            : kind === "moves"
+                              ? place
+                                ? "The performer, and the place around them"
+                                : "Only the performer"
+                              : kind === "moment"
+                                ? range
+                                  ? `Only ${formatTimecode(range.start)} to ${formatTimecode(range.end)}, blended in at both ends`
+                                  : "Only the chosen moment"
+                                : kind === "extend"
+                                  ? "Nothing in the take; new seconds follow it"
+                                  : kind === "reframe"
+                                    ? "Only the new edges around the take"
+                                    : "Only the marked person"}
             </dd>
             <dt className="text-muted-foreground">Keeps</dt>
             <dd>
@@ -1454,6 +1706,18 @@ export function ReplacementStudio({
                   preservedLabels[a].toLowerCase().replace("things", "Things"),
                 )
                 .join(", ")}
+            </dd>
+            <dt className="text-muted-foreground">Model</dt>
+            <dd>
+              {model}
+              {card && (
+                <span className="text-muted-foreground">
+                  {" "}
+                  · {card.maker} ·{" "}
+                  {card.weights === "open" ? "open weights" : "hosted"} on{" "}
+                  {card.runsOn}
+                </span>
+              )}
             </dd>
             <dt className="text-muted-foreground">Project look</dt>
             <dd>
@@ -1515,6 +1779,17 @@ export function ReplacementStudio({
               The new seconds are silent; the take keeps its sound.
             </p>
           )}
+          {kind === "moves" && (
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">
+              {range
+                ? "The stretch is cut here and saved to your library, so only it is sent. "
+                : ""}
+              {source?.hasAudio === false
+                ? "The clip is silent, so the new shot is too. "
+                : "The clip’s sound is laid back under the new shot. "}
+              Use clips you have the rights to.
+            </p>
+          )}
           {kind === "reframe" && (
             <p className="mt-2 text-xs leading-5 text-muted-foreground">
               The take stays whole in the middle; the model draws what lies
@@ -1550,11 +1825,13 @@ export function ReplacementStudio({
             size="lg"
             disabled={busy || problems.length > 0}
           >
-            {busy
-              ? "Starting…"
-              : pendingKey
-                ? "Retry request"
-                : replacementKinds[kind].label}
+            {cutting !== null
+              ? `Cutting the stretch… ${Math.round(cutting * 100)}%`
+              : busy
+                ? "Starting…"
+                : pendingKey
+                  ? "Retry request"
+                  : replacementKinds[kind].label}
             <ArrowRight aria-hidden="true" />
           </Button>
           {/* Everything wrong with the clip at once, so it is re-exported once. */}
@@ -1604,8 +1881,12 @@ function SourceStage({
   /** Changes when the painted area is cleared, so the brush layer starts over. */
   paintKey: number;
   onMask: (mask: string | null) => void;
-  /** Redo a moment: the stretch shown on the scrub bar. */
-  moment: { range: { start: number; end: number }; seconds: number } | null;
+  /** Redo a moment or Copy the moves: the stretch shown on the scrub bar. */
+  moment: {
+    range: { start: number; end: number };
+    seconds: number;
+    noun: "moment" | "stretch";
+  } | null;
   onMomentStart: (start: number) => void;
   /** Reframe: the new frame's shape, with the take inside it. */
   reframeRatio: number | null;
@@ -1709,6 +1990,7 @@ function SourceStage({
           video={video}
           range={moment.range}
           seconds={moment.seconds}
+          noun={moment.noun}
           onStart={onMomentStart}
         />
       )}
@@ -2120,6 +2402,7 @@ function BackgroundMethod({
 
 function ElementChoice({
   kind,
+  place = false,
   loading,
   candidates,
   elementId,
@@ -2127,19 +2410,26 @@ function ElementChoice({
   onChoose,
 }: {
   kind: ReplacementKind;
+  /** Copy the moves: the optional Location the Character performs in. */
+  place?: boolean;
   loading: boolean;
   candidates: Element[];
   elementId: string | null;
   stateId: string | null;
   onChoose: (elementId: string | null, stateId: string | null) => void;
 }) {
-  const noun =
-    kind === "character" || kind === "extend" || kind === "moment"
+  const noun = place
+    ? "Location"
+    : kind === "character" ||
+        kind === "extend" ||
+        kind === "moment" ||
+        kind === "moves"
       ? "Character"
       : kind === "object"
         ? "Thing"
         : "Location";
   const optional =
+    place ||
     kind === "background" ||
     kind === "restyle" ||
     kind === "extend" ||
@@ -2152,17 +2442,21 @@ function ElementChoice({
   return (
     <fieldset>
       <legend className="text-sm font-medium">
-        {kind === "background"
-          ? "New setting"
-          : kind === "object"
-            ? "Swap in"
-            : kind === "restyle"
-              ? "Look from a Location"
-              : kind === "extend"
-                ? "Who comes in (optional)"
-                : kind === "moment"
-                  ? "Who it is about (optional)"
-                  : "New character"}
+        {place
+          ? "New place (optional)"
+          : kind === "moves"
+            ? "Who performs"
+            : kind === "background"
+              ? "New setting"
+              : kind === "object"
+                ? "Swap in"
+                : kind === "restyle"
+                  ? "Look from a Location"
+                  : kind === "extend"
+                    ? "Who comes in (optional)"
+                    : kind === "moment"
+                      ? "Who it is about (optional)"
+                      : "New character"}
       </legend>
       {loading ? (
         <p className="mt-2 text-xs text-muted-foreground">Loading Elements…</p>
@@ -2171,20 +2465,28 @@ function ElementChoice({
           No {noun}s yet.{" "}
           <Link
             to="/elements/new"
-            search={{ type: kindElementTypes[kind] ?? "character" }}
+            search={{
+              type: place
+                ? "location"
+                : (kindElementTypes[kind] ?? "character"),
+            }}
             className="text-foreground"
           >
             Make a {noun}
           </Link>{" "}
-          {kind === "background"
-            ? "to reuse a place across shots, or describe the setting below."
-            : kind === "object"
-              ? "with approved references to swap it into shots."
-              : kind === "restyle"
-                ? "to borrow its look, or use a style image or words below."
-                : kind === "extend" || kind === "moment"
-                  ? "to keep a person the same from shot to shot."
-                  : "with approved references to cast them."}
+          {place
+            ? "to move the moves somewhere else. Without one, the clip’s own place stays."
+            : kind === "moves"
+              ? "with approved references to have them perform."
+              : kind === "background"
+                ? "to reuse a place across shots, or describe the setting below."
+                : kind === "object"
+                  ? "with approved references to swap it into shots."
+                  : kind === "restyle"
+                    ? "to borrow its look, or use a style image or words below."
+                    : kind === "extend" || kind === "moment"
+                      ? "to keep a person the same from shot to shot."
+                      : "with approved references to cast them."}
         </p>
       ) : (
         <ul className="mt-2 flex flex-col gap-1" aria-label={`${noun}s`}>
@@ -2449,6 +2751,23 @@ function momentRange(
   return { start: round(from), end: round(from + span) };
 }
 
+/**
+ * The stretch of a long clip one Copy the moves run takes; null when the
+ * whole clip fits, or until its length is known. It starts at the top.
+ */
+function movesRange(
+  seconds: number | null,
+  start: number | null,
+  length: number,
+) {
+  if (seconds === null || seconds <= MOTION_LIMITS.maxSeconds + 0.05)
+    return null;
+  const span = Math.min(length, MOTION_LIMITS.maxSeconds);
+  const from = Math.min(Math.max(start ?? 0, 0), seconds - span);
+  const round = (n: number) => Math.round(n * 100) / 100;
+  return { start: round(from), end: round(from + span) };
+}
+
 /** Mask size: the long side, enough for a soft-edged area at generation size. */
 const MASK_SIDE = 512;
 
@@ -2559,11 +2878,13 @@ function MomentBar({
   video,
   range,
   seconds,
+  noun,
   onStart,
 }: {
   video: { current: HTMLVideoElement | null };
   range: { start: number; end: number };
   seconds: number;
+  noun: "moment" | "stretch";
   onStart: (start: number) => void;
 }) {
   const band = useRef<HTMLSpanElement | null>(null);
@@ -2610,7 +2931,7 @@ function MomentBar({
           max={latest}
           step={0.04}
           defaultValue={range.start}
-          aria-label="Where the moment starts"
+          aria-label={`Where the ${noun} starts`}
           aria-valuetext={`${formatTimecode(range.start)} to ${formatTimecode(range.end)}`}
           className="compare-scrubber moment-scrubber absolute top-0 -ml-[6.5px]"
           // The thumb travels the band's possible starts, so it sits on the band's left edge.
@@ -2645,7 +2966,7 @@ function MomentBar({
             void v.play();
           }}
         >
-          Play the moment
+          Play the {noun}
         </button>
       </div>
     </div>
@@ -2684,6 +3005,138 @@ function MomentLength({
             className="tabular inline-flex h-7 items-center rounded-full border border-border px-3 text-xs text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring aria-checked:border-tungsten/70 aria-checked:text-foreground"
           >
             {option} s
+          </button>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+function MovesStretch({
+  length,
+  range,
+  clipSeconds,
+  onLength,
+}: {
+  length: number;
+  range: { start: number; end: number } | null;
+  clipSeconds: number | null;
+  onLength: (length: number) => void;
+}) {
+  return (
+    <fieldset className="revision-reveal">
+      <legend className="text-sm font-medium">The moves</legend>
+      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+        {range
+          ? `${formatTimecode(range.start)} to ${formatTimecode(range.end)}. One run copies up to ${MOTION_LIMITS.maxSeconds} seconds; drag the band under the clip to choose them.`
+          : clipSeconds !== null
+            ? `The whole clip, ${clipSeconds.toFixed(1)} seconds, step for step.`
+            : "Choose a clip: a dance, a stunt, a gesture. Up to ten seconds are copied."}
+      </p>
+      {range && (
+        <div
+          role="radiogroup"
+          aria-label="How long"
+          className="mt-2 flex gap-1.5"
+        >
+          {MOVES_LENGTHS.map((option) => (
+            <button
+              key={option}
+              type="button"
+              role="radio"
+              aria-checked={length === option}
+              onClick={() => onLength(option)}
+              className="tabular inline-flex h-7 items-center rounded-full border border-border px-3 text-xs text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring aria-checked:border-tungsten/70 aria-checked:text-foreground"
+            >
+              {option} s
+            </button>
+          ))}
+        </div>
+      )}
+    </fieldset>
+  );
+}
+
+/**
+ * The engine, named by the model that runs, who makes it, whether its weights
+ * are open and where it runs. Nothing is rebranded.
+ */
+function MovesEngine({
+  engine,
+  onEngine,
+  resolution,
+  onResolution,
+}: {
+  engine: Exclude<MotionEngine, "ltx-edges">;
+  onEngine: (engine: Exclude<MotionEngine, "ltx-edges">) => void;
+  resolution: MotionResolution;
+  onResolution: (resolution: MotionResolution) => void;
+}) {
+  return (
+    <fieldset className="revision-reveal">
+      <legend className="text-sm font-medium">Model</legend>
+      <div className="mt-2 flex flex-col gap-1">
+        {(
+          Object.keys(MOVES_RESOLUTIONS) as (keyof typeof MOVES_RESOLUTIONS)[]
+        ).map((option) => {
+          const facts = MOTION_ENGINES[option];
+          return (
+            <label
+              key={option}
+              className="flex cursor-pointer items-start gap-3 rounded-lg px-2 py-2 hover:bg-surface has-focus-visible:ring-2 has-focus-visible:ring-ring"
+            >
+              <input
+                type="radio"
+                name="moves-engine"
+                checked={engine === option}
+                onChange={() => onEngine(option)}
+                className="mt-1 accent-(--tungsten)"
+              />
+              <span className="min-w-0">
+                <span className="flex flex-wrap items-baseline gap-x-2 text-sm">
+                  {facts.model}
+                  <span className="text-xs text-muted-foreground">
+                    {facts.maker}
+                  </span>
+                </span>
+                <span className="mt-1 flex flex-wrap gap-1">
+                  <span
+                    className={cn(
+                      "inline-flex h-5 items-center rounded-full px-2 text-[11px]",
+                      option === "wan-animate"
+                        ? "bg-tungsten/15 text-foreground"
+                        : "bg-secondary text-muted-foreground",
+                    )}
+                  >
+                    {facts.weights}
+                  </span>
+                  <span className="inline-flex h-5 items-center rounded-full bg-secondary px-2 text-[11px] text-muted-foreground">
+                    {facts.runsOn}
+                  </span>
+                </span>
+                <span className="mt-1 block text-xs leading-5 text-muted-foreground">
+                  {facts.description}
+                </span>
+              </span>
+            </label>
+          );
+        })}
+      </div>
+      <div
+        role="radiogroup"
+        aria-label="Resolution"
+        className="mt-2 flex gap-1.5 pl-2"
+      >
+        {MOVES_RESOLUTIONS[engine].map((option) => (
+          <button
+            key={option}
+            type="button"
+            role="radio"
+            aria-checked={resolution === option}
+            onClick={() => onResolution(option)}
+            className="tabular inline-flex h-7 items-center rounded-full border border-border px-3 text-xs text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring aria-checked:border-tungsten/70 aria-checked:text-foreground"
+          >
+            {option}
           </button>
         ))}
       </div>

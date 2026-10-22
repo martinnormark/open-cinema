@@ -1,0 +1,835 @@
+{
+  "source": {
+    "class_type": "LoadVideo",
+    "inputs": {
+      "file": "source.mp4"
+    }
+  },
+  "stretch": {
+    "class_type": "Video Slice",
+    "inputs": {
+      "video": [
+        "source",
+        0
+      ],
+      "start_time": 0,
+      "duration": 8,
+      "strict_duration": false
+    }
+  },
+  "resampled": {
+    "class_type": "VideoFrameSample",
+    "inputs": {
+      "video": [
+        "stretch",
+        0
+      ],
+      "num_frames": 192,
+      "strategy": "uniform",
+      "seed": 0
+    }
+  },
+  "stretch_parts": {
+    "class_type": "GetVideoComponents",
+    "inputs": {
+      "video": [
+        "stretch",
+        0
+      ]
+    }
+  },
+  "parts": {
+    "class_type": "GetVideoComponents",
+    "inputs": {
+      "video": [
+        "resampled",
+        0
+      ]
+    }
+  },
+  "source_size": {
+    "class_type": "GetImageSize",
+    "inputs": {
+      "image": [
+        "parts",
+        0
+      ]
+    }
+  },
+  "out_width": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(16, round(a * 960 / max(a, b) / 16) * 16)",
+      "values.a": [
+        "source_size",
+        0
+      ],
+      "values.b": [
+        "source_size",
+        1
+      ]
+    }
+  },
+  "out_height": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(16, round(b * 960 / max(a, b) / 16) * 16)",
+      "values.a": [
+        "source_size",
+        0
+      ],
+      "values.b": [
+        "source_size",
+        1
+      ]
+    }
+  },
+  "drive": {
+    "class_type": "ResizeImageMaskNode",
+    "inputs": {
+      "input": [
+        "parts",
+        0
+      ],
+      "resize_type": "scale dimensions",
+      "resize_type.width": [
+        "out_width",
+        1
+      ],
+      "resize_type.height": [
+        "out_height",
+        1
+      ],
+      "resize_type.crop": "center",
+      "scale_method": "area"
+    }
+  },
+  "first": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "drive",
+        0
+      ],
+      "batch_index": 0,
+      "length": 1
+    }
+  },
+  "unet": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "wan_animate_2_int8_convrot.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "lora": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "model": [
+        "unet",
+        0
+      ],
+      "lora_name": "lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
+      "strength_model": 1
+    }
+  },
+  "cache": {
+    "class_type": "WanAnimate2Cache",
+    "inputs": {
+      "model": [
+        "lora",
+        0
+      ],
+      "device": "gpu",
+      "dtype": "int8"
+    }
+  },
+  "msd3": {
+    "class_type": "ModelSamplingSD3",
+    "inputs": {
+      "model": [
+        "cache",
+        0
+      ],
+      "shift": 5
+    }
+  },
+  "sched": {
+    "class_type": "BasicScheduler",
+    "inputs": {
+      "model": [
+        "cache",
+        0
+      ],
+      "scheduler": "simple",
+      "steps": 6,
+      "denoise": 1
+    }
+  },
+  "sampler": {
+    "class_type": "KSamplerSelect",
+    "inputs": {
+      "sampler_name": "lcm"
+    }
+  },
+  "clip": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "type": "wan",
+      "device": "default"
+    }
+  },
+  "clip_vision": {
+    "class_type": "CLIPVisionLoader",
+    "inputs": {
+      "clip_name": "clip_vision_h.safetensors"
+    }
+  },
+  "vae": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "Wan2_1_VAE_bf16.safetensors"
+    }
+  },
+  "positive": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": [
+        "clip",
+        0
+      ],
+      "text": "Character description: Cal, A man in his late sixties with swept-back silver hair, in a charcoal wool overcoat, navy sweater, dark trousers and black shoes, moving exactly as in the reference motion.\nBackground description: the same place as the first frame."
+    }
+  },
+  "negative": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": [
+        "clip",
+        0
+      ],
+      "text": "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走"
+    }
+  },
+  "positive_pose": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": [
+        "clip",
+        0
+      ],
+      "text": ""
+    }
+  },
+  "keyframe_unet": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "flux3-image-klein-int8-convrot.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "keyframe_clip": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen3vl_4b_int8_convrot.safetensors",
+      "type": "flux3",
+      "device": "default"
+    }
+  },
+  "keyframe_vae": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "flux2-vae.safetensors"
+    }
+  },
+  "keyframe_text": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "In the first image, replace the dancer with Cal, the person shown in the second image and the third image: A man in his late sixties with swept-back silver hair, in a charcoal wool overcoat, navy sweater, dark trousers and black shoes. Keep their exact position, scale, pose, body angle, head direction and gesture from the first image, lit by the scene's own light. Change nothing else: everyone else, the background, the floor and the framing stay exactly as they are.",
+      "clip": [
+        "keyframe_clip",
+        0
+      ]
+    }
+  },
+  "keyframe_zero": {
+    "class_type": "ConditioningZeroOut",
+    "inputs": {
+      "conditioning": [
+        "keyframe_text",
+        0
+      ]
+    }
+  },
+  "reference_0": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "reference-0.png"
+    }
+  },
+  "reference_1": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "reference-1.png"
+    }
+  },
+  "keyframe_references": {
+    "class_type": "ReferenceMultiLatent",
+    "inputs": {
+      "positive": [
+        "keyframe_text",
+        0
+      ],
+      "negative": [
+        "keyframe_zero",
+        0
+      ],
+      "vae": [
+        "keyframe_vae",
+        0
+      ],
+      "resolution": "resize",
+      "resolution.megapixels": 1,
+      "images.image0": [
+        "first",
+        0
+      ],
+      "images.image1": [
+        "reference_0",
+        0
+      ],
+      "images.image2": [
+        "reference_1",
+        0
+      ]
+    }
+  },
+  "keyframe_sample": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": [
+        "keyframe_unet",
+        0
+      ],
+      "positive": [
+        "keyframe_references",
+        0
+      ],
+      "negative": [
+        "keyframe_references",
+        1
+      ],
+      "latent_image": [
+        "keyframe_references",
+        2
+      ],
+      "seed": 20261030,
+      "steps": 16,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1
+    }
+  },
+  "keyframe_decode": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "keyframe_sample",
+        0
+      ],
+      "vae": [
+        "keyframe_vae",
+        0
+      ]
+    }
+  },
+  "reference": {
+    "class_type": "ResizeImageMaskNode",
+    "inputs": {
+      "input": [
+        "keyframe_decode",
+        0
+      ],
+      "resize_type": "scale dimensions",
+      "resize_type.width": [
+        "out_width",
+        1
+      ],
+      "resize_type.height": [
+        "out_height",
+        1
+      ],
+      "resize_type.crop": "center",
+      "scale_method": "area"
+    }
+  },
+  "vision_reference": {
+    "class_type": "CLIPVisionEncode",
+    "inputs": {
+      "clip_vision": [
+        "clip_vision",
+        0
+      ],
+      "image": [
+        "reference",
+        0
+      ],
+      "crop": "none"
+    }
+  },
+  "vision_pose": {
+    "class_type": "CLIPVisionEncode",
+    "inputs": {
+      "clip_vision": [
+        "clip_vision",
+        0
+      ],
+      "image": [
+        "first",
+        0
+      ],
+      "crop": "none"
+    }
+  },
+  "animate_0": {
+    "class_type": "WanAnimate2ToVideo",
+    "inputs": {
+      "positive": [
+        "positive",
+        0
+      ],
+      "negative": [
+        "negative",
+        0
+      ],
+      "vae": [
+        "vae",
+        0
+      ],
+      "width": [
+        "out_width",
+        1
+      ],
+      "height": [
+        "out_height",
+        1
+      ],
+      "length": 33,
+      "batch_size": 1,
+      "video_frame_offset": 0,
+      "pose_strength": 1,
+      "pose_start_percent": 0,
+      "pose_end_percent": 1,
+      "reference_image_strength": 1,
+      "reference_image": [
+        "reference",
+        0
+      ],
+      "pose_video": [
+        "drive",
+        0
+      ],
+      "clip_vision_output": [
+        "vision_reference",
+        0
+      ],
+      "positive_pose": [
+        "positive_pose",
+        0
+      ],
+      "clip_vision_output_pose": [
+        "vision_pose",
+        0
+      ]
+    }
+  },
+  "sample_0": {
+    "class_type": "SamplerCustom",
+    "inputs": {
+      "model": [
+        "msd3",
+        0
+      ],
+      "add_noise": true,
+      "noise_seed": 20261030,
+      "cfg": 1,
+      "positive": [
+        "animate_0",
+        0
+      ],
+      "negative": [
+        "animate_0",
+        1
+      ],
+      "sampler": [
+        "sampler",
+        0
+      ],
+      "sigmas": [
+        "sched",
+        0
+      ],
+      "latent_image": [
+        "animate_0",
+        2
+      ]
+    }
+  },
+  "trim_0": {
+    "class_type": "TrimVideoLatent",
+    "inputs": {
+      "samples": [
+        "sample_0",
+        0
+      ],
+      "trim_amount": [
+        "animate_0",
+        3
+      ]
+    }
+  },
+  "decode_0": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "trim_0",
+        0
+      ],
+      "vae": [
+        "vae",
+        0
+      ]
+    }
+  },
+  "animate_1": {
+    "class_type": "WanAnimate2ToVideo",
+    "inputs": {
+      "positive": [
+        "positive",
+        0
+      ],
+      "negative": [
+        "negative",
+        0
+      ],
+      "vae": [
+        "vae",
+        0
+      ],
+      "width": [
+        "out_width",
+        1
+      ],
+      "height": [
+        "out_height",
+        1
+      ],
+      "length": 81,
+      "batch_size": 1,
+      "video_frame_offset": [
+        "animate_0",
+        5
+      ],
+      "pose_strength": 1,
+      "pose_start_percent": 0,
+      "pose_end_percent": 1,
+      "reference_image_strength": 1,
+      "reference_image": [
+        "reference",
+        0
+      ],
+      "pose_video": [
+        "drive",
+        0
+      ],
+      "clip_vision_output": [
+        "vision_reference",
+        0
+      ],
+      "positive_pose": [
+        "positive_pose",
+        0
+      ],
+      "clip_vision_output_pose": [
+        "vision_pose",
+        0
+      ],
+      "continue_motion": [
+        "decode_0",
+        0
+      ]
+    }
+  },
+  "sample_1": {
+    "class_type": "SamplerCustom",
+    "inputs": {
+      "model": [
+        "msd3",
+        0
+      ],
+      "add_noise": true,
+      "noise_seed": 20261031,
+      "cfg": 1,
+      "positive": [
+        "animate_1",
+        0
+      ],
+      "negative": [
+        "animate_1",
+        1
+      ],
+      "sampler": [
+        "sampler",
+        0
+      ],
+      "sigmas": [
+        "sched",
+        0
+      ],
+      "latent_image": [
+        "animate_1",
+        2
+      ]
+    }
+  },
+  "trim_1": {
+    "class_type": "TrimVideoLatent",
+    "inputs": {
+      "samples": [
+        "sample_1",
+        0
+      ],
+      "trim_amount": [
+        "animate_1",
+        3
+      ]
+    }
+  },
+  "decode_1": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "trim_1",
+        0
+      ],
+      "vae": [
+        "vae",
+        0
+      ]
+    }
+  },
+  "tail_1": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "decode_1",
+        0
+      ],
+      "batch_index": 1,
+      "length": 4096
+    }
+  },
+  "animate_2": {
+    "class_type": "WanAnimate2ToVideo",
+    "inputs": {
+      "positive": [
+        "positive",
+        0
+      ],
+      "negative": [
+        "negative",
+        0
+      ],
+      "vae": [
+        "vae",
+        0
+      ],
+      "width": [
+        "out_width",
+        1
+      ],
+      "height": [
+        "out_height",
+        1
+      ],
+      "length": 81,
+      "batch_size": 1,
+      "video_frame_offset": [
+        "animate_1",
+        5
+      ],
+      "pose_strength": 1,
+      "pose_start_percent": 0,
+      "pose_end_percent": 1,
+      "reference_image_strength": 1,
+      "reference_image": [
+        "reference",
+        0
+      ],
+      "pose_video": [
+        "drive",
+        0
+      ],
+      "clip_vision_output": [
+        "vision_reference",
+        0
+      ],
+      "positive_pose": [
+        "positive_pose",
+        0
+      ],
+      "clip_vision_output_pose": [
+        "vision_pose",
+        0
+      ],
+      "continue_motion": [
+        "decode_1",
+        0
+      ]
+    }
+  },
+  "sample_2": {
+    "class_type": "SamplerCustom",
+    "inputs": {
+      "model": [
+        "msd3",
+        0
+      ],
+      "add_noise": true,
+      "noise_seed": 20261032,
+      "cfg": 1,
+      "positive": [
+        "animate_2",
+        0
+      ],
+      "negative": [
+        "animate_2",
+        1
+      ],
+      "sampler": [
+        "sampler",
+        0
+      ],
+      "sigmas": [
+        "sched",
+        0
+      ],
+      "latent_image": [
+        "animate_2",
+        2
+      ]
+    }
+  },
+  "trim_2": {
+    "class_type": "TrimVideoLatent",
+    "inputs": {
+      "samples": [
+        "sample_2",
+        0
+      ],
+      "trim_amount": [
+        "animate_2",
+        3
+      ]
+    }
+  },
+  "decode_2": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "trim_2",
+        0
+      ],
+      "vae": [
+        "vae",
+        0
+      ]
+    }
+  },
+  "tail_2": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "decode_2",
+        0
+      ],
+      "batch_index": 1,
+      "length": 4096
+    }
+  },
+  "joined_0": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "decode_0",
+        0
+      ],
+      "image2": [
+        "tail_1",
+        0
+      ]
+    }
+  },
+  "joined_1": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "joined_0",
+        0
+      ],
+      "image2": [
+        "tail_2",
+        0
+      ]
+    }
+  },
+  "result_frames": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "joined_1",
+        0
+      ],
+      "batch_index": 0,
+      "length": 192
+    }
+  },
+  "save_result_video": {
+    "class_type": "CreateVideo",
+    "inputs": {
+      "images": [
+        "result_frames",
+        0
+      ],
+      "fps": 24,
+      "audio": [
+        "stretch_parts",
+        1
+      ]
+    }
+  },
+  "save_result": {
+    "class_type": "SaveVideo",
+    "inputs": {
+      "video": [
+        "save_result_video",
+        0
+      ],
+      "filename_prefix": "open_cinema/moves",
+      "format": "mp4",
+      "format.codec": "h264"
+    }
+  },
+  "save_keyframe": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": [
+        "reference",
+        0
+      ],
+      "filename_prefix": "open_cinema/moves_keyframe"
+    }
+  }
+}
