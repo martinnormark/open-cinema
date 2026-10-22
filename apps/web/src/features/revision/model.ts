@@ -123,7 +123,7 @@ export const replacementKinds = {
     label: "Copy the moves",
     verb: "Copy these moves",
     changes:
-      "A Character of yours performs the clip: every step, gesture and camera move, up to ten seconds.",
+      "Your Characters perform the clip: every step, gesture and camera move, up to 15 seconds. Click people on a frame to say who becomes whom.",
   },
 } as const satisfies Record<
   ReplacementKind,

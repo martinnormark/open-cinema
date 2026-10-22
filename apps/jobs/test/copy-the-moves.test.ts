@@ -5,6 +5,7 @@ import {
   MOTION_ENGINES,
   modelCredit,
   performanceTransferInputsSchema,
+  requestMentions,
   type ResolvedMention,
 } from "@open-cinema/contracts";
 import {
@@ -65,8 +66,33 @@ const lighthouse: ResolvedMention = {
   ],
 };
 
+const dot: ResolvedMention = {
+  ...cal,
+  elementId: "char-dot",
+  handle: "GrandmaDot",
+  name: "Grandma Dot",
+  description: "A tiny woman in her eighties with lilac hair in curlers.",
+  references: [
+    {
+      asset: { type: "media-asset", assetId: "dot-face" },
+      view: "face-closeup",
+      roles: ["identity"],
+    },
+    {
+      asset: { type: "media-asset", assetId: "dot-smile" },
+      view: "smile",
+      roles: ["identity"],
+    },
+    {
+      asset: { type: "media-asset", assetId: "dot-sheet" },
+      view: "sheet",
+      roles: ["appearance", "wardrobe"],
+    },
+  ],
+};
+
 const context: BuildContext = {
-  mentions: [cal, lighthouse],
+  mentions: [cal, lighthouse, dot],
   asset: async (ref) => {
     const id = ref.type === "media-asset" ? ref.assetId : ref.outputId;
     return {
@@ -158,7 +184,9 @@ it("asks Wan for whole seconds it can make", () => {
   expect(wan3Duration(undefined)).toBe(-1);
   expect(wan3Duration(1.2)).toBe(2);
   expect(wan3Duration(7.6)).toBe(8);
-  expect(wan3Duration(14)).toBe(10);
+  expect(wan3Duration(14)).toBe(14);
+  // Router: reference video at most 15 s.
+  expect(wan3Duration(20)).toBe(15);
 });
 
 it("reads Wan's video URL and lays the clip's sound back under it", () => {
@@ -240,4 +268,95 @@ it("builds Wan Animate 2 as a Cloud graph with the keyframe and the clip", async
       context,
     ),
   ).rejects.toThrow("length is unknown");
+});
+
+const crop = (id: string) => ({ type: "media-asset" as const, assetId: id });
+
+it("swaps tagged people, each shown to Wan by a cut-out from the clip", async () => {
+  const swaps = inputs({
+    prompt:
+      "Replace @person1 with @Cal and @person3 with @GrandmaDot. Keep the floodlights.",
+    seconds: 15,
+    cast: [
+      {
+        person: 1,
+        character: { elementId: "char-cal" },
+        point: { x: 0.55, y: 0.45, timeMs: 4000 },
+        crop: crop("cut-1"),
+      },
+      {
+        person: 3,
+        character: { elementId: "char-dot" },
+        point: { x: 0.74, y: 0.4, timeMs: 8700 },
+        crop: crop("cut-3"),
+      },
+    ],
+  });
+  const request = (await definition.build(swaps, context)) as ProviderRequest;
+  const input = request.input as {
+    input: { prompt: string; media: { type: string; url: string }[] };
+    parameters: Record<string, unknown>;
+  };
+  expect(input.input.media.map((m) => m.url)).toEqual([
+    "https://comfy-storage.test/dance",
+    "data:image/jpeg;base64,cut-1",
+    "data:image/jpeg;base64,cal-face",
+    "data:image/jpeg;base64,cal-sheet",
+    "data:image/jpeg;base64,cut-3",
+    "data:image/jpeg;base64,dot-face",
+    "data:image/jpeg;base64,dot-sheet",
+    "data:image/jpeg;base64,dot-smile",
+  ]);
+  const { prompt } = input.input;
+  expect(prompt).toContain(
+    "Person 1, the person shown in Image 1 (in the middle of the frame at 4.0 s), becomes Cal, shown in Image 2 and Image 3",
+  );
+  expect(prompt).toContain(
+    "Person 3, the person shown in Image 4 (on the right of the frame at 8.7 s), becomes Grandma Dot, shown in Image 5, Image 6 and Image 7",
+  );
+  // The cut-outs point people out; their looks must not leak into the result.
+  expect(prompt).toContain("Image 1 and Image 4 are stills from Video 1");
+  expect(prompt).toContain("Keep the floodlights.");
+  expect(prompt).not.toContain("@person");
+  expect(input.parameters.duration).toBe(15);
+  // Both Characters resolve, though only the first is `character`.
+  expect(
+    requestMentions({
+      workflowKind: "video.performance-transfer",
+      inputs: swaps,
+    }).map((m) => m.elementId),
+  ).toEqual(["char-cal", "char-dot"]);
+});
+
+it("keeps Wan 3.0 within ten reference images", async () => {
+  const many = inputs({
+    location: { elementId: "loc-lighthouse" },
+    cast: [1, 2, 3].map((person) => ({
+      person,
+      character: { elementId: "char-dot" },
+      point: { x: 0.5, y: 0.5, timeMs: 0 },
+      crop: crop(`cut-${person}`),
+    })),
+  });
+  const request = (await definition.build(many, context)) as ProviderRequest;
+  const media = (request.input as { input: { media: unknown[] } }).input.media;
+  expect(media.length - 1).toBeLessThanOrEqual(10);
+});
+
+it("leaves tagged people to Wan 3.0", async () => {
+  await expect(
+    definition.build(
+      inputs({
+        engine: "wan-animate",
+        cast: [
+          {
+            person: 1,
+            character: { elementId: "char-cal" },
+            point: { x: 0.5, y: 0.5, timeMs: 0 },
+          },
+        ],
+      }),
+      context,
+    ),
+  ).rejects.toThrow("Wan 3.0");
 });

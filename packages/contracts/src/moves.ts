@@ -43,8 +43,9 @@ export const MOTION_ENGINES: Record<MotionEngine, MotionEngineFacts> = {
     source:
       "https://docs.comfy.org/development/comfy-router/models/wan/wan3-0-video/code",
     description:
-      "The most faithful copy: the Character takes the performer's place in the clip's own setting, or in your Location, at up to 1080p.",
-    maxSeconds: 10,
+      "The most faithful copy: the Character takes the performer's place in the clip's own setting, or in your Location, at up to 1080p. Swaps several tagged people in one run.",
+    // Router: reference video at most 15 s, and input plus output at most 30 s.
+    maxSeconds: 15,
     offered: true,
   },
   "wan-animate": {
@@ -79,4 +80,26 @@ export const MOTION_ENGINES: Record<MotionEngine, MotionEngineFacts> = {
 export const motionResolutionSchema = z.enum(["480p", "720p", "1080p"]);
 export type MotionResolution = z.infer<typeof motionResolutionSchema>;
 
-export const MOTION_LIMITS = { minSeconds: 2, maxSeconds: 10 } as const;
+/** The shortest clip any engine copies, and the longest (Wan 3.0's 15 s). */
+export const MOTION_LIMITS = { minSeconds: 2, maxSeconds: 15 } as const;
+
+/**
+ * People tagged on a frame of the clip: the creator pauses, clicks someone,
+ * and they become `@person1`, `@person2`, … in the words, so "Replace
+ * @person1 with @Cal" says who becomes whom. Wan 3.0 only.
+ */
+export const CLIP_PEOPLE = {
+  /** Tags on one clip. */
+  max: 4,
+  /** Swaps in one run; each sends a cut-out plus the Character's views. */
+  maxSwaps: 3,
+} as const;
+
+export const clipPersonHandle = (person: number) => `person${person}`;
+
+/** `@person2` → 2; null for anything else. */
+export function clipPersonNumber(handle: string): number | null {
+  const match = /^person([1-9])$/i.exec(handle);
+  const n = match ? Number(match[1]) : null;
+  return n !== null && n <= CLIP_PEOPLE.max ? n : null;
+}

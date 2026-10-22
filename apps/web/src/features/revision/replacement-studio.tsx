@@ -1,8 +1,15 @@
-import { useMemo, useRef, useState, type PointerEvent } from "react";
+import {
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent,
+} from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   ArrowRight,
   Brush,
+  X,
   Check,
   Crosshair,
   Expand,
@@ -25,6 +32,7 @@ import {
   Video,
 } from "lucide-react";
 import {
+  CLIP_PEOPLE,
   DEFAULT_PRESERVATION,
   EXTEND_PIPELINES,
   EXTEND_SECONDS,
@@ -78,7 +86,19 @@ import {
 } from "@/features/settings/preferences";
 import { estimateReplacement } from "./estimate";
 import { preflight, type Preflight } from "./shot-checks";
-import { requestScan, useShotScan, type ScanState } from "./shot-checks-client";
+import {
+  cutOutPerson,
+  requestScan,
+  useShotScan,
+  type ScanState,
+} from "./shot-checks-client";
+import {
+  castFromWords,
+  nextPerson,
+  personMention,
+  withoutPerson,
+  type ClipPerson,
+} from "./clip-people";
 import {
   LTX_REVISION_SECONDS,
   checkKlingSource,
@@ -207,7 +227,7 @@ const AREA_REVISION_SECONDS = 3;
 /** Moment lengths offered, in seconds, within `MOMENT_LIMITS`. */
 const MOMENT_LENGTHS = [1, 2, 3] as const;
 /** Stretch lengths offered for a clip longer than one run copies. */
-const MOVES_LENGTHS = [4, 6, 8, 10] as const;
+const MOVES_LENGTHS = [4, 6, 8, 10, 15] as const;
 /** Each Wan engine's sizes; Wan Animate 2 renders the lower two. */
 const MOVES_RESOLUTIONS: Record<
   Exclude<MotionEngine, "ltx-edges">,
@@ -346,6 +366,11 @@ export function ReplacementStudio({
   const [locationId, setLocationId] = useState<string | null>(
     draft?.draft?.locationId ?? null,
   );
+  /** Copy the moves: people tagged on a frame, as `@person1`, `@person2`, … Not kept in drafts. */
+  const [people, setPeople] = useState<ClipPerson[]>([]);
+  /** Cut-outs already saved to the library, so a retry does not upload again. */
+  const cutOuts = useRef(new Map<string, MediaItem>());
+  const directionInput = useRef<HTMLTextAreaElement | null>(null);
   /** Progress of cutting the stretch out of a long clip, 0 to 1. */
   const [cutting, setCutting] = useState<number | null>(null);
   /** Stretches already cut and uploaded, so a retry does not upload again. */
@@ -391,6 +416,22 @@ export function ReplacementStudio({
     kind === "moves" ? elements.filter((e) => e.type === "location") : [];
   const place = locations.find((e) => e.id === locationId) ?? null;
   const placeReferences = place ? approvedReferences(place) : [];
+  /** Who each tagged person becomes, read from the words. */
+  const cast =
+    kind === "moves" && people.length
+      ? castFromWords(direction, people, candidates)
+      : [];
+  const tagged = kind === "moves" && people.length > 0;
+  const peopleMentions = useMemo(
+    () =>
+      people.map((p) => ({
+        handle: personMention(p.person).slice(1),
+        name: `Person ${p.person}`,
+        label: `Tagged at ${formatTimecode(p.timeMs / 1000)}`,
+        thumbnail: p.url,
+      })),
+    [people],
+  );
   /** What one run copies: the chosen stretch, or the whole clip when it fits. */
   const movesSeconds = range
     ? range.end - range.start
@@ -540,9 +581,26 @@ export function ReplacementStudio({
     problems.push(`${element.name} needs an approved reference first.`);
   if (kind === "reframe" && sameShape(aspect))
     problems.push("The take is already this shape. Choose another.");
-  if (kind === "moves" && !element)
+  if (tagged && engine !== "wan-3")
+    problems.push(
+      "Tagged people need Wan 3.0; Wan Animate 2 copies one person.",
+    );
+  if (tagged && !cast.length)
+    problems.push(
+      `Say who ${personMention(people[0]!.person)} becomes: “Replace ${personMention(people[0]!.person)} with @${candidates[0]?.handle ?? "Cal"}”.`,
+    );
+  if (cast.length > CLIP_PEOPLE.maxSwaps)
+    problems.push(`One run swaps up to ${CLIP_PEOPLE.maxSwaps} people.`);
+  for (const pair of cast) {
+    const person = people.find((p) => p.person === pair.person);
+    if (person?.status === "cutting")
+      problems.push(`Cutting ${personMention(pair.person)} out of the frame…`);
+    if (!approvedReferences(pair.element, pair.state?.id).length)
+      problems.push(`${pair.element.name} needs an approved reference first.`);
+  }
+  if (kind === "moves" && !tagged && !element)
     problems.push("Choose the Character who performs the moves.");
-  if (kind === "moves" && element && !references.length)
+  if (kind === "moves" && !tagged && element && !references.length)
     problems.push(`${element.name} needs an approved reference first.`);
   if (kind === "moves" && place && !placeReferences.length)
     problems.push(`${place.name} needs an approved reference first.`);
@@ -584,10 +642,78 @@ export function ReplacementStudio({
   function chooseSource(item: MediaItem) {
     setSourceKey(assetRefKey(item.ref));
     setTarget(null);
+    for (const person of people)
+      if (person.url) URL.revokeObjectURL(person.url);
+    setPeople([]);
     setMask(null);
     setMaskEpoch((n) => n + 1);
     setMomentStart(null);
     setMeasured(null);
+    setPendingKey(null);
+  }
+  /**
+   * A click on the frame tags that person: they are cut out of the frame for
+   * the model, and the words gain "Replace @personN with @" so the Character
+   * list opens right where the creator types.
+   */
+  function tagPerson(point: Target) {
+    if (!source) return;
+    const person = nextPerson(people);
+    if (person === null) return;
+    setPeople((current) => [
+      ...current,
+      {
+        person,
+        ...point,
+        status: "cutting",
+        box: null,
+        found: false,
+        blob: null,
+        url: null,
+      },
+    ]);
+    setPendingKey(null);
+    cutOutPerson(source.url, point).then(
+      ({ box, found, blob }) =>
+        setPeople((current) =>
+          current.map((p) =>
+            p.person === person && p.timeMs === point.timeMs
+              ? {
+                  ...p,
+                  status: "ready",
+                  box,
+                  found,
+                  blob,
+                  url: URL.createObjectURL(blob),
+                }
+              : p,
+          ),
+        ),
+      () =>
+        setPeople((current) =>
+          current.map((p) =>
+            p.person === person ? { ...p, status: "failed" } : p,
+          ),
+        ),
+    );
+    const mention = personMention(person);
+    if (direction.includes(mention)) return;
+    const before = direction.trim();
+    const next = `${before}${before ? (/[.!?]$/.test(before) ? " " : ". ") : ""}Replace ${mention} with @`;
+    setDirection(next);
+    requestAnimationFrame(() => {
+      const input = directionInput.current;
+      if (!input) return;
+      // Caret first, so focusing opens the Character list right after the `@`.
+      input.setSelectionRange(next.length, next.length);
+      input.focus({ preventScroll: true });
+    });
+  }
+  function untagPerson(person: number) {
+    const gone = people.find((p) => p.person === person);
+    if (gone?.url) URL.revokeObjectURL(gone.url);
+    setPeople((current) => current.filter((p) => p.person !== person));
+    setDirection((current) => withoutPerson(current, person));
     setPendingKey(null);
   }
   function togglePreserved(aspect: PreservedAspect) {
@@ -666,6 +792,21 @@ export function ReplacementStudio({
       const who =
         mention && !note.includes(mention) ? ` ${mention} comes in.` : "";
       return `Carry this shot on for ${more}, straight from its last frame.${who}${after}`;
+    }
+    if (kind === "moves" && cast.length) {
+      const when = range
+        ? ` from ${formatTimecode(range.start)} to ${formatTimecode(range.end)}`
+        : "";
+      const where = place ? ` in @${place.handle}` : "";
+      const swaps = cast.map(
+        (pair) =>
+          `${personMention(pair.person)} becomes @${pair.element.handle}`,
+      );
+      const list =
+        swaps.length === 1
+          ? swaps[0]!
+          : `${swaps.slice(0, -1).join(", ")} and ${swaps.at(-1)!}`;
+      return `${list[0]!.toUpperCase()}${list.slice(1)}, copying every move${when}${where}. Everyone else stays as filmed.`;
     }
     if (kind === "moves") {
       const who =
@@ -767,7 +908,8 @@ export function ReplacementStudio({
    * and saved to the library first, so the model reads, and bills, just that.
    */
   async function movesRequest(): Promise<GenerationRequestInput | null> {
-    if (!source || !element || movesSeconds === null) return null;
+    const performer = cast[0]?.element ?? element;
+    if (!source || !performer || movesSeconds === null) return null;
     let clip = source;
     if (range) {
       const key = `${assetRefKey(source.ref)}@${range.start}-${range.end}`;
@@ -802,18 +944,27 @@ export function ReplacementStudio({
         }
       }
     }
-    const character = {
-      elementId: element.id,
-      ...(state ? { stateId: state.id } : {}),
-    };
+    const swaps = await castRequest();
+    if (!swaps) return null;
+    const lead = cast[0];
+    const character = lead
+      ? {
+          elementId: lead.element.id,
+          ...(lead.state ? { stateId: lead.state.id } : {}),
+        }
+      : {
+          elementId: performer.id,
+          ...(state ? { stateId: state.id } : {}),
+        };
     return {
       workflowKind: "video.performance-transfer",
       inputs: {
         source: clip.ref,
         engine,
         character,
+        cast: swaps,
         ...(place ? { location: { elementId: place.id } } : {}),
-        ...(targetNote.trim().length >= 3
+        ...(!swaps.length && targetNote.trim().length >= 3
           ? { performer: targetNote.trim().slice(0, 200) }
           : {}),
         prompt: directed.length >= 3 ? directed : `${mention} copies the moves`,
@@ -823,6 +974,51 @@ export function ReplacementStudio({
         mentions: [],
       },
     };
+  }
+
+  /**
+   * Each swap with its cut-out saved to the library, and the click moved into
+   * the time of the stretch that is sent. Null when a cut-out could not be saved.
+   */
+  async function castRequest() {
+    const offset = range ? range.start * 1000 : 0;
+    const swaps = [];
+    for (const pair of cast) {
+      const person = people.find((p) => p.person === pair.person)!;
+      const key = `${person.person}@${person.timeMs}:${person.x}:${person.y}`;
+      let crop = cutOuts.current.get(key) ?? null;
+      if (!crop && person.blob) {
+        const [item] = await uploadFiles([
+          new File(
+            [person.blob],
+            `${source!.title.replace(/\.[^.]+$/, "")} ${personMention(person.person).slice(1)} ${formatTimecode(person.timeMs / 1000)}.jpg`,
+            { type: "image/jpeg" },
+          ),
+        ]);
+        if (!item) {
+          setError(
+            `${personMention(person.person)}’s cut-out could not be saved. Try again.`,
+          );
+          return null;
+        }
+        cutOuts.current.set(key, item);
+        crop = item;
+      }
+      swaps.push({
+        person: pair.person,
+        character: {
+          elementId: pair.element.id,
+          ...(pair.state ? { stateId: pair.state.id } : {}),
+        },
+        point: {
+          x: person.x,
+          y: person.y,
+          timeMs: Math.max(0, Math.round(person.timeMs - offset)),
+        },
+        ...(crop ? { crop: crop.ref } : {}),
+      });
+    }
+    return swaps;
   }
 
   async function submit() {
@@ -1113,17 +1309,28 @@ export function ReplacementStudio({
       <div className="min-w-0">
         <SourceStage
           source={source}
-          markTarget={kind === "character" || kind === "object"}
+          markTarget={
+            kind === "character" ||
+            kind === "object" ||
+            (kind === "moves" && engine === "wan-3")
+          }
           markLabel={
             kind === "object"
               ? "Click the object to swap"
-              : "Click the person to recast"
+              : kind === "moves"
+                ? people.length >= CLIP_PEOPLE.max
+                  ? `${CLIP_PEOPLE.max} people tagged`
+                  : "Pause and click a person to tag them"
+                : "Click the person to recast"
           }
-          target={target}
+          target={kind === "moves" ? null : target}
           onTarget={(next) => {
+            if (kind === "moves") return tagPerson(next);
             setTarget(next);
             setPendingKey(null);
           }}
+          scanOnMark={kind === "character"}
+          people={kind === "moves" ? people : []}
           personBox={shotCheck?.box ?? null}
           onMetadata={setMeasured}
           paint={kind === "area"}
@@ -1277,6 +1484,7 @@ export function ReplacementStudio({
             length={movesLength}
             range={range}
             clipSeconds={clipSeconds}
+            most={MOTION_ENGINES[engine].maxSeconds}
             onLength={(next) => {
               setMovesLength(next);
               setPendingKey(null);
@@ -1302,7 +1510,11 @@ export function ReplacementStudio({
           />
         ) : null}
 
-        {elementType && (
+        {kind === "moves" && engine === "wan-3" && (
+          <ClipPeople people={people} cast={cast} onRemove={untagPerson} />
+        )}
+
+        {elementType && !tagged && (
           <ElementChoice
             key={kind}
             kind={kind}
@@ -1318,7 +1530,7 @@ export function ReplacementStudio({
           />
         )}
 
-        {kind === "moves" && (
+        {kind === "moves" && !tagged && (
           <div className="revision-reveal">
             <label htmlFor="moves-performer" className="text-sm font-medium">
               Whose moves (optional)
@@ -1536,7 +1748,9 @@ export function ReplacementStudio({
                       : kind === "area"
                         ? "What goes there instead (optional)"
                         : kind === "moves"
-                          ? "Anything else about the shot (optional)"
+                          ? tagged
+                            ? "Who becomes whom"
+                            : "Anything else about the shot (optional)"
                           : kind === "moment"
                             ? "What happens instead"
                             : kind === "extend"
@@ -1552,6 +1766,8 @@ export function ReplacementStudio({
               value={direction}
               onValueChange={writeDirection}
               types={elementType ? [elementType] : []}
+              inputRef={directionInput}
+              extra={peopleMentions}
               maxLength={1500}
               rows={3}
               aria-describedby={
@@ -1572,7 +1788,9 @@ export function ReplacementStudio({
                           : kind === "area"
                             ? "Leave empty to clear it; or bare wooden table"
                             : kind === "moves"
-                              ? "Keep the hand-held camera; a grin on the last beat"
+                              ? tagged
+                                ? `Replace ${personMention(people[0]!.person)} with @${candidates[0]?.handle ?? "Cal"}`
+                                : "Keep the hand-held camera; a grin on the last beat"
                               : kind === "moment"
                                 ? "He looks up and smiles, then nods"
                                 : kind === "extend"
@@ -1587,8 +1805,9 @@ export function ReplacementStudio({
                 id="revision-direction-mention"
                 className="mt-1.5 text-xs leading-5 text-muted-foreground"
               >
-                Or type @ to name a {elementTypes[elementType].label} in your
-                words.
+                {tagged
+                  ? "Type @ for a Character or a tagged person, e.g. “Replace @person2 with @Cal”."
+                  : `Or type @ to name a ${elementTypes[elementType].label} in your words.`}
               </p>
             )}
           </div>
@@ -1685,9 +1904,11 @@ export function ReplacementStudio({
                           : kind === "area"
                             ? "Only what you painted"
                             : kind === "moves"
-                              ? place
-                                ? "The performer, and the place around them"
-                                : "Only the performer"
+                              ? cast.length
+                                ? `Only ${cast.map((c) => personMention(c.person)).join(", ")}${place ? ", and the place around them" : ""}`
+                                : place
+                                  ? "The performer, and the place around them"
+                                  : "Only the performer"
                               : kind === "moment"
                                 ? range
                                   ? `Only ${formatTimecode(range.start)} to ${formatTimecode(range.end)}, blended in at both ends`
@@ -1859,6 +2080,8 @@ function SourceStage({
   markLabel,
   target,
   onTarget,
+  scanOnMark,
+  people,
   onMetadata,
   personBox,
   paint,
@@ -1873,6 +2096,10 @@ function SourceStage({
   markLabel: string;
   target: Target | null;
   onTarget: (target: Target) => void;
+  /** Recast: start the shot check as the pointer arrives. */
+  scanOnMark: boolean;
+  /** Copy the moves: everyone tagged so far, pinned where they were clicked. */
+  people: readonly ClipPerson[];
   onMetadata: (metadata: ClipMetadata) => void;
   /** The person found under the mark, outlined so the creator can confirm it. */
   personBox: Preflight["box"];
@@ -1926,7 +2153,7 @@ function SourceStage({
     const y = (event.clientY - rect.top - (rect.height - height) / 2) / height;
     if (x < 0 || x > 1 || y < 0 || y > 1) return;
     v.pause();
-    requestScan(source!.url);
+    if (scanOnMark) requestScan(source!.url);
     onTarget({ x, y, timeMs: Math.round(v.currentTime * 1000) });
   }
 
@@ -1950,7 +2177,9 @@ function SourceStage({
         }
         onPointerUp={mark}
         // Start analysing as the pointer arrives, so the check is ready by the click.
-        onPointerEnter={markTarget ? () => requestScan(source.url) : undefined}
+        onPointerEnter={
+          markTarget && scanOnMark ? () => requestScan(source.url) : undefined
+        }
       >
         <video
           key={source.id}
@@ -1974,6 +2203,9 @@ function SourceStage({
         />
         {markTarget && target && (
           <TargetMarker target={target} ratio={frameRatio} box={personBox} />
+        )}
+        {people.length > 0 && (
+          <PeopleMarkers people={people} ratio={frameRatio} video={video} />
         )}
         {paint && (
           <PaintLayer
@@ -2055,6 +2287,91 @@ function TargetMarker({
       >
         <span className="absolute inset-0 m-auto size-1.5 rounded-full bg-tungsten" />
       </span>
+    </div>
+  );
+}
+
+/**
+ * Each tagged person's pin and label. Pins show on every frame (they mark
+ * where someone was clicked, not where they are now); the outline of the
+ * person found shows only near the frame they were tagged on, so it never
+ * sits on the wrong body while the clip is scrubbed.
+ */
+function PeopleMarkers({
+  people,
+  ratio,
+  video,
+}: {
+  people: readonly ClipPerson[];
+  ratio: number;
+  video: { current: HTMLVideoElement | null };
+}) {
+  const [nowMs, setNowMs] = useState<number | null>(null);
+  // Follows the frame on each seek, not on every played frame.
+  const attach = useCallback(
+    (node: HTMLDivElement | null) => {
+      const v = video.current;
+      if (!node || !v) return;
+      const sync = () => setNowMs(Math.round(v.currentTime * 1000));
+      v.addEventListener("seeked", sync);
+      v.addEventListener("pause", sync);
+      sync();
+      return () => {
+        v.removeEventListener("seeked", sync);
+        v.removeEventListener("pause", sync);
+      };
+    },
+    [video],
+  );
+  return (
+    <div
+      ref={attach}
+      className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+      style={{
+        width: `min(100cqw, ${ratio * 100}cqh)`,
+        height: `min(100cqh, ${100 / ratio}cqw)`,
+      }}
+    >
+      {people.map((person) => {
+        const away = nowMs === null ? 0 : Math.abs(nowMs - person.timeMs);
+        const here = away < 120;
+        // A pin marks a click on one frame; far from it, it would point at nobody.
+        if (away > 1500) return null;
+        return (
+          <div key={person.person}>
+            {here && person.box && person.found && (
+              <span
+                className="target-person absolute rounded-md border border-dashed border-tungsten/70"
+                style={{
+                  left: `${person.box.x * 100}%`,
+                  top: `${person.box.y * 100}%`,
+                  width: `${person.box.w * 100}%`,
+                  height: `${person.box.h * 100}%`,
+                }}
+              />
+            )}
+            <span
+              className={cn(
+                "person-pin absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-full border border-tungsten bg-black/70 py-0.5 pr-2 pl-0.5 text-[11px] font-medium text-white shadow-[0_0_0_3px_rgb(0_0_0/0.3)] transition-opacity duration-150",
+                !here && "opacity-55",
+              )}
+              style={{ left: `${person.x * 100}%`, top: `${person.y * 100}%` }}
+            >
+              <span className="grid size-4 place-items-center rounded-full bg-tungsten text-[10px] text-black tabular">
+                {person.status === "cutting" ? (
+                  <LoaderCircle
+                    aria-hidden="true"
+                    className="size-3 motion-safe:animate-spin"
+                  />
+                ) : (
+                  person.person
+                )}
+              </span>
+              {personMention(person.person)}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -2766,10 +3083,11 @@ function movesRange(
   if (seconds === null) return null;
   const whole =
     engine === "wan-3" && Math.abs(seconds - Math.round(seconds)) > 0.05;
-  if (seconds <= MOTION_LIMITS.maxSeconds + 0.05 && !whole) return null;
+  const most = MOTION_ENGINES[engine].maxSeconds;
+  if (seconds <= most + 0.05 && !whole) return null;
   const span = Math.min(
     length,
-    MOTION_LIMITS.maxSeconds,
+    most,
     whole ? Math.max(MOTION_LIMITS.minSeconds, Math.floor(seconds)) : seconds,
   );
   if (span > seconds) return null;
@@ -3022,28 +3340,109 @@ function MomentLength({
   );
 }
 
+/**
+ * Everyone tagged on the clip, each with their cut-out and who they become.
+ * The words decide the pairs; this list shows how they were read.
+ */
+function ClipPeople({
+  people,
+  cast,
+  onRemove,
+}: {
+  people: readonly ClipPerson[];
+  cast: readonly { person: number; element: { name: string } }[];
+  onRemove: (person: number) => void;
+}) {
+  return (
+    <fieldset className="revision-reveal">
+      <legend className="text-sm font-medium">People in the clip</legend>
+      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+        {people.length
+          ? "Write who each person becomes below. Anyone you do not name stays as filmed."
+          : "Pause on a frame where someone is clear and click them. They become @person1, which you can name in your words: “Replace @person1 with @Cal”."}
+      </p>
+      {people.length > 0 && (
+        <ul className="mt-2 grid gap-1.5">
+          {people.map((person) => {
+            const becomes = cast.find((c) => c.person === person.person);
+            return (
+              <li
+                key={person.person}
+                className="clip-person flex items-center gap-3 rounded-lg border border-border py-1.5 pr-1.5 pl-1.5"
+              >
+                <span className="h-12 w-9 shrink-0 overflow-hidden rounded-md bg-secondary">
+                  {person.url ? (
+                    <img
+                      src={person.url}
+                      alt={`Person ${person.person}, as tagged`}
+                      className="size-full object-cover"
+                    />
+                  ) : (
+                    <span className="grid size-full place-items-center">
+                      <LoaderCircle
+                        aria-hidden="true"
+                        className="size-3.5 text-muted-foreground motion-safe:animate-spin"
+                      />
+                    </span>
+                  )}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium">
+                    {personMention(person.person)}
+                  </span>
+                  <span className="block truncate text-xs text-muted-foreground">
+                    {person.status === "cutting"
+                      ? "Cutting them out of the frame…"
+                      : person.status === "failed"
+                        ? "Could not cut them out; the click alone points them out"
+                        : becomes
+                          ? `Becomes ${becomes.element.name}`
+                          : `Stays as filmed · tagged at ${formatTimecode(person.timeMs / 1000)}`}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onRemove(person.person)}
+                  aria-label={`Remove ${personMention(person.person)}`}
+                  className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <X aria-hidden="true" className="size-3.5" />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </fieldset>
+  );
+}
+
 function MovesStretch({
   length,
   range,
   clipSeconds,
+  most,
   onLength,
 }: {
   length: number;
   range: { start: number; end: number } | null;
   clipSeconds: number | null;
+  /** The engine's longest run, in seconds. */
+  most: number;
   onLength: (length: number) => void;
 }) {
+  const span = range ? range.end - range.start : null;
   return (
     <fieldset className="revision-reveal">
       <legend className="text-sm font-medium">The moves</legend>
       <p className="mt-1 text-xs leading-5 text-muted-foreground">
         {range
-          ? clipSeconds !== null && clipSeconds <= MOTION_LIMITS.maxSeconds
+          ? clipSeconds !== null && clipSeconds <= most
             ? `${formatTimecode(range.start)} to ${formatTimecode(range.end)}. Wan 3.0 makes whole seconds, so the clip is cut to keep its sound in step; drag the band to choose them.`
-            : `${formatTimecode(range.start)} to ${formatTimecode(range.end)}. One run copies up to ${MOTION_LIMITS.maxSeconds} seconds; drag the band under the clip to choose them.`
+            : `${formatTimecode(range.start)} to ${formatTimecode(range.end)}. One run copies up to ${most} seconds; drag the band under the clip to choose them.`
           : clipSeconds !== null
             ? `The whole clip, ${clipSeconds.toFixed(1)} seconds, step for step.`
-            : "Choose a clip: a dance, a stunt, a gesture. Up to ten seconds are copied."}
+            : `Choose a clip: a dance, a stunt, a gesture. Up to ${most} seconds are copied.`}
       </p>
       {range && (
         <div
@@ -3052,13 +3451,14 @@ function MovesStretch({
           className="mt-2 flex gap-1.5"
         >
           {MOVES_LENGTHS.filter(
-            (option) => clipSeconds === null || option <= clipSeconds,
+            (option) =>
+              option <= most && (clipSeconds === null || option <= clipSeconds),
           ).map((option) => (
             <button
               key={option}
               type="button"
               role="radio"
-              aria-checked={length === option}
+              aria-checked={span === option}
               onClick={() => onLength(option)}
               className="tabular inline-flex h-7 items-center rounded-full border border-border px-3 text-xs text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring aria-checked:border-tungsten/70 aria-checked:text-foreground"
             >

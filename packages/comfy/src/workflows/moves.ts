@@ -7,6 +7,7 @@
 
 import {
   MOTION_ENGINES,
+  type AssetRef,
   type MotionResolution,
   type PerformanceTransferInputs,
   type ResolvedMention,
@@ -35,6 +36,8 @@ export const WAN3_MODEL = MOTION_ENGINES["wan-3"].modelId;
 /** Character views first (portrait, then sheet), then the Location's. */
 const MAX_CHARACTER_IMAGES = 3;
 const MAX_LOCATION_IMAGES = 2;
+/** Wan 3.0 reads at most ten reference images. */
+const MAX_IMAGES = 10;
 
 const clean = (text: string) => text.trim().replace(/[.\s]+$/, "");
 const sentence = (text: string) => {
@@ -63,12 +66,32 @@ export function movesCast(
   inputs: PerformanceTransferInputs,
   context: BuildContext,
 ) {
-  const character = find(context, inputs.character?.elementId);
+  const character = find(
+    context,
+    inputs.character?.elementId ?? inputs.cast[0]?.character.elementId,
+  );
   const location = find(context, inputs.location?.elementId);
   if (!character || character.type !== "character")
     throw new Error("Choose the Character who performs the moves");
   return { character, location };
 }
+
+/** Each tagged person with the Character who takes their place, checked. */
+export function movesSwaps(
+  inputs: PerformanceTransferInputs,
+  context: BuildContext,
+) {
+  return inputs.cast.map((swap) => {
+    const character = find(context, swap.character.elementId);
+    if (!character || character.type !== "character")
+      throw new Error(`Choose who @person${swap.person} becomes`);
+    return { ...swap, character };
+  });
+}
+
+/** `@person2` in the creator's words reads "Person 2", as the instruction names them. */
+export const namePeople = (text: string) =>
+  text.replace(/@person([1-9])\b/gi, "Person $1");
 
 /** The creator's extra words, with mentions spelled out; empty when they only named the cast. */
 function extraDirection(
@@ -76,7 +99,7 @@ function extraDirection(
   mentions: readonly ResolvedMention[],
   names: readonly string[],
 ) {
-  const words = clean(expandMentions(inputs.prompt, mentions));
+  const words = clean(namePeople(expandMentions(inputs.prompt, mentions)));
   // "@Cal copies the moves" adds nothing the instruction does not say already.
   const bare = names.reduce(
     (text, name) => text.replaceAll(name, ""),
@@ -138,6 +161,80 @@ export function wan3MovesPrompt(o: {
     .slice(0, 4000);
 }
 
+/** Where a click sits on the frame, in words: "on the right", "in the middle, near the top". */
+export function frameSpot(point: { x: number; y: number }) {
+  const across =
+    point.x < 0.36
+      ? "on the left"
+      : point.x > 0.64
+        ? "on the right"
+        : "in the middle";
+  const down =
+    point.y < 0.33
+      ? ", near the top"
+      : point.y > 0.67
+        ? ", near the bottom"
+        : "";
+  return `${across}${down}`;
+}
+
+/**
+ * Several swaps in one run. Each tagged person is shown to Wan as a cut-out
+ * from the clip ("the person in Image 1"), then the Character's views, so
+ * nobody has to describe who is who in words.
+ */
+export function wan3CastPrompt(o: {
+  swaps: readonly {
+    person: number;
+    character: ResolvedMention;
+    point: { x: number; y: number; timeMs: number };
+    /** The cut-out's image number, or null when none was sent. */
+    crop: number | null;
+    /** The Character's image numbers and views, in order. */
+    images: readonly {
+      n: number;
+      view: ResolvedMention["references"][number]["view"];
+    }[];
+  }[];
+  location: ResolvedMention | undefined;
+  locationImages: readonly number[];
+  direction: string;
+}) {
+  const tag = (n: number) => `Image ${n}`;
+  const lines = o.swaps.map((swap) => {
+    const where = `${frameSpot(swap.point)} of the frame at ${(swap.point.timeMs / 1000).toFixed(1)} s`;
+    const who = identity(swap.character);
+    const seen =
+      swap.crop === null
+        ? `the person ${where}`
+        : `the person shown in ${tag(swap.crop)} (${where})`;
+    return [
+      `Person ${swap.person}, ${seen}, becomes ${swap.character.name}, shown in ${list(swap.images.map((i) => tag(i.n)))}${who ? `: ${who}` : ""}.`,
+      referenceGuide(swap.images.map((i) => ({ tag: tag(i.n), view: i.view }))),
+    ]
+      .filter(Boolean)
+      .join(" ");
+  });
+  const crops = o.swaps.flatMap((s) => (s.crop === null ? [] : [tag(s.crop)]));
+  const setting = o.location
+    ? `Use the place from ${list(o.locationImages.map(tag)) || "the description"}: ${o.location.name}${o.location.description ? `, ${clean(o.location.description)}` : ""}. Light everyone as that place would.`
+    : "Keep the place, the light and everyone else exactly as in Video 1.";
+  return [
+    `In Video 1, swap ${o.swaps.length === 1 ? "one person" : `${o.swaps.length} people`} and leave everyone else exactly as filmed.`,
+    ...lines,
+    crops.length
+      ? `${list(crops)} ${crops.length === 1 ? "is a still" : "are stills"} from Video 1 that only point out who to replace; take nobody's face, hair or clothes from ${crops.length === 1 ? "it" : "them"}.`
+      : "",
+    setting,
+    "Each of them copies every step, gesture and expression of the person they replace, with the same timing, the same camera framing and the same camera movement as Video 1.",
+    o.direction,
+    "Photorealistic.",
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .slice(0, 4000);
+}
+
 /** Wan 3.0's resolution tiers, in its own spelling. */
 const WAN3_RESOLUTION: Record<MotionResolution, string> = {
   "480p": "480P",
@@ -145,11 +242,97 @@ const WAN3_RESOLUTION: Record<MotionResolution, string> = {
   "1080p": "1080P",
 };
 
+/** Inline when Wan may take it so; the clip itself always goes by URL. */
+async function imageUrl(context: BuildContext, ref: AssetRef) {
+  const asset = await context.asset(ref);
+  return asset.publicUrl ?? (await asset.dataUri());
+}
+
+/** Several tagged people, each with their own Character. */
+async function wan3CastMedia(
+  inputs: PerformanceTransferInputs,
+  context: BuildContext,
+  location: ResolvedMention | undefined,
+) {
+  const swaps = movesSwaps(inputs, context);
+  const crops = swaps.filter((s) => s.crop).length;
+  const placeRefs = location
+    ? locationReferences(location).slice(
+        0,
+        Math.max(
+          0,
+          Math.min(MAX_LOCATION_IMAGES, MAX_IMAGES - crops - swaps.length * 2),
+        ),
+      )
+    : [];
+  // Ten images in all: the cut-outs, then as many views per Character as fit.
+  const perCharacter = Math.max(
+    1,
+    Math.min(
+      MAX_CHARACTER_IMAGES,
+      Math.floor((MAX_IMAGES - crops - placeRefs.length) / swaps.length),
+    ),
+  );
+  const refs: AssetRef[] = [];
+  const planned = swaps.map((swap) => {
+    const views = characterReferences(swap.character).slice(0, perCharacter);
+    if (!views.length)
+      throw new Error(
+        `${swap.character.name} needs an approved reference first`,
+      );
+    let crop: number | null = null;
+    if (swap.crop) {
+      refs.push(swap.crop);
+      crop = refs.length;
+    }
+    const images = views.map((view) => {
+      refs.push(view.asset);
+      return { n: refs.length, view: view.view };
+    });
+    return { ...swap, crop, images };
+  });
+  const locationImages = placeRefs.map((ref) => {
+    refs.push(ref);
+    return refs.length;
+  });
+  const images = await Promise.all(refs.map((ref) => imageUrl(context, ref)));
+  const prompt = wan3CastPrompt({
+    swaps: planned,
+    location,
+    locationImages,
+    direction: extraDirection(
+      inputs,
+      context.mentions,
+      [...swaps.map((s) => s.character.name), location?.name ?? ""].filter(
+        Boolean,
+      ),
+    ),
+  });
+  return { images, prompt };
+}
+
 export async function wan3MovesRequest(
   inputs: PerformanceTransferInputs,
   context: BuildContext,
 ): Promise<ProviderRequest> {
   const { character, location } = movesCast(inputs, context);
+  const source = await context.asset(inputs.source);
+  if (!source.mediaType.startsWith("video/"))
+    throw new Error("Choose a video clip whose moves to copy");
+  const videoUrl = await source.fetchableUrl();
+  const { images, prompt } = inputs.cast.length
+    ? await wan3CastMedia(inputs, context, location)
+    : await wan3SoloMedia(inputs, context, character, location);
+  return wan3Body(inputs, videoUrl, images, prompt);
+}
+
+/** One Character in place of the performer, as worded or the only person. */
+async function wan3SoloMedia(
+  inputs: PerformanceTransferInputs,
+  context: BuildContext,
+  character: ResolvedMention,
+  location: ResolvedMention | undefined,
+) {
   const characterRefs = characterReferences(character).slice(
     0,
     MAX_CHARACTER_IMAGES,
@@ -159,16 +342,11 @@ export async function wan3MovesRequest(
   const placeRefs = location
     ? locationReferences(location).slice(0, MAX_LOCATION_IMAGES)
     : [];
-  const source = await context.asset(inputs.source);
-  if (!source.mediaType.startsWith("video/"))
-    throw new Error("Choose a video clip whose moves to copy");
-  const videoUrl = await source.fetchableUrl();
   // Images may go inline; the clip may not.
   const images = await Promise.all(
-    [...characterRefs.map((r) => r.asset), ...placeRefs].map(async (ref) => {
-      const asset = await context.asset(ref);
-      return asset.publicUrl ?? (await asset.dataUri());
-    }),
+    [...characterRefs.map((r) => r.asset), ...placeRefs].map((ref) =>
+      imageUrl(context, ref),
+    ),
   );
   const prompt = wan3MovesPrompt({
     performer: inputs.performer,
@@ -182,6 +360,15 @@ export async function wan3MovesRequest(
       [character.name, location?.name ?? ""].filter(Boolean),
     ),
   });
+  return { images, prompt };
+}
+
+function wan3Body(
+  inputs: PerformanceTransferInputs,
+  videoUrl: string,
+  images: readonly string[],
+  prompt: string,
+): ProviderRequest {
   return {
     model: WAN3_MODEL,
     input: {
@@ -311,6 +498,8 @@ export async function wanAnimateMovesRequest(
   inputs: PerformanceTransferInputs,
   context: BuildContext,
 ): Promise<CloudWorkflowRequest> {
+  if (inputs.cast.length)
+    throw new Error("Tagged people need Wan 3.0; Wan Animate 2 copies one");
   const { character, location } = movesCast(inputs, context);
   // The portrait for the face, the sheet for the body and outfit.
   const characterRefs = characterReferences(character)

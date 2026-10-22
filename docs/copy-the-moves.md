@@ -10,13 +10,24 @@ The idea comes from Higgsfield's "Genjutsu" and the open-source [Open Photon](ht
 
 ## How it works
 
-| Step         | What happens                                                                                                                                                                                                                                                                                                                                                                                   |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The moves    | Up to 10 seconds. A longer clip shows a band under the player; drag it to choose the stretch (4, 6, 8 or 10 s). The stretch is cut in the browser with Mediabunny and saved to the library as its own clip, so only that stretch is sent and billed and the compare view lines up. Browsers without an H.264 encoder (open-source Chromium) copy from the keyframe before the stretch instead. |
-| Who performs | A Character with approved references (required). Their close portrait and sheet go to the model as images.                                                                                                                                                                                                                                                                                     |
-| Whose moves  | Optional words such as "the dancer in the middle" when the clip has several people. Everyone else stays.                                                                                                                                                                                                                                                                                       |
-| New place    | An optional Location. Without one, the clip's own place, light and people stay.                                                                                                                                                                                                                                                                                                                |
-| Model        | Wan 3.0 (default) or Wan Animate 2, and the output size.                                                                                                                                                                                                                                                                                                                                       |
+| Step         | What happens                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The moves    | Up to 15 seconds on Wan 3.0 and 10 on Wan Animate 2. A longer clip shows a band under the player; drag it to choose the stretch (4, 6, 8, 10 or 15 s). The stretch is cut in the browser with Mediabunny and saved to the library as its own clip, so only that stretch is sent and billed and the compare view lines up. Browsers without an H.264 encoder (open-source Chromium) copy from the keyframe before the stretch instead. |
+| Who performs | A Character with approved references (required). Their close portrait and sheet go to the model as images.                                                                                                                                                                                                                                                                                                                            |
+| Whose moves  | Optional words such as "the dancer in the middle" when the clip has several people. Everyone else stays. Or tag people on the frame (below).                                                                                                                                                                                                                                                                                          |
+| New place    | An optional Location. Without one, the clip's own place, light and people stay.                                                                                                                                                                                                                                                                                                                                                       |
+| Model        | Wan 3.0 (default) or Wan Animate 2, and the output size.                                                                                                                                                                                                                                                                                                                                                                              |
+
+## Tagging people on the frame
+
+For clips with several people, nobody has to describe who is who:
+
+1. Pause on a frame where someone is clear and click them. They become `@person1` (then `@person2`, up to four), pinned on that frame.
+2. The pose model already used by Recast's shot check (MoveNet in a worker, `cutOutPerson` in `shot-checks-client.ts`) finds the person under the click, and the studio cuts them out of the frame. If nobody is found, a person-sized box around the click is used.
+3. The words gain "Replace @person1 with @", with the caret after the `@`, so the Character list opens straight away. `@person1` is offered in the same list.
+4. The words decide the pairs, in either order ("Replace @person1 with @Cal", "@Cal takes over from @person1"). `castFromWords` in `clip-people.ts` reads them, and the People list shows how they were read ("Becomes Cal", or "Stays as filmed").
+
+The run sends each swap as `cast` (`castSwapSchema`): the tag, the Character, the click (moved into the time of the stretch that is sent) and the cut-out, saved to the library. `wan3CastPrompt` then gives Wan each cut-out as a reference image ("Person 2, the person shown in Image 4 (on the right of the frame at 6.8 s), becomes Chef Bruno, shown in Image 5 and Image 6"), and says that the cut-outs only point out who to replace, so their looks do not leak in. Up to three swaps per run, within Wan's ten reference images: a cut-out each, then as many views per Character as fit. Tagging is Wan 3.0 only; Wan Animate 2 copies one person.
 
 ### Wan 3.0 (hosted, Comfy Router)
 
@@ -65,7 +76,8 @@ All with Cal from the starter world. TikTok clips were downloaded with `scripts/
 
 ## Limits
 
-- 2 to 10 seconds per run. Longer dances need several runs, one stretch each.
+- 2 to 15 seconds per run on Wan 3.0 (Router: the reference video is at most 15 s, and input plus output at most 30 s), 2 to 10 on Wan Animate 2. Longer dances need several runs, one stretch each.
+- Up to four tagged people and three swaps per run. A pin marks one frame; tag someone where they are clear, not mid-blur.
 - Wan 3.0 is a hosted model with closed weights; its output follows Alibaba's terms.
 - Wan Animate 2 copies one performer; in a group clip the others can soften.
 - Use clips you have the rights to. The studio says so above the button.

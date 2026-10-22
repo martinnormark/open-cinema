@@ -7,7 +7,11 @@ import {
 } from "./elements";
 import { cameraMoveSchema, restageAngleSchema } from "./camera";
 import { vfxEffectSchema } from "./vfx";
-import { motionEngineSchema, motionResolutionSchema } from "./moves";
+import {
+  CLIP_PEOPLE,
+  motionEngineSchema,
+  motionResolutionSchema,
+} from "./moves";
 import {
   extendPipelineSchema,
   extendSecondsSchema,
@@ -16,7 +20,11 @@ import {
 } from "./take-edits";
 import { assetRefSchema, type AssetRef } from "./media";
 import { directionSnapshotSchema } from "./direction";
-import { preservationIntentSchema, targetSelectionSchema } from "./replacement";
+import {
+  framePointSchema,
+  preservationIntentSchema,
+  targetSelectionSchema,
+} from "./replacement";
 import { workflowKindSchema, type WorkflowKind } from "./workflow-kinds";
 
 export { workflowKindSchema, type WorkflowKind } from "./workflow-kinds";
@@ -153,6 +161,21 @@ export const performanceControlSchema = z.enum(["edges", "edges-detailed"]);
 export type PerformanceControl = z.infer<typeof performanceControlSchema>;
 
 /**
+ * One swap in Copy the moves: a person the creator tagged on a frame of the
+ * clip (`@person1`) and the Character who takes their place.
+ */
+export const castSwapSchema = z.object({
+  /** The tag's number: 1 for `@person1`. */
+  person: z.number().int().min(1).max(CLIP_PEOPLE.max),
+  character: elementMentionSchema,
+  /** Where they were clicked, in the time of the clip that is sent. */
+  point: framePointSchema,
+  /** That person cut out of the frame, so the model sees who is meant. */
+  crop: assetRefSchema.optional(),
+});
+export type CastSwap = z.infer<typeof castSwapSchema>;
+
+/**
  * "Copy the moves" (once "Reuse a performance"): the source clip supplies the
  * acting, choreography and timing; the result shows the intended Character
  * and setting instead. `engine` names the model that runs (contracts/moves.ts).
@@ -165,8 +188,13 @@ export const performanceTransferInputsSchema = z.object({
    * were all LTX 2.3 Union Control, so that stays the default when absent.
    */
   engine: motionEngineSchema.default("ltx-edges"),
-  /** Who performs in the new shot. */
+  /** Who performs in the new shot. With `cast`, the first swap's Character. */
   character: elementMentionSchema.optional(),
+  /**
+   * Wan 3.0: tagged people and who each becomes, for clips with several
+   * people. Replaces `performer`; untagged people stay as filmed.
+   */
+  cast: z.array(castSwapSchema).max(CLIP_PEOPLE.maxSwaps).default([]),
   /** Where the new shot takes place; without one the clip's own place stays. */
   location: elementMentionSchema.optional(),
   /** Which person in the clip the Character replaces, in words. */
@@ -445,6 +473,9 @@ export function requestAssetRefs(request: GenerationRequest): AssetRef[] {
       return [
         request.inputs.source,
         ...(request.inputs.firstFrame ? [request.inputs.firstFrame] : []),
+        ...request.inputs.cast.flatMap((swap) =>
+          swap.crop ? [swap.crop] : [],
+        ),
       ];
     case "video.object-swap":
     case "video.restage":
@@ -477,9 +508,10 @@ export function requestMentions(request: GenerationRequest) {
     case "video.character-replace":
       return [request.inputs.character];
     case "video.performance-transfer": {
-      const { character, location, mentions } = request.inputs;
+      const { character, location, mentions, cast } = request.inputs;
       const all = [
         ...(character ? [character] : []),
+        ...cast.map((swap) => swap.character),
         ...(location ? [location] : []),
         ...mentions,
       ];

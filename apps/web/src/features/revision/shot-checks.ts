@@ -168,6 +168,26 @@ export interface TrackedFrame {
  * Follows the marked person through the sampled frames: the person under the
  * mark on the nearest frame, then frame to frame by overlap.
  */
+/** The smallest person under a click, or the nearest one within reach of it. */
+export function personUnder(
+  people: readonly PersonDetection[],
+  mark: { x: number; y: number },
+): PersonDetection | null {
+  const under = people
+    .filter((p) => contains(p.box, mark))
+    .sort((a, b) => area(a.box) - area(b.box));
+  if (under[0]) return under[0];
+  let nearest: PersonDetection | null = null;
+  for (const p of people)
+    if (
+      distance(centre(p.box), mark) < 0.15 &&
+      (!nearest ||
+        distance(centre(p.box), mark) < distance(centre(nearest.box), mark))
+    )
+      nearest = p;
+  return nearest;
+}
+
 export function trackTarget(
   scan: ShotScan,
   mark: { x: number; y: number; timeMs: number },
@@ -182,21 +202,8 @@ export function trackTarget(
     )
       anchor = i;
 
-  const pick = (people: readonly PersonDetection[]) => {
-    const under = people
-      .filter((p) => contains(p.box, mark))
-      .sort((a, b) => area(a.box) - area(b.box));
-    if (under[0]) return under[0];
-    let nearest: PersonDetection | null = null;
-    for (const p of people)
-      if (
-        distance(centre(p.box), mark) < 0.15 &&
-        (!nearest ||
-          distance(centre(p.box), mark) < distance(centre(nearest.box), mark))
-      )
-        nearest = p;
-    return nearest;
-  };
+  const pick = (people: readonly PersonDetection[]) =>
+    personUnder(people, mark);
   // The mark may sit on a frame where detection missed them; try neighbours.
   let start: PersonDetection | null = null;
   for (const offset of [0, -1, 1, -2, 2]) {

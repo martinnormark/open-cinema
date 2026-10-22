@@ -2,7 +2,9 @@ import { useSyncExternalStore } from "react";
 import {
   checkPeople,
   checkResult,
+  personUnder,
   sampleTimes,
+  type Box,
   type ResultChecks,
   type ShotScan,
 } from "./shot-checks";
@@ -120,6 +122,84 @@ export async function scanClip(url: string, times?: Times): Promise<ShotScan> {
     height: sampled.height,
     durationMs: sampled.durationMs,
     frames: response.frames ?? [],
+  };
+}
+
+/** A cut-out's shorter side; Wan 3.0 refuses reference images under 240 px. */
+const CUT_OUT_MIN_SIDE = 512;
+
+/**
+ * The person under a click, cut out of that frame: found by the pose model
+ * when it can, otherwise a person-shaped box around the click. The cut-out
+ * shows a model who is meant without anyone describing them.
+ */
+export async function cutOutPerson(
+  url: string,
+  mark: { x: number; y: number; timeMs: number },
+): Promise<{ box: Box; found: boolean; blob: Blob }> {
+  const sampled = await sampleFrames(url, [mark.timeMs]);
+  const frame = sampled.frames[0];
+  if (!frame) throw new Error("That frame could not be read.");
+  const { width, height } = sampled;
+  let box: Box | null = null;
+  try {
+    // The worker takes its own copy; this one is cut from.
+    const copy = await createImageBitmap(frame.bitmap);
+    const response = await call(
+      { type: "frames", frames: [{ bitmap: copy, timeMs: mark.timeMs }] },
+      [copy],
+    );
+    const people = response.ok ? (response.frames?.[0]?.people ?? []) : [];
+    box = personUnder(people, mark)?.box ?? null;
+  } catch {
+    // Detection is a help, not a requirement.
+  }
+  const found = box !== null;
+  // Unfound: a standing figure around the click, a third of the frame tall.
+  box ??= {
+    x: mark.x - (0.33 * height) / width / 4,
+    y: mark.y - 0.165,
+    w: (0.33 * height) / width / 2,
+    h: 0.33,
+  };
+  // Room around them, then clamped to the frame.
+  // Tight at the sides, so whoever stands next to them stays out of it.
+  const padX = box.w * 0.08;
+  const padY = box.h * 0.08;
+  const x0 = Math.max(0, (box.x - padX) * width);
+  const y0 = Math.max(0, (box.y - padY) * height);
+  const x1 = Math.min(width, (box.x + box.w + padX) * width);
+  const y1 = Math.min(height, (box.y + box.h + padY) * height);
+  const cw = Math.max(1, x1 - x0);
+  const ch = Math.max(1, y1 - y0);
+  const scale = Math.max(1, CUT_OUT_MIN_SIDE / Math.min(cw, ch));
+  const canvas = new OffscreenCanvas(
+    Math.round(cw * scale),
+    Math.round(ch * scale),
+  );
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("This browser cannot cut out a frame.");
+  context.imageSmoothingQuality = "high";
+  context.drawImage(
+    frame.bitmap,
+    x0,
+    y0,
+    cw,
+    ch,
+    0,
+    0,
+    canvas.width,
+    canvas.height,
+  );
+  frame.bitmap.close();
+  const blob = await canvas.convertToBlob({
+    type: "image/jpeg",
+    quality: 0.92,
+  });
+  return {
+    box: { x: x0 / width, y: y0 / height, w: cw / width, h: ch / height },
+    found,
+    blob,
   };
 }
 

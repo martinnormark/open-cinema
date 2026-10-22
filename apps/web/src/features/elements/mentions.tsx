@@ -6,6 +6,7 @@ import {
   useState,
   type ComponentProps,
   type KeyboardEvent,
+  type RefObject,
 } from "react";
 import { cn } from "@/lib/utils";
 import {
@@ -219,8 +220,19 @@ function activeQuery(text: string, caret: number): Query | null {
 interface Suggestion {
   key: string;
   insert: string;
-  element: Element;
+  /** Null for a person tagged in a clip, which is not an Element. */
+  element: Element | null;
   state: ElementState | null;
+  thumbnail: string | null;
+  name: string;
+  label: string;
+}
+
+/** Something to mention that is not an Element, e.g. `@person1` tagged on a frame. */
+export interface ExtraMention {
+  handle: string;
+  name: string;
+  label: string;
   thumbnail: string | null;
 }
 function suggestionsFor(
@@ -261,6 +273,8 @@ function suggestionsFor(
         element,
         state,
         thumbnail: thumbnail(element, state.id),
+        name: `${element.name} · ${state.name}`,
+        label: STATE_KIND_LABELS[state.kind],
       }));
   }
   const q = query.handle.toLowerCase();
@@ -281,6 +295,27 @@ function suggestionsFor(
       element,
       state: null,
       thumbnail: thumbnail(element, null),
+      name: element.name,
+      label: elementTypes[element.type].label,
+    }));
+}
+
+function extraSuggestions(
+  query: Query,
+  extra: readonly ExtraMention[],
+): Suggestion[] {
+  if (query.stateQuery !== null) return [];
+  const q = query.handle.toLowerCase();
+  return extra
+    .filter((m) => m.handle.toLowerCase().startsWith(q))
+    .map((m) => ({
+      key: `extra-${m.handle}`,
+      insert: `@${m.handle}`,
+      element: null,
+      state: null,
+      thumbnail: m.thumbnail,
+      name: m.name,
+      label: m.label,
     }));
 }
 
@@ -298,6 +333,8 @@ export function MentionTextarea({
   onBlur,
   focusAtEnd = false,
   types,
+  extra,
+  inputRef,
   ...props
 }: TextareaProps & {
   value: string;
@@ -306,6 +343,10 @@ export function MentionTextarea({
   focusAtEnd?: boolean;
   /** Only these Element types are suggested; every type when left out. */
   types?: readonly ElementType[];
+  /** Offered after the Elements, e.g. people tagged on a frame. */
+  extra?: readonly ExtraMention[];
+  /** The textarea, for focusing it from outside. */
+  inputRef?: RefObject<HTMLTextAreaElement | null>;
 }) {
   const { elements: all } = useElements();
   const elements = useMemo(
@@ -318,19 +359,26 @@ export function MentionTextarea({
   const attach = useCallback(
     (node: HTMLTextAreaElement | null) => {
       textarea.current = node;
+      if (inputRef) inputRef.current = node;
       if (!node || !focusAtEnd) return;
       node.focus({ preventScroll: true });
       node.setSelectionRange(node.value.length, node.value.length);
     },
-    [focusAtEnd],
+    [focusAtEnd, inputRef],
   );
   const [caret, setCaret] = useState<number | null>(null);
   const [dismissedAt, setDismissedAt] = useState<number | null>(null);
   const [highlight, setHighlight] = useState(0);
   const query = caret === null ? null : activeQuery(value, caret);
   const suggestions = useMemo(
-    () => (query ? suggestionsFor(query, elements) : []),
-    [query?.start, query?.handle, query?.stateQuery, elements],
+    () =>
+      query
+        ? [
+            ...suggestionsFor(query, elements),
+            ...extraSuggestions(query, extra ?? []),
+          ]
+        : [],
+    [query?.start, query?.handle, query?.stateQuery, elements, extra],
   );
   const open = !!query && dismissedAt !== query.start && suggestions.length > 0;
   const active = open ? Math.min(highlight, suggestions.length - 1) : -1;
@@ -346,23 +394,16 @@ export function MentionTextarea({
     if (!query) return;
     const after = value.slice(query.end);
     // Offer states next when this Element has any; otherwise close with a space.
-    const trailing =
-      !suggestion.state && suggestion.element.states.length
-        ? ""
-        : after.startsWith(" ")
-          ? ""
-          : " ";
+    const offersStates =
+      !suggestion.state && !!suggestion.element?.states.length;
+    const trailing = offersStates ? "" : after.startsWith(" ") ? "" : " ";
     const next =
       value.slice(0, query.start) + suggestion.insert + trailing + after;
     const position = query.start + suggestion.insert.length + trailing.length;
     onValueChange(next);
     setHighlight(0);
     setCaret(position);
-    setDismissedAt(
-      !suggestion.state && suggestion.element.states.length
-        ? null
-        : query.start,
-    );
+    setDismissedAt(offersStates ? null : query.start);
     requestAnimationFrame(() => {
       textarea.current?.focus();
       textarea.current?.setSelectionRange(position, position);
@@ -401,6 +442,10 @@ export function MentionTextarea({
           track(event.target);
         }}
         onSelect={(event) => track(event.currentTarget)}
+        onFocus={(event) => {
+          track(event.currentTarget);
+          props.onFocus?.(event);
+        }}
         onBlur={(event) => {
           setCaret(null);
           onBlur?.(event);
@@ -441,18 +486,14 @@ export function MentionTextarea({
             </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-medium">
-                {suggestion.state
-                  ? `${suggestion.element.name} · ${suggestion.state.name}`
-                  : suggestion.element.name}
+                {suggestion.name}
               </span>
               <span className="block truncate text-xs text-muted-foreground">
                 {suggestion.insert}
               </span>
             </span>
             <span className="shrink-0 text-xs text-muted-foreground">
-              {suggestion.state
-                ? STATE_KIND_LABELS[suggestion.state.kind]
-                : elementTypes[suggestion.element.type].label}
+              {suggestion.label}
             </span>
           </li>
         ))}
