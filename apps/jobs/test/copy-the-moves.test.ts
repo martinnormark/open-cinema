@@ -184,9 +184,7 @@ it("asks Wan for whole seconds it can make", () => {
   expect(wan3Duration(undefined)).toBe(-1);
   expect(wan3Duration(1.2)).toBe(2);
   expect(wan3Duration(7.6)).toBe(8);
-  expect(wan3Duration(14)).toBe(14);
-  // Router: reference video at most 15 s.
-  expect(wan3Duration(20)).toBe(15);
+  expect(wan3Duration(14)).toBe(10);
 });
 
 it("reads Wan's video URL and lays the clip's sound back under it", () => {
@@ -276,7 +274,7 @@ it("swaps tagged people, each shown to Wan by a cut-out from the clip", async ()
   const swaps = inputs({
     prompt:
       "Replace @person1 with @Cal and @person3 with @GrandmaDot. Keep the floodlights.",
-    seconds: 15,
+    seconds: 10,
     cast: [
       {
         person: 1,
@@ -318,7 +316,7 @@ it("swaps tagged people, each shown to Wan by a cut-out from the clip", async ()
   expect(prompt).toContain("Image 1 and Image 4 are stills from Video 1");
   expect(prompt).toContain("Keep the floodlights.");
   expect(prompt).not.toContain("@person");
-  expect(input.parameters.duration).toBe(15);
+  expect(input.parameters.duration).toBe(10);
   // Both Characters resolve, though only the first is `character`.
   expect(
     requestMentions({

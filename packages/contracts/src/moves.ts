@@ -44,8 +44,9 @@ export const MOTION_ENGINES: Record<MotionEngine, MotionEngineFacts> = {
       "https://docs.comfy.org/development/comfy-router/models/wan/wan3-0-video/code",
     description:
       "The most faithful copy: the Character takes the performer's place in the clip's own setting, or in your Location, at up to 1080p. Swaps several tagged people in one run.",
-    // Router: reference video at most 15 s, and input plus output at most 30 s.
-    maxSeconds: 15,
+    // Wan takes 15 s, but Router timed out both 15 s runs (2026-10-22);
+    // 10 s runs finish in about 8 minutes.
+    maxSeconds: 10,
     offered: true,
   },
   "wan-animate": {
@@ -80,8 +81,8 @@ export const MOTION_ENGINES: Record<MotionEngine, MotionEngineFacts> = {
 export const motionResolutionSchema = z.enum(["480p", "720p", "1080p"]);
 export type MotionResolution = z.infer<typeof motionResolutionSchema>;
 
-/** The shortest clip any engine copies, and the longest (Wan 3.0's 15 s). */
-export const MOTION_LIMITS = { minSeconds: 2, maxSeconds: 15 } as const;
+/** The shortest clip any engine copies, and the longest. */
+export const MOTION_LIMITS = { minSeconds: 2, maxSeconds: 10 } as const;
 
 /**
  * People tagged on a frame of the clip: the creator pauses, clicks someone,

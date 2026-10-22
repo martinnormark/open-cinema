@@ -227,7 +227,7 @@ const AREA_REVISION_SECONDS = 3;
 /** Moment lengths offered, in seconds, within `MOMENT_LIMITS`. */
 const MOMENT_LENGTHS = [1, 2, 3] as const;
 /** Stretch lengths offered for a clip longer than one run copies. */
-const MOVES_LENGTHS = [4, 6, 8, 10, 15] as const;
+const MOVES_LENGTHS = [4, 6, 8, 10] as const;
 /** Each Wan engine's sizes; Wan Animate 2 renders the lower two. */
 const MOVES_RESOLUTIONS: Record<
   Exclude<MotionEngine, "ltx-edges">,
