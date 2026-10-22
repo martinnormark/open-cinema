@@ -579,11 +579,29 @@ function DecisionList({
               <dd className="mt-0.5">
                 {model}
                 {card && (
-                  <span className="block text-xs text-muted-foreground">
-                    {card.maker} ·{" "}
-                    {card.weights === "open" ? "open weights" : "hosted model"}{" "}
-                    · {card.runsOn}
-                  </span>
+                  <>
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      {card.maker}
+                    </span>
+                    {/* The same facts, in the same marks, as before generating. */}
+                    <span className="mt-1 flex flex-wrap gap-1">
+                      <span
+                        className={cn(
+                          "inline-flex h-5 items-center rounded-full px-2 text-[11px]",
+                          card.weights === "open"
+                            ? "bg-tungsten/15 text-foreground"
+                            : "bg-secondary text-muted-foreground",
+                        )}
+                      >
+                        {card.weights === "open"
+                          ? "Open weights"
+                          : "Hosted model"}
+                      </span>
+                      <span className="inline-flex h-5 items-center rounded-full bg-secondary px-2 text-[11px] text-muted-foreground">
+                        {card.runsOn}
+                      </span>
+                    </span>
+                  </>
                 )}
               </dd>
             </div>

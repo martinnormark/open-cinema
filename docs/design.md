@@ -60,6 +60,9 @@ Motion tokens follow the transitions.dev scale (`--duration-*`, `--ease-smooth-o
 - Dialogs, menus and selects open in `--duration-fast` (250ms) and close in `--duration-quick` (150ms); dialogs scale from 0.96, menus from 0.97.
 - The mobile sidebar sheet opens in `--duration-slow` and closes in `--duration-medium`.
 - Progress fills move with `transform` only, so live job updates stay on the compositor.
+- A chosen option in a list moves as one sliding fill (the front page's goals, the compare modes), gliding on a new choice and snapping while the list reflows.
+- Pictures still loading when they mount resolve in with `img-reveal` and `revealOnLoad` (`lib/reveal.ts`); cached pictures never wait.
+- Tagging a person in Copy the moves drops a pin with one ring out from the click; away from its frame a pin shrinks to its number, and the cut-out resolves out of a scanning placeholder beside the Character it becomes.
 - `prefers-reduced-motion: reduce` removes animation and transition globally; state must still read from text.
 
 All motion is subject to the 60 fps requirement in [AGENTS.md](../AGENTS.md).

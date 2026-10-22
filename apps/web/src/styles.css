@@ -194,6 +194,18 @@
 [data-slot="select-content"][data-state="closed"] {
   animation-duration: var(--duration-quick);
 }
+/* A picture still loading when it mounts resolves in (skeleton reveal);
+   see lib/reveal.ts. Cached and server-rendered pictures never wait. */
+.img-reveal {
+  transition:
+    opacity var(--duration-slow) ease-in-out,
+    filter var(--duration-slow) ease-in-out;
+}
+.img-reveal[data-pending] {
+  opacity: 0;
+  filter: blur(2px);
+  transition: none;
+}
 /* Page change (transitions.dev page slide, without blur on a surface this
    large): a newly opened page settles 8px up as it fades in. Only the route's
    own root animates, so the sidebar, header and Orb stay put, and nothing

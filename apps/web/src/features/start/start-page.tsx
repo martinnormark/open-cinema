@@ -171,7 +171,11 @@ function GoalList({
     />
   );
   return (
-    <div className="flex flex-col gap-5">
+    <div
+      ref={followChoice}
+      className="start-goals relative flex flex-col gap-5"
+    >
+      <span aria-hidden="true" className="start-goal-pill" />
       <fieldset>
         <legend className="px-3 text-xs font-medium text-muted-foreground">
           Change a take
@@ -234,7 +238,7 @@ function GoalOption({
     <label
       data-checked={checked || undefined}
       style={{ "--i": order } as CSSProperties}
-      className="start-goal start-rise group flex cursor-pointer items-start gap-3 rounded-lg px-3 py-2 has-focus-visible:ring-2 has-focus-visible:ring-ring"
+      className="start-goal start-rise group relative flex cursor-pointer items-start gap-3 rounded-lg px-3 py-2 has-focus-visible:ring-2 has-focus-visible:ring-ring"
     >
       <input
         type="radio"
@@ -267,6 +271,56 @@ function GoalOption({
       </span>
     </label>
   );
+}
+
+/**
+ * The chosen goal's fill slides from goal to goal (transitions.dev tabs
+ * sliding), so a new choice reads as one move down the list. It takes the
+ * checked goal's box: gliding when the choice changes, snapping while the
+ * list itself reflows (fonts loading, "More" opening).
+ */
+function placeGoalPill(list: HTMLElement, glide: boolean) {
+  const pill = list.querySelector<HTMLElement>(".start-goal-pill");
+  const checked = list.querySelector<HTMLElement>(".start-goal[data-checked]");
+  if (!pill) return;
+  if (!checked || !checked.offsetHeight) {
+    delete pill.dataset.placed;
+    return;
+  }
+  // The goals sit inside fieldsets and the "More" panel; sum up to the list.
+  let top = 0;
+  for (
+    let node: HTMLElement | null = checked;
+    node && node !== list;
+    node = node.offsetParent as HTMLElement | null
+  )
+    top += node.offsetTop;
+  const snap = !glide || !pill.dataset.placed;
+  if (snap) pill.style.transition = "none";
+  pill.style.width = `${checked.offsetWidth}px`;
+  pill.style.height = `${checked.offsetHeight}px`;
+  pill.style.transform = `translateY(${top}px)`;
+  if (snap) {
+    void pill.offsetWidth;
+    pill.style.transition = "";
+    pill.dataset.placed = "true";
+  }
+}
+function followChoice(list: HTMLDivElement | null) {
+  if (!list || typeof ResizeObserver === "undefined") return;
+  placeGoalPill(list, false);
+  const resized = new ResizeObserver(() => placeGoalPill(list, false));
+  resized.observe(list);
+  const chosen = new MutationObserver(() => placeGoalPill(list, true));
+  chosen.observe(list, {
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["data-checked"],
+  });
+  return () => {
+    resized.disconnect();
+    chosen.disconnect();
+  };
 }
 
 /** Signed out, nothing can be stored yet; say so where the drop would land. */

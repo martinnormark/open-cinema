@@ -72,6 +72,7 @@ import { acceptSnapshot, useGeneration } from "@/features/generation/store";
 import { startSession } from "@/features/elements/generate";
 import { useElements } from "@/features/elements/store";
 import { MentionTextarea, resolveMentions } from "@/features/elements/mentions";
+import { ElementCover } from "@/features/elements/visuals";
 import { assetUrl } from "@/lib/media-url";
 import {
   elementTypes,
@@ -1306,7 +1307,9 @@ export function ReplacementStudio({
 
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_24rem]">
-      <div className="min-w-0">
+      {/* On a tall enough desktop the take stays in view while the choices
+          scroll beside it, so tagging and naming happen side by side. */}
+      <div className="min-w-0 [@media(min-width:1024px)_and_(min-height:820px)]:sticky [@media(min-width:1024px)_and_(min-height:820px)]:top-20 [@media(min-width:1024px)_and_(min-height:820px)]:self-start">
         <SourceStage
           source={source}
           markTarget={
@@ -1879,7 +1882,9 @@ export function ReplacementStudio({
           aria-label="Before you generate"
           className="rounded-xl bg-surface p-4"
         >
-          <p className="text-sm leading-6">{intentSentence()}</p>
+          <p className="text-sm leading-6">
+            <WithMentions text={intentSentence()} />
+          </p>
           <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
             <dt className="text-muted-foreground">Changes</dt>
             <dd>
@@ -2335,13 +2340,19 @@ function PeopleMarkers({
       {people.map((person) => {
         const away = nowMs === null ? 0 : Math.abs(nowMs - person.timeMs);
         const here = away < 120;
-        // A pin marks a click on one frame; far from it, it would point at nobody.
-        if (away > 1500) return null;
+        // A pin marks a click on one frame; far from it, it would point at
+        // nobody, so it fades out (kept mounted, so it never pops back in).
+        const gone = away > 1500;
         return (
-          <div key={person.person}>
-            {here && person.box && person.found && (
+          <div
+            key={person.person}
+            className="person-pin-group"
+            data-gone={gone || undefined}
+          >
+            {person.box && person.found && (
               <span
-                className="target-person absolute rounded-md border border-dashed border-tungsten/70"
+                data-away={!here || undefined}
+                className="target-person person-outline absolute rounded-md border border-dashed border-tungsten/70"
                 style={{
                   left: `${person.box.x * 100}%`,
                   top: `${person.box.y * 100}%`,
@@ -2351,13 +2362,12 @@ function PeopleMarkers({
               />
             )}
             <span
-              className={cn(
-                "person-pin absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-full border border-tungsten bg-black/70 py-0.5 pr-2 pl-0.5 text-[11px] font-medium text-white shadow-[0_0_0_3px_rgb(0_0_0/0.3)] transition-opacity duration-150",
-                !here && "opacity-55",
-              )}
+              className="person-pin absolute flex -translate-x-1/2 -translate-y-1/2 items-center rounded-full border border-tungsten bg-black/70 p-0.5 text-[11px] font-medium text-white shadow-[0_1px_8px_rgb(0_0_0/0.45)]"
+              data-away={!here || undefined}
+              data-cutting={person.status === "cutting" || undefined}
               style={{ left: `${person.x * 100}%`, top: `${person.y * 100}%` }}
             >
-              <span className="grid size-4 place-items-center rounded-full bg-tungsten text-[10px] text-black tabular">
+              <span className="relative grid size-4 place-items-center rounded-full bg-tungsten text-[10px] text-black tabular">
                 {person.status === "cutting" ? (
                   <LoaderCircle
                     aria-hidden="true"
@@ -2367,7 +2377,15 @@ function PeopleMarkers({
                   person.person
                 )}
               </span>
-              {personMention(person.person)}
+              {/* Off its frame the pin keeps only its number, so pins from
+                  other moments never pile their labels onto each other. */}
+              <span className="person-pin-label">
+                <span className="min-w-0 overflow-hidden">
+                  <span className="block pr-1.5 pl-1 whitespace-nowrap">
+                    {personMention(person.person)}
+                  </span>
+                </span>
+              </span>
             </span>
           </div>
         );
@@ -3330,7 +3348,7 @@ function MomentLength({
             role="radio"
             aria-checked={length === option}
             onClick={() => onLength(option)}
-            className="tabular inline-flex h-7 items-center rounded-full border border-border px-3 text-xs text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring aria-checked:border-tungsten/70 aria-checked:text-foreground"
+            className="tabular inline-flex h-7 items-center rounded-full border border-border px-3 text-xs text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring aria-checked:border-tungsten/70 aria-checked:bg-surface aria-checked:text-foreground"
           >
             {option} s
           </button>
@@ -3344,13 +3362,26 @@ function MomentLength({
  * Everyone tagged on the clip, each with their cut-out and who they become.
  * The words decide the pairs; this list shows how they were read.
  */
+/** The summary sentence, with each @mention set apart as the thing it names. */
+function WithMentions({ text }: { text: string }) {
+  return text.split(/(@[A-Za-z0-9_]+)/).map((part, i) =>
+    i % 2 ? (
+      <span key={i} className="font-medium text-tungsten">
+        {part}
+      </span>
+    ) : (
+      part
+    ),
+  );
+}
+
 function ClipPeople({
   people,
   cast,
   onRemove,
 }: {
   people: readonly ClipPerson[];
-  cast: readonly { person: number; element: { name: string } }[];
+  cast: readonly { person: number; element: Element }[];
   onRemove: (person: number) => void;
 }) {
   return (
@@ -3370,18 +3401,33 @@ function ClipPeople({
                 key={person.person}
                 className="clip-person flex items-center gap-3 rounded-lg border border-border py-1.5 pr-1.5 pl-1.5"
               >
-                <span className="h-12 w-9 shrink-0 overflow-hidden rounded-md bg-secondary">
-                  {person.url ? (
-                    <img
-                      src={person.url}
-                      alt={`Person ${person.person}, as tagged`}
-                      className="size-full object-cover"
-                    />
-                  ) : (
-                    <span className="grid size-full place-items-center">
-                      <LoaderCircle
+                <span className="flex shrink-0 items-center">
+                  <span
+                    className={cn(
+                      "h-12 w-9 overflow-hidden rounded-md bg-secondary",
+                      person.status === "cutting" && "clip-person-pending",
+                    )}
+                  >
+                    {person.url && (
+                      <img
+                        src={person.url}
+                        alt={`Person ${person.person}, as tagged`}
+                        className="clip-person-cutout size-full object-cover"
+                      />
+                    )}
+                  </span>
+                  {becomes && (
+                    <span
+                      key={becomes.element.id}
+                      className="clip-person-becomes flex items-center"
+                    >
+                      <ArrowRight
                         aria-hidden="true"
-                        className="size-3.5 text-muted-foreground motion-safe:animate-spin"
+                        className="mx-1 size-3 text-subtle-foreground"
+                      />
+                      <ElementCover
+                        element={becomes.element}
+                        className="h-12 w-9 rounded-md"
                       />
                     </span>
                   )}
@@ -3390,7 +3436,10 @@ function ClipPeople({
                   <span className="block text-sm font-medium">
                     {personMention(person.person)}
                   </span>
-                  <span className="block truncate text-xs text-muted-foreground">
+                  <span
+                    key={`${person.status}-${becomes?.element.id ?? ""}`}
+                    className="clip-person-status block truncate text-xs text-muted-foreground"
+                  >
                     {person.status === "cutting"
                       ? "Cutting them out of the frame…"
                       : person.status === "failed"
@@ -3460,7 +3509,7 @@ function MovesStretch({
               role="radio"
               aria-checked={span === option}
               onClick={() => onLength(option)}
-              className="tabular inline-flex h-7 items-center rounded-full border border-border px-3 text-xs text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring aria-checked:border-tungsten/70 aria-checked:text-foreground"
+              className="tabular inline-flex h-7 items-center rounded-full border border-border px-3 text-xs text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring aria-checked:border-tungsten/70 aria-checked:bg-surface aria-checked:text-foreground"
             >
               {option} s
             </button>
@@ -3497,7 +3546,7 @@ function MovesEngine({
           return (
             <label
               key={option}
-              className="flex cursor-pointer items-start gap-3 rounded-lg px-2 py-2 hover:bg-surface has-focus-visible:ring-2 has-focus-visible:ring-ring"
+              className="flex cursor-pointer items-start gap-3 rounded-lg border border-transparent px-2 py-2 transition-colors duration-150 hover:bg-surface has-checked:border-tungsten/60 has-checked:bg-surface has-focus-visible:ring-2 has-focus-visible:ring-ring"
             >
               <input
                 type="radio"
@@ -3548,7 +3597,7 @@ function MovesEngine({
             role="radio"
             aria-checked={resolution === option}
             onClick={() => onResolution(option)}
-            className="tabular inline-flex h-7 items-center rounded-full border border-border px-3 text-xs text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring aria-checked:border-tungsten/70 aria-checked:text-foreground"
+            className="tabular inline-flex h-7 items-center rounded-full border border-border px-3 text-xs text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring aria-checked:border-tungsten/70 aria-checked:bg-surface aria-checked:text-foreground"
           >
             {option}
           </button>
@@ -3697,7 +3746,7 @@ function ExtendMethod({
               role="radio"
               aria-checked={seconds === option}
               onClick={() => onSeconds(option)}
-              className="tabular inline-flex h-7 items-center rounded-full border border-border px-3 text-xs text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring aria-checked:border-tungsten/70 aria-checked:text-foreground"
+              className="tabular inline-flex h-7 items-center rounded-full border border-border px-3 text-xs text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring aria-checked:border-tungsten/70 aria-checked:bg-surface aria-checked:text-foreground"
             >
               {option} s
             </button>

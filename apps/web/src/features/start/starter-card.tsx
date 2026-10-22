@@ -3,9 +3,11 @@ import { Link, useRouter } from "@tanstack/react-router";
 import { LoopingClip } from "@/components/looping-clip";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { revealOnLoad } from "@/lib/reveal";
 import { cn } from "@/lib/utils";
 import { bringStarterWorld, useStarter } from "./starter";
 import { starterMediaUrl } from "./starter-world";
+import "./start.css";
 
 const CAST = [
   {
@@ -48,7 +50,10 @@ export function StarterWorld({
       ? Math.round((starter.sent / Math.max(1, starter.total)) * 100)
       : 0;
   return (
-    <div className={cn("starter flex flex-col", className)}>
+    <div
+      className={cn("starter flex flex-col", className)}
+      data-bringing={starter.phase === "bringing" || undefined}
+    >
       <ul
         className={cn("grid grid-cols-3", compact ? "gap-2" : "gap-3")}
         aria-label="In the Tide Mill"
@@ -59,7 +64,7 @@ export function StarterWorld({
             className="starter-cast min-w-0"
             style={{ "--i": i } as CSSProperties}
           >
-            <div className="relative aspect-[4/5] overflow-hidden rounded-md bg-surface">
+            <div className="starter-frame relative aspect-[4/5] overflow-hidden rounded-md bg-surface">
               {"poster" in item ? (
                 <LoopingClip
                   src={starterMediaUrl(item.src)}
@@ -67,10 +72,11 @@ export function StarterWorld({
                 />
               ) : (
                 <img
+                  ref={revealOnLoad}
                   src={starterMediaUrl(item.src)}
                   alt=""
                   decoding="async"
-                  className="size-full object-cover"
+                  className="img-reveal size-full object-cover"
                 />
               )}
               <span className="absolute inset-x-0 bottom-0 bg-linear-to-t from-background/85 to-transparent px-2 pt-6 pb-1.5 text-xs font-medium">

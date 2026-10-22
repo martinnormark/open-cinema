@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { startSession } from "./generate";
 import { assetUrl, posterUrl } from "@/lib/media-url";
+import { revealOnLoad } from "@/lib/reveal";
 import { leadRank } from "@open-cinema/contracts";
 import { isMovingView, type Element, type ElementType } from "./model";
 import "./elements.css";
@@ -83,11 +84,12 @@ export function ElementCover({
         />
       ) : url ? (
         <img
+          ref={revealOnLoad}
           src={url}
           alt=""
           loading="lazy"
           decoding="async"
-          className="size-full object-cover"
+          className="img-reveal size-full object-cover"
         />
       ) : (
         <div className="flex size-full items-center justify-center text-subtle-foreground">

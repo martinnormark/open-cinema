@@ -6,8 +6,37 @@
 .start-goal:hover {
   background-color: color-mix(in oklab, var(--surface) 60%, transparent);
 }
-.start-goal[data-checked] {
+/* The chosen goal's fill is one pill that slides between goals; until it is
+   placed after hydration, the checked goal carries the fill itself. */
+.start-goals:not(:has(.start-goal-pill[data-placed]))
+  .start-goal[data-checked] {
   background-color: var(--surface);
+}
+.start-goal[data-checked]:hover {
+  background-color: transparent;
+}
+.start-goal-pill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 0.5rem;
+  background-color: var(--surface);
+  pointer-events: none;
+  opacity: 0;
+  transition:
+    transform var(--duration-fast) var(--ease-smooth-out),
+    height var(--duration-fast) var(--ease-smooth-out);
+}
+.start-goal-pill[data-placed] {
+  opacity: 1;
+  /* Arrives with the goals' entrance rather than ahead of it. */
+  animation: start-pill-in var(--duration-very-slow) ease-in-out
+    calc(var(--duration-stagger) * 3) backwards;
+}
+@keyframes start-pill-in {
+  from {
+    opacity: 0;
+  }
 }
 
 /* The drop frame answers the drag: the hairline warms and the arrow lifts. */
@@ -163,5 +192,46 @@
   .start-example,
   .start-rise {
     animation: none;
+  }
+}
+
+/* The Tide Mill's cast arrives in reading order, after the goals. */
+.starter-cast {
+  animation: start-rise var(--duration-very-slow) var(--ease-smooth-out)
+    backwards;
+  animation-delay: calc(
+    var(--duration-micro) * 2 + var(--i, 0) * var(--duration-micro)
+  );
+}
+/* While the world is brought in, light passes over the cast: the work is
+   moving, and the words under it say how far. Transform only. */
+.starter-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    color-mix(in oklab, var(--foreground) 14%, transparent) 50%,
+    transparent 70%
+  );
+  transform: translateX(-100%);
+  transition: opacity var(--duration-medium) var(--ease-smooth-out);
+}
+.starter[data-bringing] .starter-frame::after {
+  opacity: 1;
+  animation: starter-sweep 1.6s linear infinite;
+}
+.starter[data-bringing] .starter-cast:nth-child(2) .starter-frame::after {
+  animation-delay: 160ms;
+}
+.starter[data-bringing] .starter-cast:nth-child(3) .starter-frame::after {
+  animation-delay: 320ms;
+}
+@keyframes starter-sweep {
+  to {
+    transform: translateX(100%);
   }
 }

@@ -62,20 +62,154 @@
 .target-marker {
   animation: target-marker var(--duration-fast) var(--ease-smooth-out);
 }
+/* Scale, not transform: the marker is centred with the translate property,
+   which a transform keyframe would stack onto and shove off the click. */
 @keyframes target-marker {
   from {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(0.6);
+    scale: 0.6;
   }
 }
 
-/* The person found under the mark: outline fades in after the check (opacity only). */
+/* The person found under the mark: the outline settles onto them, like a
+   viewfinder finding focus (scale from 1.04, opacity). */
 .target-person {
-  animation: target-person var(--duration-fast) var(--ease-smooth-out);
+  animation: target-person var(--duration-slow) var(--ease-smooth-out);
 }
 @keyframes target-person {
   from {
     opacity: 0;
+    scale: 1.04;
+  }
+}
+
+/* Copy the moves: a tagged person's pin. It pops onto the frame where it was
+   clicked (scale and fade, decelerating), with one ring going out from the click so the tag
+   reads as placed. Away from that frame it shrinks to its number. */
+.person-pin {
+  animation: person-pin-in var(--duration-very-slow) var(--ease-smooth-out);
+  transition:
+    opacity var(--duration-fast) var(--ease-smooth-out),
+    background-color var(--duration-fast) var(--ease-smooth-out);
+}
+@keyframes person-pin-in {
+  from {
+    opacity: 0;
+    scale: 0.5;
+  }
+}
+.person-pin::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  border: 1.5px solid var(--tungsten);
+  pointer-events: none;
+  opacity: 0;
+  animation: person-pin-ring 700ms var(--ease-smooth-out);
+}
+@keyframes person-pin-ring {
+  from {
+    opacity: 0.9;
+    scale: 1;
+  }
+  to {
+    opacity: 0;
+    scale: 1.9 2.6;
+  }
+}
+/* While the person is cut out of the frame, the pin breathes. */
+.person-pin[data-cutting] {
+  animation:
+    person-pin-in var(--duration-very-slow) var(--ease-smooth-out),
+    person-pin-cutting 1.2s ease-in-out var(--duration-very-slow) infinite;
+}
+@keyframes person-pin-cutting {
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in oklab, var(--tungsten) 22%, transparent);
+  }
+}
+.person-pin[data-away] {
+  opacity: 0.6;
+}
+.person-pin-group[data-gone] .person-pin,
+.person-pin-group[data-gone] .person-outline {
+  opacity: 0;
+}
+.person-pin-label {
+  display: grid;
+  grid-template-columns: 1fr;
+  transition:
+    grid-template-columns var(--duration-fast) var(--ease-smooth-out),
+    opacity var(--duration-quick) var(--ease-smooth-out);
+}
+.person-pin[data-away] .person-pin-label {
+  grid-template-columns: 0fr;
+  opacity: 0;
+}
+.person-outline {
+  transition: opacity var(--duration-fast) var(--ease-smooth-out);
+}
+.person-outline[data-away] {
+  opacity: 0;
+}
+
+/* People in the clip: each tagged person's row arrives under the last; the
+   cut-out resolves out of a moving placeholder (skeleton reveal), and the
+   Character they become steps in beside them (scale and fade, decelerating). */
+.clip-person {
+  animation: clip-person-in var(--duration-slow) var(--ease-smooth-out);
+}
+@keyframes clip-person-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+    filter: blur(2px);
+  }
+}
+.clip-person-pending {
+  position: relative;
+  overflow: hidden;
+}
+.clip-person-pending::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    transparent 20%,
+    color-mix(in oklab, var(--tungsten) 28%, transparent) 50%,
+    transparent 80%
+  );
+  transform: translateY(-100%);
+  animation: clip-person-scan 1.2s ease-in-out infinite;
+}
+@keyframes clip-person-scan {
+  to {
+    transform: translateY(100%);
+  }
+}
+.clip-person-cutout {
+  animation: result-reveal var(--duration-slow) ease-in-out;
+}
+.clip-person-becomes {
+  animation: clip-person-becomes var(--duration-very-slow)
+    var(--ease-smooth-out);
+}
+@keyframes clip-person-becomes {
+  from {
+    opacity: 0;
+    transform: translateX(-6px) scale(0.6);
+  }
+}
+.clip-person-status {
+  animation: clip-person-status var(--duration-quick) ease-in-out;
+}
+@keyframes clip-person-status {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+    filter: blur(2px);
   }
 }
 
@@ -99,7 +233,7 @@
 @keyframes result-reveal {
   from {
     opacity: 0;
-    filter: blur(4px);
+    filter: blur(2px);
   }
 }
 
@@ -131,7 +265,14 @@
   .target-person,
   .shot-check,
   .shot-check-spin,
-  .result-reveal {
+  .result-reveal,
+  .person-pin,
+  .person-pin::after,
+  .clip-person,
+  .clip-person-pending::after,
+  .clip-person-cutout,
+  .clip-person-becomes,
+  .clip-person-status {
     animation: none;
   }
 }
