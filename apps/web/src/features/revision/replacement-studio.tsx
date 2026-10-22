@@ -9,6 +9,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import {
   ArrowRight,
   Brush,
+  ChevronDown,
   X,
   Check,
   Crosshair,
@@ -240,7 +241,7 @@ const MOVES_RESOLUTIONS: Record<
 
 export function ReplacementStudio({
   initialSource,
-  initialKind = "background",
+  initialKind,
   initialElementId,
   projectId,
   parentRevisionId,
@@ -271,7 +272,22 @@ export function ReplacementStudio({
     sourceKey === null
       ? (videos[0] ?? null)
       : (videos.find((v) => assetRefKey(v.ref) === sourceKey) ?? null);
-  const [kind, setKind] = useState<ReplacementKind>(draft?.kind ?? initialKind);
+  const [kind, setKind] = useState<ReplacementKind>(
+    draft?.kind ?? initialKind ?? "background",
+  );
+  // Once a mode is chosen (here, or on the front page) the ten options fold
+  // into one line; they open again from "Change".
+  const [pickingKind, setPickingKind] = useState(
+    !draft?.kind && initialKind === undefined,
+  );
+  const kindToggle = useRef<HTMLButtonElement>(null);
+  function closeKinds() {
+    setPickingKind(false);
+    // The chosen option is folding away; keep focus on what stays.
+    requestAnimationFrame(() =>
+      kindToggle.current?.focus({ preventScroll: true }),
+    );
+  }
   /** Undefined until the creator chooses, so a sensible default can stand in; null is "none". */
   const [elementId, setElementId] = useState<string | null | undefined>(
     draft ? (draft.element?.id ?? null) : initialElementId,
@@ -1375,43 +1391,117 @@ export function ReplacementStudio({
           void submit();
         }}
       >
-        <fieldset>
-          <legend className="text-sm font-medium">What changes</legend>
-          <div className="mt-3 grid grid-cols-2 gap-1.5">
-            {(Object.keys(KIND_ICONS) as ReplacementKind[]).map((option) => {
-              const Icon = KIND_ICONS[option];
-              return (
-                <label
-                  key={option}
-                  className={cn(
-                    "flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-2 transition-colors has-focus-visible:ring-2 has-focus-visible:ring-ring",
-                    kind === option
-                      ? "border-tungsten/70 bg-surface"
-                      : "border-border hover:bg-surface",
-                  )}
-                >
-                  <input
-                    type="radio"
-                    name="replacement-kind"
-                    className="sr-only"
-                    checked={kind === option}
-                    onChange={() => chooseKind(option)}
-                  />
-                  <Icon
-                    aria-hidden="true"
-                    className={cn(
-                      "size-4 shrink-0",
-                      kind === option
-                        ? "text-tungsten"
-                        : "text-subtle-foreground",
-                    )}
-                  />
-                  <span className="truncate text-sm">
-                    {replacementKinds[option].label}
-                  </span>
-                </label>
-              );
-            })}
+        <fieldset
+          className="kind-picker"
+          data-open={pickingKind || undefined}
+          onKeyDown={(event) => {
+            if (event.key === "Escape" && pickingKind) {
+              event.preventDefault();
+              closeKinds();
+            }
+          }}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <legend className="text-sm font-medium">What changes</legend>
+            <button
+              ref={kindToggle}
+              type="button"
+              aria-expanded={pickingKind}
+              aria-controls="kind-options"
+              onClick={() =>
+                pickingKind ? closeKinds() : setPickingKind(true)
+              }
+              className="-mr-1.5 flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {pickingKind ? "Done" : "Change"}
+              <ChevronDown
+                aria-hidden="true"
+                className="kind-picker-chevron size-3.5"
+              />
+            </button>
+          </div>
+          {/* Folded: the chosen mode alone, as one line. */}
+          <div
+            className="kind-picker-panel kind-picker-chosen"
+            aria-hidden={pickingKind || undefined}
+          >
+            <div className="kind-picker-inner">
+              {(() => {
+                const Icon = KIND_ICONS[kind];
+                return (
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    onClick={() => setPickingKind(true)}
+                    className="mt-3 flex w-full cursor-pointer items-center gap-2 rounded-lg border border-tungsten/70 bg-surface px-2.5 py-2 text-left outline-none"
+                  >
+                    <Icon
+                      aria-hidden="true"
+                      className="size-4 shrink-0 text-tungsten"
+                    />
+                    <span
+                      key={kind}
+                      className="kind-picker-label truncate text-sm"
+                    >
+                      {replacementKinds[kind].label}
+                    </span>
+                  </button>
+                );
+              })()}
+            </div>
+          </div>
+          {/* Open: every mode. Hidden from focus and readers while folded. */}
+          <div
+            id="kind-options"
+            className="kind-picker-panel kind-picker-options"
+            inert={!pickingKind || undefined}
+          >
+            <div className="kind-picker-inner">
+              <div className="mt-3 grid grid-cols-2 gap-1.5">
+                {(Object.keys(KIND_ICONS) as ReplacementKind[]).map(
+                  (option) => {
+                    const Icon = KIND_ICONS[option];
+                    return (
+                      <label
+                        key={option}
+                        // A pointer choice is final; arrow keys browse, and
+                        // Escape or "Done" folds the list.
+                        onPointerUp={() => {
+                          chooseKind(option);
+                          closeKinds();
+                        }}
+                        className={cn(
+                          "flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-2 transition-colors has-focus-visible:ring-2 has-focus-visible:ring-ring",
+                          kind === option
+                            ? "border-tungsten/70 bg-surface"
+                            : "border-border hover:bg-surface",
+                        )}
+                      >
+                        <input
+                          type="radio"
+                          name="replacement-kind"
+                          className="sr-only"
+                          checked={kind === option}
+                          onChange={() => chooseKind(option)}
+                        />
+                        <Icon
+                          aria-hidden="true"
+                          className={cn(
+                            "size-4 shrink-0",
+                            kind === option
+                              ? "text-tungsten"
+                              : "text-subtle-foreground",
+                          )}
+                        />
+                        <span className="truncate text-sm">
+                          {replacementKinds[option].label}
+                        </span>
+                      </label>
+                    );
+                  },
+                )}
+              </div>
+            </div>
           </div>
           {/* One line for the chosen kind keeps ten choices scannable. */}
           <p

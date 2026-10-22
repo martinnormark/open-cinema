@@ -295,3 +295,45 @@
 .moment-scrubber::-moz-range-track {
   background: transparent;
 }
+
+/* What changes: once chosen, the ten modes fold into the chosen one
+   (transitions.dev accordion, run as a cross-fold). Two panels trade height
+   on grid rows, so nothing is measured; each inner fades and unblurs. */
+.kind-picker-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--duration-fast) var(--ease-smooth-out);
+}
+.kind-picker-inner {
+  min-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  filter: blur(2px);
+  transition:
+    opacity var(--duration-fast) var(--ease-smooth-out),
+    filter var(--duration-fast) var(--ease-smooth-out);
+}
+.kind-picker:not([data-open]) .kind-picker-chosen,
+.kind-picker[data-open] .kind-picker-options {
+  grid-template-rows: 1fr;
+}
+.kind-picker:not([data-open]) .kind-picker-chosen .kind-picker-inner,
+.kind-picker[data-open] .kind-picker-options .kind-picker-inner {
+  opacity: 1;
+  filter: blur(0);
+}
+/* Room inside the clip for the options' focus rings. */
+.kind-picker-inner {
+  margin: -3px;
+  padding: 3px;
+}
+.kind-picker-chevron {
+  transition: transform var(--duration-fast) var(--ease-smooth-out);
+}
+.kind-picker[data-open] .kind-picker-chevron {
+  transform: scaleY(-1);
+}
+/* A new mode's name settles in place (text swap). */
+.kind-picker-label {
+  animation: clip-person-status var(--duration-quick) ease-in-out;
+}
