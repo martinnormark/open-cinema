@@ -119,13 +119,10 @@ export function StartPage({
       aria-labelledby="page-title"
     >
       <header className="max-w-2xl">
-        <h1
-          id="page-title"
-          className="text-[1.75rem] leading-tight font-semibold tracking-[-0.025em] text-balance"
-        >
+        <h1 id="page-title" className="text-title font-semibold text-balance">
           Bring a take, or start from your Elements
         </h1>
-        <p className="mt-2 text-[0.9375rem] leading-6 text-muted-foreground">
+        <p className="mt-2 text-body leading-6 text-muted-foreground">
           Pick what should happen. Everything you did not ask to change stays as
           it was, and the original sits beside the result.
         </p>
@@ -260,7 +257,7 @@ function GoalOption({
         <span className="flex items-center gap-2 text-sm font-medium">
           {option.title}
           {"caution" in option && option.caution && (
-            <span className="rounded-sm bg-muted px-1.5 py-px text-[0.6875rem] font-normal text-muted-foreground">
+            <span className="rounded-sm bg-muted px-1.5 py-px text-caption font-normal text-muted-foreground">
               Experimental
             </span>
           )}

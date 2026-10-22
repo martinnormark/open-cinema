@@ -442,7 +442,7 @@ function Identity({
       </p>
       <h1
         id="page-title"
-        className="mt-2 text-[1.75rem] leading-tight font-semibold tracking-[-0.025em] text-balance"
+        className="mt-2 text-title font-semibold text-balance"
       >
         {element.name}
       </h1>
@@ -489,7 +489,7 @@ function Identity({
           Edit identity
         </button>
       </div>
-      <p className="mt-4 text-[0.9375rem] leading-7 text-muted-foreground">
+      <p className="mt-4 text-body leading-7 text-muted-foreground">
         {element.description ||
           "No description yet. Describe what should stay the same in every shot."}
       </p>

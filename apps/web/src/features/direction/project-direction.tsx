@@ -162,7 +162,7 @@ export function ProjectShots({
               !sameLook(direction.project.look, project.look);
             return (
               <li key={shot.jobId} className="min-w-0">
-                <span className="relative block aspect-video overflow-hidden rounded-lg bg-black">
+                <span className="relative block aspect-video overflow-hidden rounded-lg bg-letterbox">
                   {shot.posterUrl ? (
                     <Thumbnail
                       src={shot.posterUrl}

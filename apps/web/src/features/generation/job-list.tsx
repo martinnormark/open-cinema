@@ -162,7 +162,7 @@ function JobRow({ job }: { job: Job }) {
                 playsInline
                 preload="metadata"
                 aria-label={job.prompt}
-                className="aspect-video w-full rounded-lg bg-black object-contain"
+                className="aspect-video w-full rounded-lg bg-letterbox object-contain"
               />
             )}
             <figcaption hidden className="text-sm text-muted-foreground">

@@ -64,7 +64,7 @@ Generation is asynchronous and must continue across navigation, closed tabs, and
 
 The product name is **Open Cinema**. Use the established vocabulary: Elements, Characters, Locations, Things, states, reference sheets, creative recipes, and project direction. Keep creator-facing language about ideas, taste, direction, and outcomes; technical controls should become available as needed without becoming prerequisites.
 
-The visual identity, palette, typography and motion rules are in [docs/design.md](docs/design.md).
+The visual identity, palette, typography and motion rules are in [DESIGN.md](DESIGN.md).
 
 ## Evidence on Hand
 

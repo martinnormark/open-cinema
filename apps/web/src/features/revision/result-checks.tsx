@@ -209,7 +209,7 @@ export function ResultChecksPanel({
             : "Comparing faces with the original…"}
         </p>
       )}
-      <p className="mt-3 text-[0.6875rem] leading-4 text-subtle-foreground">
+      <p className="mt-3 text-caption leading-4 text-subtle-foreground">
         Measured on {checks?.framesCompared ?? 10} matched frames with an
         on-device face model. A guide for your review, not a verdict.
       </p>

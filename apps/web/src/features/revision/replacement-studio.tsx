@@ -2257,7 +2257,7 @@ function SourceStage({
       <div
         className={cn(
           "relative mx-auto overflow-hidden rounded-xl",
-          reframeRatio ? "reframe-stage" : "aspect-video bg-black",
+          reframeRatio ? "reframe-stage" : "aspect-video bg-letterbox",
           markTarget && "cursor-crosshair",
         )}
         style={
@@ -2377,7 +2377,7 @@ function TargetMarker({
       )}
       <span
         key={`${target.x}-${target.y}`}
-        className="target-marker absolute size-9 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-tungsten bg-tungsten/20 shadow-[0_0_0_4px_rgb(0_0_0/0.35)]"
+        className="target-marker absolute size-9 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-tungsten bg-tungsten/20 ring-4 ring-letterbox/35"
         style={{ left: `${target.x * 100}%`, top: `${target.y * 100}%` }}
       >
         <span className="absolute inset-0 m-auto size-1.5 rounded-full bg-tungsten" />
@@ -2452,12 +2452,12 @@ function PeopleMarkers({
               />
             )}
             <span
-              className="person-pin absolute flex -translate-x-1/2 -translate-y-1/2 items-center rounded-full border border-tungsten bg-black/70 p-0.5 text-[11px] font-medium text-white shadow-[0_1px_8px_rgb(0_0_0/0.45)]"
+              className="person-pin absolute flex -translate-x-1/2 -translate-y-1/2 items-center rounded-full border border-tungsten bg-scrim/85 p-0.5 text-caption font-medium text-on-media shadow-on-media"
               data-away={!here || undefined}
               data-cutting={person.status === "cutting" || undefined}
               style={{ left: `${person.x * 100}%`, top: `${person.y * 100}%` }}
             >
-              <span className="relative grid size-4 place-items-center rounded-full bg-tungsten text-[10px] text-black tabular">
+              <span className="relative grid size-4 place-items-center rounded-full bg-tungsten text-caption text-tungsten-foreground tabular">
                 {person.status === "cutting" ? (
                   <LoaderCircle
                     aria-hidden="true"
@@ -3255,10 +3255,10 @@ function PaintLayer({
     // Painted pixels turn white, the rest black: white is redone.
     ctx.drawImage(canvas, 0, 0);
     ctx.globalCompositeOperation = "source-in";
-    ctx.fillStyle = "#fff";
+    ctx.fillStyle = "#fff"; // design-token-exempt: mask pixels, not UI colour
     ctx.fillRect(0, 0, width, height);
     ctx.globalCompositeOperation = "destination-over";
-    ctx.fillStyle = "#000";
+    ctx.fillStyle = "#000"; // design-token-exempt: mask pixels, not UI colour
     ctx.fillRect(0, 0, width, height);
     onMask(out.toDataURL("image/png"));
   }
@@ -3655,7 +3655,7 @@ function MovesEngine({
                 <span className="mt-1 flex flex-wrap gap-1">
                   <span
                     className={cn(
-                      "inline-flex h-5 items-center rounded-full px-2 text-[11px]",
+                      "inline-flex h-5 items-center rounded-full px-2 text-caption",
                       option === "wan-animate"
                         ? "bg-tungsten/15 text-foreground"
                         : "bg-secondary text-muted-foreground",
@@ -3663,7 +3663,7 @@ function MovesEngine({
                   >
                     {facts.weights}
                   </span>
-                  <span className="inline-flex h-5 items-center rounded-full bg-secondary px-2 text-[11px] text-muted-foreground">
+                  <span className="inline-flex h-5 items-center rounded-full bg-secondary px-2 text-caption text-muted-foreground">
                     {facts.runsOn}
                   </span>
                 </span>
@@ -3773,7 +3773,7 @@ function AspectChoice({
                 />
               </span>
               <span className="text-xs">{REFRAME_ASPECTS[option].label}</span>
-              <span className="tabular text-[11px] text-muted-foreground">
+              <span className="tabular text-caption text-muted-foreground">
                 {option}
               </span>
             </label>

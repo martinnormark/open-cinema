@@ -68,7 +68,7 @@ export function DurationBadge({
   return (
     <span
       className={cn(
-        "tabular absolute rounded bg-black/70 px-1 text-[0.6875rem] text-white",
+        "tabular absolute rounded bg-scrim/85 px-1 text-caption text-on-media",
         className,
       )}
     >

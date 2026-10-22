@@ -267,14 +267,11 @@ export function RevisionView({
       </nav>
       <header className="mt-3 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <h1
-            id="page-title"
-            className="text-[1.75rem] leading-tight font-semibold tracking-[-0.025em] text-balance"
-          >
+          <h1 id="page-title" className="text-title font-semibold text-balance">
             {replacementKinds[kind].label}
             <span className="text-muted-foreground"> · {sourceTitle}</span>
           </h1>
-          <p className="mt-2 max-w-3xl text-[0.9375rem] leading-6 text-muted-foreground">
+          <p className="mt-2 max-w-3xl text-body leading-6 text-muted-foreground">
             {revision.intent}
           </p>
         </div>
@@ -459,7 +456,7 @@ function PendingStage({
   }
   return (
     <div>
-      <div className="relative aspect-video overflow-hidden rounded-xl bg-black">
+      <div className="relative aspect-video overflow-hidden rounded-xl bg-letterbox">
         <img
           src={posterUrl(revision.source)}
           alt=""
@@ -471,8 +468,8 @@ function PendingStage({
           )}
         />
         {!failed && <div className="generating-sweep" aria-hidden="true" />}
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent p-5 pt-16">
-          <p className="text-sm font-medium text-white" aria-live="polite">
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-letterbox/85 to-transparent p-5 pt-16">
+          <p className="text-sm font-medium text-on-media" aria-live="polite">
             {failed
               ? phase === "attention"
                 ? "The generation service stopped answering about this job."
@@ -495,10 +492,10 @@ function PendingStage({
                     : 6
               }
               aria-label="Revision progress"
-              className="mt-3 h-1 bg-white/15 [&>[data-slot=progress-indicator]]:bg-tungsten"
+              className="mt-3 h-1 bg-on-media/15 [&>[data-slot=progress-indicator]]:bg-tungsten"
             />
           )}
-          <p className="mt-2 text-xs leading-5 text-white/70">
+          <p className="mt-2 text-xs leading-5 text-on-media/70">
             {failed
               ? (job?.error ??
                 "Nothing was charged for the unfinished result. Your original is unchanged.")
@@ -587,7 +584,7 @@ function DecisionList({
                     <span className="mt-1 flex flex-wrap gap-1">
                       <span
                         className={cn(
-                          "inline-flex h-5 items-center rounded-full px-2 text-[11px]",
+                          "inline-flex h-5 items-center rounded-full px-2 text-caption",
                           card.weights === "open"
                             ? "bg-tungsten/15 text-foreground"
                             : "bg-secondary text-muted-foreground",
@@ -597,7 +594,7 @@ function DecisionList({
                           ? "Open weights"
                           : "Hosted model"}
                       </span>
-                      <span className="inline-flex h-5 items-center rounded-full bg-secondary px-2 text-[11px] text-muted-foreground">
+                      <span className="inline-flex h-5 items-center rounded-full bg-secondary px-2 text-caption text-muted-foreground">
                         {card.runsOn}
                       </span>
                     </span>
@@ -792,7 +789,7 @@ function History({
                   {revision.intent}
                 </span>
                 {revision.parentRevisionId && (
-                  <span className="mt-0.5 flex items-center gap-1 text-[0.6875rem] text-subtle-foreground">
+                  <span className="mt-0.5 flex items-center gap-1 text-caption text-subtle-foreground">
                     <GitBranch aria-hidden="true" className="size-3" /> Branched
                     from an earlier result
                   </span>

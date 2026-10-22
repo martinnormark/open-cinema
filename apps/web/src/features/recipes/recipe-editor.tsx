@@ -203,7 +203,7 @@ export function RecipeEditor({
             maxLength={1500}
             rows={4}
             onChange={(e) => setTemplate(e.target.value)}
-            className="font-mono text-[0.8125rem] leading-6"
+            className="font-mono text-label leading-6"
           />
         </Field>
         {slots.length > 0 && (
@@ -333,7 +333,7 @@ export function RecipeEditor({
                   )
                 }
                 className={cn(
-                  "inline-flex h-8 items-center rounded-full border px-3 text-[0.8125rem] transition-[color,background-color,border-color] duration-(--duration-quick) outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  "inline-flex h-8 items-center rounded-full border px-3 text-label transition-[color,background-color,border-color] duration-(--duration-quick) outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   on
                     ? "border-tungsten/70 bg-tungsten/12 text-foreground"
                     : "border-border text-muted-foreground hover:border-input hover:text-foreground",
@@ -410,7 +410,7 @@ function Section({
 }) {
   return (
     <fieldset className="grid gap-4">
-      <legend className="mb-3 text-[0.9375rem] font-medium">{title}</legend>
+      <legend className="mb-3 text-body font-medium">{title}</legend>
       {description && (
         <p className="-mt-1 max-w-prose text-sm leading-6 text-muted-foreground">
           {description}

@@ -208,7 +208,7 @@ function Settings() {
                   : "Production"}
               </Fact>
               <Fact term="Host">
-                <code className="font-mono text-[0.8125rem]">
+                <code className="font-mono text-label">
                   {settings.environment.host}
                 </code>
                 {settings.environment.secure ? "" : " · not HTTPS"}
@@ -218,7 +218,7 @@ function Settings() {
                 <ul className="flex flex-wrap gap-1.5">
                   {models.map((model) => (
                     <li key={model}>
-                      <code className="rounded-sm bg-secondary px-1.5 py-0.5 font-mono text-[0.75rem] text-muted-foreground">
+                      <code className="rounded-sm bg-secondary px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
                         {model}
                       </code>
                     </li>
@@ -259,7 +259,7 @@ function SettingsSection({
       className="grid gap-4 p-6 md:grid-cols-[14rem_1fr] md:gap-10"
     >
       <div>
-        <h2 className="text-[0.9375rem] font-medium">{title}</h2>
+        <h2 className="text-body font-medium">{title}</h2>
         <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
           {description}
         </p>

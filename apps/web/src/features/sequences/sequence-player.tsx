@@ -97,12 +97,12 @@ export function SequencePlayer({
         onOpenChange(next);
       }}
     >
-      <DialogContent className="max-w-[min(96vw,1200px)] gap-0 overflow-hidden bg-black p-0 sm:max-w-[min(96vw,1200px)]">
+      <DialogContent className="max-w-[min(96vw,1200px)] gap-0 overflow-hidden bg-letterbox p-0 sm:max-w-[min(96vw,1200px)]">
         <DialogTitle className="sr-only">{title}</DialogTitle>
         <DialogDescription className="sr-only">
           Plays each shot’s approved take in order.
         </DialogDescription>
-        <div className="relative aspect-video w-full bg-black">
+        <div className="relative aspect-video w-full bg-letterbox">
           {([0, 1] as const).map((slot) => {
             const entry = slotItem(slot);
             return (
@@ -144,7 +144,7 @@ export function SequencePlayer({
             />
           )}
           {ended && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black text-white">
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-letterbox text-on-media">
               <p className="text-sm">End of {title}</p>
               <Button variant="secondary" onClick={() => show(0)}>
                 <RotateCcw aria-hidden="true" /> Play again

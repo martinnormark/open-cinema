@@ -653,7 +653,7 @@ function Picture({
         controls
         playsInline
         preload="metadata"
-        className="aspect-video w-full rounded-lg bg-black object-contain"
+        className="aspect-video w-full rounded-lg bg-letterbox object-contain"
       />
     );
   if (keyframe?.asset)
@@ -661,7 +661,7 @@ function Picture({
       <img
         src={takeUrl(keyframe.asset)}
         alt={`Approved keyframe for ${shot.title}`}
-        className="aspect-video w-full rounded-lg bg-black object-cover"
+        className="aspect-video w-full rounded-lg bg-letterbox object-cover"
       />
     );
   return (
@@ -719,7 +719,7 @@ function Takes({
               kind={take.role === "motion" ? "video" : "image"}
               className="aspect-video"
             />
-            <span className="block truncate bg-surface px-1.5 py-1 text-[0.6875rem] text-muted-foreground">
+            <span className="block truncate bg-surface px-1.5 py-1 text-caption text-muted-foreground">
               {role}
               {take.origin === "continued"
                 ? " · continued"
@@ -731,7 +731,7 @@ function Takes({
               {approved && <span className="text-tungsten"> · approved</span>}
             </span>
             {view.phase === "working" && (
-              <span className="absolute inset-x-0 top-0 flex aspect-video items-center justify-center bg-surface text-[0.6875rem] text-tungsten">
+              <span className="absolute inset-x-0 top-0 flex aspect-video items-center justify-center bg-surface text-caption text-tungsten">
                 <span className="tabular">
                   {view.progress !== null
                     ? `${Math.round(view.progress * 100)}%`
@@ -741,7 +741,7 @@ function Takes({
             )}
             {view.phase === "failed" && (
               <span
-                className="absolute inset-x-0 top-0 flex aspect-video items-center justify-center bg-black/70 px-2 text-center text-[0.6875rem] leading-4 text-destructive"
+                className="absolute inset-x-0 top-0 flex aspect-video items-center justify-center bg-scrim/85 px-2 text-center text-caption leading-4 text-destructive"
                 title={view.error ?? undefined}
               >
                 Did not finish

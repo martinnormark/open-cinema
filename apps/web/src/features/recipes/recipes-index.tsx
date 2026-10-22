@@ -118,12 +118,12 @@ function ExampleTile({
             decoding="async"
           />
           {recipe.spec.medium === "video" && (
-            <span className="absolute top-2 left-2 rounded-md bg-black/70 px-1.5 py-0.5 text-[0.6875rem] font-medium text-white">
+            <span className="absolute top-2 left-2 rounded-md bg-scrim/85 px-1.5 py-0.5 text-caption font-medium text-on-media">
               Video
             </span>
           )}
         </span>
-        <span className="mt-3 block text-[0.9375rem] font-medium group-hover:underline">
+        <span className="mt-3 block text-body font-medium group-hover:underline">
           {recipe.name}
         </span>
         <span className="mt-1 block max-w-prose text-sm leading-6 text-muted-foreground">

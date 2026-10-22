@@ -106,7 +106,7 @@ export function RecipePage({
     return (
       <section className="mx-auto w-full max-w-6xl px-6 py-10 md:px-12 md:py-14">
         <BackLink />
-        <h1 id="page-title" className="mt-3 text-[1.75rem] font-semibold">
+        <h1 id="page-title" className="mt-3 text-title font-semibold">
           {status === "loading" ? "Loading recipe…" : "This recipe isn’t here"}
         </h1>
         {status !== "loading" && (
@@ -123,13 +123,10 @@ export function RecipePage({
         aria-labelledby="page-title"
       >
         <BackLink />
-        <h1
-          id="page-title"
-          className="mt-3 text-[1.75rem] leading-tight font-semibold tracking-[-0.025em]"
-        >
+        <h1 id="page-title" className="mt-3 text-title font-semibold">
           Edit {view.name}
         </h1>
-        <p className="mt-2 max-w-2xl text-[0.9375rem] leading-6 text-muted-foreground">
+        <p className="mt-2 max-w-2xl text-body leading-6 text-muted-foreground">
           Saving a change makes version {view.version + 1}; version{" "}
           {view.version} stays in the history.
         </p>
@@ -221,13 +218,10 @@ function RecipeDetail({ view }: { view: RecipeView }) {
       <BackLink />
       <header className="mt-3 flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
-          <h1
-            id="page-title"
-            className="text-[1.75rem] leading-tight font-semibold tracking-[-0.025em] text-balance"
-          >
+          <h1 id="page-title" className="text-title font-semibold text-balance">
             {view.name}
           </h1>
-          <p className="mt-2 max-w-2xl text-[0.9375rem] leading-6 text-muted-foreground">
+          <p className="mt-2 max-w-2xl text-body leading-6 text-muted-foreground">
             {view.summary ||
               (view.spec.medium === "video"
                 ? "A video recipe."
@@ -372,7 +366,7 @@ function Preview({ view }: { view: RecipeView }) {
           loop
           preload="metadata"
           aria-label={`${view.name} example`}
-          className="aspect-video w-full rounded-xl bg-black object-contain"
+          className="aspect-video w-full rounded-xl bg-letterbox object-contain"
         />
       ) : (
         <div className="recipe-stage" style={{ aspectRatio: aspect }}>

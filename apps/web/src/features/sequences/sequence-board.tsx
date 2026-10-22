@@ -108,7 +108,7 @@ export function SequenceBoard({
               }
             }}
             maxLength={120}
-            className="-mx-1.5 w-full max-w-2xl rounded-md bg-transparent px-1.5 text-[1.75rem] leading-tight font-semibold tracking-[-0.025em] outline-none hover:bg-surface focus-visible:bg-surface focus-visible:ring-2 focus-visible:ring-ring/50"
+            className="-mx-1.5 w-full max-w-2xl rounded-md bg-transparent px-1.5 text-title font-semibold outline-none hover:bg-surface focus-visible:bg-surface focus-visible:ring-2 focus-visible:ring-ring/50"
           />
           {direction && (
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
@@ -265,7 +265,7 @@ function Filmstrip({ sequence }: { sequence: Sequence }) {
                     kind={picture?.kind ?? "image"}
                     className="aspect-video"
                   />
-                  <span className="tabular absolute top-1 left-1 rounded bg-black/70 px-1 text-[0.6875rem] font-medium text-white">
+                  <span className="tabular absolute top-1 left-1 rounded bg-scrim/85 px-1 text-caption font-medium text-on-media">
                     {index + 1}
                   </span>
                 </span>

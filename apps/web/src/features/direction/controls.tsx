@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import "./direction.css";
 
 const chip =
-  "inline-flex h-8 items-center rounded-full border px-3 text-[0.8125rem] whitespace-nowrap transition-[color,background-color,border-color] duration-(--duration-quick) outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50";
+  "inline-flex h-8 items-center rounded-full border px-3 text-label whitespace-nowrap transition-[color,background-color,border-color] duration-(--duration-quick) outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50";
 const chipOff =
   "border-border text-muted-foreground hover:border-input hover:text-foreground";
 const chipOn = "border-tungsten/70 bg-tungsten/12 text-foreground";

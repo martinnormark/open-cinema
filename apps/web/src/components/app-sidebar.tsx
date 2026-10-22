@@ -22,7 +22,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { BrandMark } from "@/components/brand-mark";
+import { BrandLockup } from "@/components/brand-mark";
 
 const navigation = [
   { title: "Start", to: "/", icon: House },
@@ -45,10 +45,7 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton asChild size="lg" tooltip="Open Cinema">
               <Link to="/" onClick={() => setOpenMobile(false)}>
-                <BrandMark className="size-5 shrink-0" />
-                <span className="text-[0.9375rem] font-semibold tracking-[-0.01em]">
-                  Open Cinema
-                </span>
+                <BrandLockup className="text-xl" />
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

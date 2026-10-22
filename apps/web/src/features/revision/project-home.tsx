@@ -57,14 +57,11 @@ export function ProjectHome({
       </Link>
       <header className="mt-3 flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
-          <h1
-            id="page-title"
-            className="text-[1.75rem] leading-tight font-semibold tracking-[-0.025em] text-balance"
-          >
+          <h1 id="page-title" className="text-title font-semibold text-balance">
             {project.name}
           </h1>
           {lookPrompt(project.look, "image") && (
-            <p className="mt-2 max-w-2xl text-[0.9375rem] leading-6 text-muted-foreground">
+            <p className="mt-2 max-w-2xl text-body leading-6 text-muted-foreground">
               {lookPrompt(project.look, "image")}
             </p>
           )}
@@ -136,7 +133,7 @@ function Revisions({
                   params={{ revisionId: revision.id }}
                   className="group block no-underline"
                 >
-                  <span className="relative block aspect-video overflow-hidden rounded-lg bg-black">
+                  <span className="relative block aspect-video overflow-hidden rounded-lg bg-letterbox">
                     <Thumbnail
                       src={posterUrl(result ?? revision.source)}
                       kind="video"
@@ -147,13 +144,13 @@ function Revisions({
                     />
                     <span
                       className={cn(
-                        "absolute top-2 left-2 rounded-md bg-black/70 px-1.5 py-0.5 text-[0.6875rem] font-medium",
+                        "absolute top-2 left-2 rounded-md bg-scrim/85 px-1.5 py-0.5 text-caption font-medium",
                         phase === "kept"
                           ? "text-success"
                           : phase === "failed" || phase === "attention"
                             ? "text-destructive"
                             : phase === "ready"
-                              ? "text-white"
+                              ? "text-on-media"
                               : "text-tungsten",
                       )}
                     >

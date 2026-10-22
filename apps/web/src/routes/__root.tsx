@@ -5,8 +5,9 @@ import {
   Outlet,
   Scripts,
 } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
+import { BrandLockup, BrandMark } from "@/components/brand-mark";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,26 +28,39 @@ export const Route = createRootRoute({
         name: "description",
         content: "Your creative studio for images, films, and reusable worlds.",
       },
+      // Browser chrome matches the app canvas (--background).
+      { name: "theme-color", content: "#0d0c0a" }, // design-token-exempt: meta needs a literal
     ],
-    links: [{ rel: "stylesheet", href: stylesUrl }],
+    links: [
+      { rel: "stylesheet", href: stylesUrl },
+      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+      { rel: "icon", href: "/favicon.png", type: "image/png", sizes: "32x32" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
+    ],
   }),
   shellComponent: RootDocument,
   component: AppLayout,
   notFoundComponent: () => (
     <section className="mx-auto w-full max-w-6xl px-6 py-10 md:px-12 md:py-14">
-      <h1 id="page-title" className="sr-only">
-        Page not found
-      </h1>
-      <EmptyState
-        title="This page is off the reel"
-        actions={
-          <Button asChild>
-            <Link to="/">Back to the start</Link>
-          </Button>
-        }
-      >
-        <p>The address may be mistyped, or the page has moved.</p>
-      </EmptyState>
+      <div className="end-card">
+        <BrandMark tone="ink" className="end-card-mark size-14" />
+        <h1 id="page-title" className="end-card-title end-card-line">
+          This page is off the reel
+        </h1>
+        <p
+          className="end-card-body end-card-line"
+          style={{ "--line": 1 } as CSSProperties}
+        >
+          The address may be mistyped, or the page has moved.
+        </p>
+        <Link
+          to="/"
+          className="end-card-action end-card-line"
+          style={{ "--line": 2 } as CSSProperties}
+        >
+          Back to the start
+        </Link>
+      </div>
     </section>
   ),
   errorComponent: ({ reset }) => (
@@ -80,6 +94,14 @@ function AppLayout() {
       <SidebarInset>
         <header className="studio-header flex h-14 shrink-0 items-center gap-3 border-b border-border px-3 md:px-4">
           <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
+          {/* The sidebar carries the lockup on desktop; a phone shows it here. */}
+          <Link
+            to="/"
+            className="rounded-sm md:hidden"
+            aria-label="Open Cinema"
+          >
+            <BrandLockup className="text-lg" />
+          </Link>
         </header>
         <main id="main-content" tabIndex={-1} className="flex-1 outline-none">
           <Outlet />

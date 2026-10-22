@@ -1,5 +1,7 @@
 # Open Cinema
 
+<img src="apps/web/public/brand/lockup-on-tungsten.png" alt="Open Cinema" width="420">
+
 An open creative studio for images, films and reusable worlds, built on the [Comfy Developer Platform](https://docs.comfy.org/development/overview). Describe an idea, explore directions, save the people, places and things that work as **Elements**, and keep directing the same world across stills and video. Complexity lives in Comfy workflows; the studio keeps your attention on the picture.
 
 Open Cinema is an early preview and our entry to Comfy's [Open Source Higgsfield](https://comfy.org/open-source-higgsfield) competition. Product direction lives in [GOALS.md](GOALS.md) and [PRODUCT.md](PRODUCT.md); the roadmap is [issue #2](https://github.com/martinnormark/open-cinema/issues/2).
@@ -170,7 +172,7 @@ Read [ARCHITECTURE.md](ARCHITECTURE.md) before extending the app, and [AGENTS.md
 ## Documentation
 
 - [Sign-in and public deployment](docs/auth.md)
-- [Design system](docs/design.md)
+- [Design system](DESIGN.md)
 - [Generation pipeline and verification](docs/generation-mvp.md)
 - [Competition submission](docs/competition-submission.md) and [competition rules](docs/competition.md)
 - [Comfy developer reference](docs/README.md)

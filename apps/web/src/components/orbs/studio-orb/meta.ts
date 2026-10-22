@@ -12,9 +12,10 @@ export const meta = {
 } as const;
 
 export const studioOrb: OrbVariant = {
+  // Shader uniforms, mirrored by .orb-fallback in styles.css.
   colors: [
-    { default: "#fff2dd", key: "light", label: "Light" },
-    { default: "#161616", key: "base", label: "Base" },
+    { default: "#fff2dd", key: "light", label: "Light" }, // design-token-exempt: shader uniform
+    { default: "#161616", key: "base", label: "Base" }, // design-token-exempt: shader uniform
   ],
   key: meta.slug,
   label: meta.title,

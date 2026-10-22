@@ -250,7 +250,7 @@ export function CompareViewer({
 
   const videoClass = "absolute inset-0 size-full object-contain";
   const label =
-    "pointer-events-none absolute top-3 rounded-md bg-black/60 px-2 py-1 text-xs font-medium text-white";
+    "pointer-events-none absolute top-3 rounded-md bg-letterbox/60 px-2 py-1 text-xs font-medium text-on-media";
 
   return (
     <div
@@ -262,7 +262,7 @@ export function CompareViewer({
       <div
         ref={stage}
         className={cn(
-          "relative isolate overflow-hidden rounded-xl bg-black",
+          "relative isolate overflow-hidden rounded-xl bg-letterbox",
           mode === "side" && "grid grid-cols-2 gap-px bg-border",
           mode === "wipe" && "cursor-ew-resize touch-none select-none",
         )}
@@ -274,7 +274,7 @@ export function CompareViewer({
         onClick={mode === "side" ? () => void togglePlay() : undefined}
       >
         <div
-          className={cn(mode === "side" ? "relative bg-black" : "contents")}
+          className={cn(mode === "side" ? "relative bg-letterbox" : "contents")}
           style={mode === "side" ? { aspectRatio } : undefined}
         >
           <video
@@ -309,7 +309,7 @@ export function CompareViewer({
           ref={wipeWindow}
           className={cn(
             mode === "side"
-              ? "relative bg-black"
+              ? "relative bg-letterbox"
               : "compare-layer absolute inset-0 overflow-hidden",
           )}
           style={
@@ -381,8 +381,8 @@ export function CompareViewer({
                 }
               }}
             >
-              <span className="absolute inset-y-0 left-0 w-px -translate-x-1/2 bg-white/90 shadow-[0_0_0_1px_rgb(0_0_0/0.35)]" />
-              <span className="pointer-events-auto absolute top-1/2 left-0 grid size-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white text-black shadow-[0_2px_10px_rgb(0_0_0/0.45)]">
+              <span className="absolute inset-y-0 left-0 w-px -translate-x-1/2 bg-on-media/90 shadow-edge" />
+              <span className="pointer-events-auto absolute top-1/2 left-0 grid size-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-on-media text-scrim shadow-on-media">
                 <SplitSquareHorizontal aria-hidden="true" className="size-4" />
               </span>
             </div>

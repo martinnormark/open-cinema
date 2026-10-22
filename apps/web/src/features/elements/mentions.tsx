@@ -461,7 +461,7 @@ export function MentionTextarea({
         role="listbox"
         aria-label={query?.stateQuery !== null ? "States" : "Elements"}
         hidden={!open}
-        className="mention-list absolute inset-x-0 top-full z-20 mt-1 max-h-80 overflow-y-auto rounded-xl border border-border bg-background p-1 shadow-[0_8px_24px_-8px_rgb(0_0_0/0.18)]"
+        className="mention-list absolute inset-x-0 top-full z-20 mt-1 max-h-80 overflow-y-auto rounded-xl border border-border bg-background p-1 shadow-floating"
       >
         {suggestions.map((suggestion, index) => (
           <li

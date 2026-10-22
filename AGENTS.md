@@ -41,6 +41,14 @@ The skill's narrow exception permits direct `useEffect` only inside reusable cus
 
 The component-level ban is a repository policy stricter than React's general guidance. Where a skill example uses a direct effect in a component, adapt it to this policy.
 
+## Design identity: follow DESIGN.md
+
+[DESIGN.md](DESIGN.md) is the source of truth for the Open Cinema identity: the mark and lockup, colour roles, type scale, radii, shadows and motion. Read it before any UI work and do not drift from it.
+
+- Use tokens only. Never hard-code a colour, Tailwind palette colour (`bg-black`, `text-amber-400`), arbitrary type size or tracking in a component; use the role tokens (`bg-surface`, `text-muted-foreground`, `bg-scrim/85`, `text-title`) or `var(--token)` in CSS.
+- Use `BrandLockup` and `BrandMark` from `apps/web/src/components/brand-mark.tsx` wherever the logo appears.
+- A new token goes into DESIGN.md's frontmatter and `apps/web/src/styles.css` in the same change. `apps/web/test/design-tokens.test.ts` fails on drift between the two and on off-token values in components; do not weaken it or add exemptions for UI colour.
+
 ## Required design and motion skills
 
 For UI work, read and apply the relevant local skills before implementation:

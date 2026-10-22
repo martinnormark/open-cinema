@@ -51,7 +51,7 @@ a:hover .recipe-frame > img {
   position: relative;
   overflow: hidden;
   border-radius: 0.75rem;
-  background: black;
+  background: var(--letterbox);
 }
 .recipe-stage > img {
   position: absolute;

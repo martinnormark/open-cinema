@@ -32,7 +32,7 @@ function Frame({
   ) : (
     <span
       className={cn(
-        "flex items-center justify-center rounded-md border border-dashed border-border px-2 text-center text-[0.6875rem] leading-4 text-subtle-foreground",
+        "flex items-center justify-center rounded-md border border-dashed border-border px-2 text-center text-caption leading-4 text-subtle-foreground",
         className,
       )}
     >
