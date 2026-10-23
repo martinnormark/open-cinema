@@ -39,11 +39,17 @@ import {
 import { ltxVideoModel, ltxVideoRequest } from "./ltx-video";
 import {
   movesDubStage,
+  wan3CastCloudRequest,
   wan3MovesOutputs,
   wan3MovesRequest,
   wanAnimateMovesRequest,
 } from "./moves";
 import { WAN_ANIMATE_OUTPUT_NODES } from "./wan-animate";
+import {
+  WAN3_CAST_JOB_MODEL,
+  WAN3_CAST_MODEL_ID,
+  WAN3_CAST_OUTPUT_NODES,
+} from "./wan3-cast";
 import {
   planReferences,
   REFERENCE_VIDEO_MODEL,
@@ -466,28 +472,43 @@ async function ltxPerformanceRequest(
   };
 }
 
+/** Wan 3.0 with tagged people: one Comfy Cloud graph with SAM 3.1's tracks (./wan3-cast.ts). */
+const tracked = (inputs: WorkflowInputs<"video.performance-transfer">) =>
+  inputs.engine === "wan-3" && inputs.cast.length > 0;
+
 /**
  * Copy the moves: the clip's motion, performed by a Character. Each engine is
  * named by the model that runs it (contracts/moves.ts): Wan 3.0 on Router
- * with the clip's sound laid back on, Wan Animate 2 on Comfy Cloud, or the
+ * with the clip's sound laid back on, or with tagged people as a Comfy Cloud
+ * graph where SAM 3.1 tracks who is who; Wan Animate 2 on Comfy Cloud; or the
  * LTX 2.3 graph older runs used.
  */
 export const performanceTransferWorkflow: WorkflowDefinition<"video.performance-transfer"> =
   {
     kind: "video.performance-transfer",
-    displayModel: (inputs) => MOTION_ENGINES[inputs.engine].jobModel,
+    displayModel: (inputs) =>
+      tracked(inputs)
+        ? WAN3_CAST_JOB_MODEL
+        : MOTION_ENGINES[inputs.engine].jobModel,
     deadlineMs: 60 * 60_000,
-    model: (inputs) => MOTION_ENGINES[inputs.engine].modelId,
+    model: (inputs) =>
+      tracked(inputs)
+        ? WAN3_CAST_MODEL_ID
+        : MOTION_ENGINES[inputs.engine].modelId,
     provider: (inputs) =>
-      inputs.engine === "wan-3" ? "router" : "cloud-workflow",
-    // Both pipelines save their result as "save_result"; each node is read once.
+      inputs.engine === "wan-3" && !tracked(inputs)
+        ? "router"
+        : "cloud-workflow",
+    // Every pipeline saves its result as "save_result"; each node is read once.
     cloudOutputNodes: [
       ...new Set([
         ...WAN_ANIMATE_OUTPUT_NODES,
         ...LTX_PERFORMANCE_OUTPUT_NODES,
+        ...WAN3_CAST_OUTPUT_NODES,
       ]),
     ],
     build(inputs, context) {
+      if (tracked(inputs)) return wan3CastCloudRequest(inputs, context);
       if (inputs.engine === "wan-3") return wan3MovesRequest(inputs, context);
       if (inputs.engine === "wan-animate")
         return wanAnimateMovesRequest(inputs, context);
@@ -496,8 +517,11 @@ export const performanceTransferWorkflow: WorkflowDefinition<"video.performance-
     // Cloud outputs are read from the SaveVideo nodes, not a Router document.
     outputs: wan3MovesOutputs,
     label: "Copying the moves",
+    // The tracked graph lays the sound back on itself.
     stages: (inputs) =>
-      inputs.engine === "wan-3" && inputs.sound ? [movesDubStage] : [],
+      inputs.engine === "wan-3" && inputs.sound && !tracked(inputs)
+        ? [movesDubStage]
+        : [],
   };
 
 export const characterReplaceWorkflow: WorkflowDefinition<"video.character-replace"> =

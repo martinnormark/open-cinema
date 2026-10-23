@@ -239,6 +239,14 @@ function compatState(status: unknown): JobState {
   }
 }
 
+/** Partner (API) nodes call hosted models with the caller's Comfy key. */
+function hasPartnerNode(graph: unknown) {
+  return Object.values(graph as Record<string, { class_type?: unknown }>).some(
+    (node) =>
+      typeof node?.class_type === "string" && /Api$/.test(node.class_type),
+  );
+}
+
 /**
  * The same Cloud graphs through ComfyUI's own routes (`/api/upload/image`,
  * `/api/prompt`, `/api/jobs`, `/api/view`), which the media steps use too.
@@ -246,7 +254,11 @@ function compatState(status: unknown): JobState {
  * credential is refused by the `/api/v2` routes the SDK calls (foundation.md),
  * so this is what lets a local stack run Cloud graphs end to end.
  */
-function createCompatClient(baseUrl: string, order: readonly string[]) {
+function createCompatClient(
+  baseUrl: string,
+  order: readonly string[],
+  apiKey: string,
+) {
   async function read(id: string, signal?: AbortSignal) {
     const response = await fetch(
       `${baseUrl}/api/jobs/${encodeURIComponent(id)}`,
@@ -357,7 +369,14 @@ function createCompatClient(baseUrl: string, order: readonly string[]) {
       const response = await fetch(`${baseUrl}/api/prompt`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
+        // Partner nodes (Wan 3.0 in the tracked cast graph) bill this key;
+        // other graphs never send it.
+        body: JSON.stringify({
+          prompt,
+          ...(apiKey && hasPartnerNode(prompt)
+            ? { extra_data: { api_key_comfy_org: apiKey } }
+            : {}),
+        }),
         signal,
       });
       const submitted = (await response.json().catch(() => null)) as {
@@ -425,7 +444,7 @@ export function createComfyClient(options: {
   const relay = loopbackRelay(options.baseUrl);
   const baseUrl = relay ?? COMFY_CLOUD_BASE_URL;
   if (!options.apiKey.trim()) throw new Error("Comfy credentials are required");
-  if (relay) return createCompatClient(relay, order);
+  if (relay) return createCompatClient(relay, order, options.apiKey);
   // The SDK stores fetch as an instance method; Workers requires the global receiver.
   const client = new Comfy({
     apiKey: options.apiKey,
@@ -457,7 +476,12 @@ export function createComfyClient(options: {
         isCloudRequest(graph) ? graph.input.graph : graph,
       );
       return status(
-        await client.submit(workflow, { idempotencyKey, signal }),
+        // The key also authorises partner nodes, such as Wan 3.0 in a graph.
+        await client.submit(workflow, {
+          idempotencyKey,
+          signal,
+          apiKey: options.apiKey,
+        }),
         order,
       );
     },

@@ -6,6 +6,7 @@ import type {
   MotionResolution,
 } from "@open-cinema/contracts";
 import { requestedDuration } from "./workflows/ltx-video";
+import { trackWindow } from "./workflows/wan3-cast";
 
 /**
  * Pre-generation estimates. Prices are Router's published rates (211 credits =
@@ -115,23 +116,34 @@ export const WAN3_CREDITS_PER_SECOND = {
   "1080p": 42.2,
 } as const satisfies Record<MotionResolution, number>;
 
+/**
+ * With tagged people, Wan 3.0 also reads SAM 3.1's tracks video (./workflows/
+ * wan3-cast.ts), so the seconds it reads grow by its length; SAM 3.1 itself
+ * ran in about 20 s of Cloud GPU time on a 6 s clip (2026-10-23).
+ */
 export function movesEstimate(
   engine: MotionEngine,
   seconds: number | null,
   resolution: MotionResolution,
+  tagged = false,
 ): GenerationEstimate {
   if (engine === "wan-3") {
     const rate = WAN3_CREDITS_PER_SECOND[resolution];
     const length = seconds === null ? null : Math.max(2, Math.round(seconds));
-    const credits = length === null ? null : rate * length * 2;
+    const tracks =
+      tagged && seconds !== null ? trackWindow(seconds, []).seconds : 0;
+    const credits = length === null ? null : rate * (length * 2 + tracks);
+    const billing = tagged
+      ? "Wan 3.0 bills the seconds it reads (the clip and SAM 3.1’s tracks of who is who) and the seconds it makes."
+      : "Wan 3.0 bills the seconds it reads and the seconds it makes.";
     return {
       credits: credits === null ? null : round(credits, credits),
       seconds: round(180, 900),
       basis: credits === null ? "heuristic" : "published-pricing",
       note:
         length === null
-          ? `About ${Math.round(rate * 2)} credits per second of clip: Wan 3.0 bills the seconds it reads and the seconds it makes.`
-          : "Wan 3.0 bills the seconds it reads and the seconds it makes.",
+          ? `About ${Math.round(rate * (tagged ? 3 : 2))} credits per second of clip: ${billing}`
+          : billing,
     };
   }
   if (engine === "wan-animate")
@@ -336,6 +348,8 @@ export function estimateGeneration(
         request.inputs.engine,
         request.inputs.seconds ?? null,
         request.inputs.resolution,
+        // Unparsed inputs may leave out `cast`.
+        (request.inputs.cast?.length ?? 0) > 0,
       );
     case "video.object-swap":
       return cloudEstimate("swap");

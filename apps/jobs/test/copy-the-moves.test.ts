@@ -18,6 +18,9 @@ import {
   wan3Duration,
   wan3MovesOutputs,
   wanFrameCount,
+  SAM3_MODEL,
+  trackWindow,
+  WAN3_CAST_MODEL_ID,
   wanWindows,
   workflowStages,
   type BuildContext,
@@ -268,9 +271,12 @@ it("builds Wan Animate 2 as a Cloud graph with the keyframe and the clip", async
   ).rejects.toThrow("length is unknown");
 });
 
-const crop = (id: string) => ({ type: "media-asset" as const, assetId: id });
+type Graph = Record<
+  string,
+  { class_type: string; inputs: Record<string, unknown> }
+>;
 
-it("swaps tagged people, each shown to Wan by a cut-out from the clip", async () => {
+it("tracks tagged people with SAM 3.1 and names them by colour to Wan 3.0, in one Cloud graph", async () => {
   const swaps = inputs({
     prompt:
       "Replace @person1 with @Cal and @person3 with @GrandmaDot. Keep the floodlights.",
@@ -280,43 +286,76 @@ it("swaps tagged people, each shown to Wan by a cut-out from the clip", async ()
         person: 1,
         character: { elementId: "char-cal" },
         point: { x: 0.55, y: 0.45, timeMs: 4000 },
-        crop: crop("cut-1"),
+        box: { x: 0.4, y: 0.2, w: 0.3, h: 0.6 },
       },
       {
         person: 3,
         character: { elementId: "char-dot" },
         point: { x: 0.74, y: 0.4, timeMs: 8700 },
-        crop: crop("cut-3"),
       },
     ],
   });
-  const request = (await definition.build(swaps, context)) as ProviderRequest;
-  const input = request.input as {
-    input: { prompt: string; media: { type: string; url: string }[] };
-    parameters: Record<string, unknown>;
-  };
-  // Six images by URL: each cut-out, then two views per Character.
-  expect(input.input.media.map((m) => m.url)).toEqual([
-    "https://comfy-storage.test/dance",
-    "https://comfy-storage.test/cut-1",
-    "https://comfy-storage.test/cal-face",
-    "https://comfy-storage.test/cal-sheet",
-    "https://comfy-storage.test/cut-3",
-    "https://comfy-storage.test/dot-face",
-    "https://comfy-storage.test/dot-sheet",
+  expect(definition.provider!(swaps)).toBe("cloud-workflow");
+  expect(definition.model(swaps)).toBe(WAN3_CAST_MODEL_ID);
+  expect(displayModel(swaps)).toBe("SAM 3.1 + Wan 3.0");
+  expect(modelCredit(displayModel(swaps))).toBe(
+    "SAM 3.1 + Wan 3.0 by Meta and Alibaba (Tongyi Wan), hosted, via Comfy Cloud",
+  );
+  // The sound goes back on inside the graph; no dub stage follows.
+  expect(workflowStages("video.performance-transfer", swaps)).toEqual([]);
+
+  const request = (await definition.build(
+    swaps,
+    context,
+  )) as CloudWorkflowRequest;
+  const graph = request.input.graph as Graph;
+  // The clip, then up to three views per Character: no cut-outs.
+  expect(
+    request.input.media.map((m) => [m.node, m.url.split("/").at(-1)]),
+  ).toEqual([
+    ["source", "dance"],
+    ["reference_0", "cal-face"],
+    ["reference_1", "cal-sheet"],
+    ["reference_2", "dot-face"],
+    ["reference_3", "dot-sheet"],
+    ["reference_4", "dot-smile"],
   ]);
-  const { prompt } = input.input;
+  // SAM 3.1 segments each from their click (and box) on their own frame,
+  // then tracks them forwards and backwards from it.
+  expect(graph.sam!.inputs.ckpt_name).toBe(SAM3_MODEL);
+  const detect = Object.values(graph).filter(
+    (n) => n.class_type === "SAM3_Detect",
+  );
+  expect(detect).toHaveLength(2);
+  expect(graph.p0_box!.class_type).toBe("PrimitiveBoundingBox");
+  expect(graph.p1_box).toBeUndefined();
+  expect(
+    Object.values(graph).filter((n) => n.class_type === "SAM3_VideoTrack"),
+  ).toHaveLength(4);
+  const wan = graph.wan!.inputs;
+  expect(graph.wan!.class_type).toBe("Wan3ReferenceToVideoApi");
+  expect(wan["model.reference_videos.video1"]).toEqual(["source", 0]);
+  expect(wan["model.reference_videos.video2"]).toEqual(["tracks_video", 0]);
+  expect(wan["model.duration"]).toBe("10");
+  expect(wan["model.audio"]).toBe(false);
+  // 15 s of reference video at most: the 10 s clip leaves 4.75 s of tracks.
+  expect(trackWindow(10, [4, 8.7])).toEqual({ start: 4, seconds: 4.7 });
+  const prompt = wan["model.prompt"] as string;
   expect(prompt).toContain(
-    "Person 1, the person shown in Image 1 (in the middle of the frame at 4.0 s), becomes Cal, shown in Image 2 and Image 3",
+    "Video 2 is the same footage as Video 1 from 4.0 s to 8.7 s",
   );
   expect(prompt).toContain(
-    "Person 3, the person shown in Image 4 (on the right of the frame at 8.7 s), becomes Grandma Dot, shown in Image 5 and Image 6",
+    "Person 1, filled in red in Video 2, becomes Cal, shown in Image 1 and Image 2",
   );
-  // The cut-outs point people out; their looks must not leak into the result.
-  expect(prompt).toContain("Image 1 and Image 4 are stills from Video 1");
+  expect(prompt).toContain(
+    "Person 3, filled in blue in Video 2, becomes Grandma Dot, shown in Image 3, Image 4 and Image 5",
+  );
+  // The colours only point people out; they must not reach the result.
+  expect(prompt).toContain("the result has no flat colours");
   expect(prompt).toContain("Keep the floodlights.");
+  expect(prompt).not.toContain("Replace");
   expect(prompt).not.toContain("@person");
-  expect(input.parameters.duration).toBe(10);
+  expect(graph.save_result!.inputs.video).toEqual(["result_video", 0]);
   // Both Characters resolve, though only the first is `character`.
   expect(
     requestMentions({
@@ -326,28 +365,67 @@ it("swaps tagged people, each shown to Wan by a cut-out from the clip", async ()
   ).toEqual(["char-cal", "char-dot"]);
 });
 
-it("sends three swaps as a cut-out and a sheet each", async () => {
-  const many = inputs({
-    location: { elementId: "loc-lighthouse" },
-    cast: [1, 2, 3].map((person) => ({
-      person,
-      character: { elementId: "char-dot" },
-      point: { x: 0.5, y: 0.5, timeMs: 0 },
-      crop: crop(`cut-${person}`),
-    })),
+it("swaps a tagged thing for one of your Things", async () => {
+  const lantern: ResolvedMention = {
+    ...cal,
+    elementId: "thing-lantern",
+    handle: "StormLantern",
+    name: "Storm Lantern",
+    type: "thing",
+    description: "A brass hurricane lantern with a green glass chimney.",
+    references: [
+      {
+        asset: { type: "media-asset", assetId: "lantern-hero" },
+        view: "three-quarter",
+        roles: ["identity"],
+      },
+    ],
+  };
+  const ball = inputs({
+    character: undefined,
+    prompt: "Replace @person1 with @StormLantern",
+    seconds: 6,
+    sound: false,
+    cast: [
+      {
+        person: 1,
+        character: { elementId: "thing-lantern" },
+        point: { x: 0.5, y: 0.43, timeMs: 1500 },
+      },
+    ],
   });
-  const request = (await definition.build(many, context)) as ProviderRequest;
-  const media = (request.input as { input: { media: { url: string }[] } }).input
-    .media;
-  expect(media.map((m) => m.url.split("/").at(-1))).toEqual([
-    "dance",
-    "cut-1",
-    "dot-sheet",
-    "cut-2",
-    "dot-sheet",
-    "cut-3",
-    "dot-sheet",
-  ]);
+  const request = (await definition.build(ball, {
+    ...context,
+    mentions: [...context.mentions, lantern],
+  })) as CloudWorkflowRequest;
+  const graph = request.input.graph as Graph;
+  const prompt = graph.wan!.inputs["model.prompt"] as string;
+  expect(prompt).toContain(
+    "The object filled in red in Video 2 becomes Storm Lantern, the object shown in Image 1",
+  );
+  // A 6 s clip leaves room to track all of it.
+  expect(prompt).toContain("Video 2 is the same footage as Video 1,");
+  // A silent clip: Wan's video is saved as it comes.
+  expect(graph.save_result!.inputs.video).toEqual(["wan", 0]);
+  expect(graph.result_video).toBeUndefined();
+});
+
+it("quotes tagged runs on the tracks Wan reads as well", () => {
+  const estimate = estimateGeneration({
+    workflowKind: "video.performance-transfer",
+    inputs: inputs({
+      seconds: 6,
+      cast: [
+        {
+          person: 1,
+          character: { elementId: "char-cal" },
+          point: { x: 0.5, y: 0.5, timeMs: 0 },
+        },
+      ],
+    }),
+  });
+  // 6 s read, 6 s of tracks read, 6 s made, at 720p.
+  expect(estimate.credits).toEqual({ min: 379.8, max: 379.8 });
 });
 
 it("leaves tagged people to Wan 3.0", async () => {

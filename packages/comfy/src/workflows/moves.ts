@@ -16,6 +16,14 @@ import { characterReferences, referenceGuide } from "./character-replace";
 import { locationReferences } from "./background-replace";
 import { mediaFilename, seedFrom } from "./ltx-alpha-background";
 import { expandMentions, httpsUrl } from "./results";
+import { thingReferences } from "./revision-modes";
+import {
+  TRACK_COLOURS,
+  WAN3_CAST_MEDIA_INPUTS,
+  WAN3_CAST_MODEL_ID,
+  trackWindow,
+  wan3CastGraph,
+} from "./wan3-cast";
 import {
   WAN_ANIMATE_MEDIA_INPUTS,
   WAN_ANIMATE_MODEL_ID,
@@ -39,7 +47,7 @@ const MAX_LOCATION_IMAGES = 2;
 /**
  * Wan 3.0 reads up to ten reference images, but Router timed out every
  * three-swap run that sent nine inline (2026-10-22); six by URL finished in
- * six minutes. Swaps send at most this many.
+ * six minutes. Tagged swaps send at most this many.
  */
 const MAX_CAST_IMAGES = 6;
 
@@ -80,19 +88,6 @@ export function movesCast(
   return { character, location };
 }
 
-/** Each tagged person with the Character who takes their place, checked. */
-export function movesSwaps(
-  inputs: PerformanceTransferInputs,
-  context: BuildContext,
-) {
-  return inputs.cast.map((swap) => {
-    const character = find(context, swap.character.elementId);
-    if (!character || character.type !== "character")
-      throw new Error(`Choose who @person${swap.person} becomes`);
-    return { ...swap, character };
-  });
-}
-
 /** `@person2` in the creator's words reads "Person 2", as the instruction names them. */
 export const namePeople = (text: string) =>
   text.replace(/@person([1-9])\b/gi, "Person $1");
@@ -103,7 +98,12 @@ function extraDirection(
   mentions: readonly ResolvedMention[],
   names: readonly string[],
 ) {
-  const words = clean(namePeople(expandMentions(inputs.prompt, mentions)));
+  // "Replace @person1 with @Cal and @person3 with @Dot" is what the cast already says.
+  const told = inputs.prompt.replace(
+    /(\b(replace|swap|and)\s+|,\s*)?@person[1-9]\s+(with|for)\s+@[\w:+-]+[.,;]?/gi,
+    "",
+  );
+  const words = clean(namePeople(expandMentions(told, mentions)));
   // "@Cal copies the moves" adds nothing the instruction does not say already.
   const bare = names.reduce(
     (text, name) => text.replaceAll(name, ""),
@@ -165,72 +165,69 @@ export function wan3MovesPrompt(o: {
     .slice(0, 4000);
 }
 
-/** Where a click sits on the frame, in words: "on the right", "in the middle, near the top". */
-export function frameSpot(point: { x: number; y: number }) {
-  const across =
-    point.x < 0.36
-      ? "on the left"
-      : point.x > 0.64
-        ? "on the right"
-        : "in the middle";
-  const down =
-    point.y < 0.33
-      ? ", near the top"
-      : point.y > 0.67
-        ? ", near the bottom"
-        : "";
-  return `${across}${down}`;
-}
-
 /**
- * Several swaps in one run. Each tagged person is shown to Wan as a cut-out
- * from the clip ("the person in Image 1"), then the Character's views, so
- * nobody has to describe who is who in words.
+ * Several swaps with SAM 3.1's tracks (./wan3-cast.ts). Video 2 is the clip
+ * with each tagged person filled in their own colour, so every person is
+ * named by a colour that follows them through the shot, not by a still.
  */
-export function wan3CastPrompt(o: {
+export function wan3TrackedCastPrompt(o: {
   swaps: readonly {
     person: number;
-    character: ResolvedMention;
-    point: { x: number; y: number; timeMs: number };
-    /** The cut-out's image number, or null when none was sent. */
-    crop: number | null;
-    /** The Character's image numbers and views, in order. */
+    element: ResolvedMention;
+    /** The Element's image numbers and views, in order. */
     images: readonly {
       n: number;
       view: ResolvedMention["references"][number]["view"];
     }[];
   }[];
+  /** The stretch of Video 1 that Video 2 shows, in seconds. */
+  tracks: { start: number; seconds: number };
+  clipSeconds: number | undefined;
   location: ResolvedMention | undefined;
   locationImages: readonly number[];
   direction: string;
 }) {
   const tag = (n: number) => `Image ${n}`;
-  const lines = o.swaps.map((swap) => {
-    const where = `${frameSpot(swap.point)} of the frame at ${(swap.point.timeMs / 1000).toFixed(1)} s`;
-    const who = identity(swap.character);
-    const seen =
-      swap.crop === null
-        ? `the person ${where}`
-        : `the person shown in ${tag(swap.crop)} (${where})`;
+  const whole =
+    o.clipSeconds !== undefined &&
+    o.tracks.start <= 0.05 &&
+    o.tracks.seconds >= o.clipSeconds - 0.25;
+  const span = whole
+    ? "the same footage as Video 1"
+    : `the same footage as Video 1 from ${o.tracks.start.toFixed(1)} s to ${(o.tracks.start + o.tracks.seconds).toFixed(1)} s`;
+  const lines = o.swaps.map((swap, i) => {
+    const colour = TRACK_COLOURS[i]!.name;
+    const thing = swap.element.type === "thing";
+    const who = identity(swap.element);
+    const shown = list(swap.images.map((image) => tag(image.n)));
     return [
-      `Person ${swap.person}, ${seen}, becomes ${swap.character.name}, shown in ${list(swap.images.map((i) => tag(i.n)))}${who ? `: ${who}` : ""}.`,
-      referenceGuide(swap.images.map((i) => ({ tag: tag(i.n), view: i.view }))),
+      thing
+        ? `The object filled in ${colour} in Video 2 becomes ${swap.element.name}, the object shown in ${shown}${who ? `: ${who}` : ""}. It moves exactly as the object it replaces.`
+        : `Person ${swap.person}, filled in ${colour} in Video 2, becomes ${swap.element.name}, shown in ${shown}${who ? `: ${who}` : ""}.`,
+      thing
+        ? ""
+        : referenceGuide(
+            swap.images.map((image) => ({
+              tag: tag(image.n),
+              view: image.view,
+            })),
+          ),
     ]
       .filter(Boolean)
       .join(" ");
   });
-  const crops = o.swaps.flatMap((s) => (s.crop === null ? [] : [tag(s.crop)]));
+  const people = o.swaps.filter((s) => s.element.type !== "thing").length;
   const setting = o.location
     ? `Use the place from ${list(o.locationImages.map(tag)) || "the description"}: ${o.location.name}${o.location.description ? `, ${clean(o.location.description)}` : ""}. Light everyone as that place would.`
     : "Keep the place, the light and everyone else exactly as in Video 1.";
   return [
-    `In Video 1, swap ${o.swaps.length === 1 ? "one person" : `${o.swaps.length} people`} and leave everyone else exactly as filmed.`,
+    `In Video 1, replace ${o.swaps.length === 1 ? "one subject" : `${o.swaps.length} subjects`} and leave everyone and everything else exactly as filmed.`,
+    `Video 2 is ${span}, with each subject to replace filled in one flat colour that stays on them throughout. It only shows who is who: the result has no flat colours, and nobody's face, hair or clothes come from Video 2.`,
     ...lines,
-    crops.length
-      ? `${list(crops)} ${crops.length === 1 ? "is a still" : "are stills"} from Video 1 that only point out who to replace; take nobody's face, hair or clothes from ${crops.length === 1 ? "it" : "them"}.`
-      : "",
     setting,
-    "Each of them copies every step, gesture and expression of the person they replace, with the same timing, the same camera framing and the same camera movement as Video 1.",
+    people
+      ? "Each new person copies every step, gesture and expression of the person they replace, with the same timing, the same camera framing and the same camera movement as Video 1."
+      : "Keep every movement, the timing, the camera framing and the camera movement exactly as in Video 1.",
     o.direction,
     "Photorealistic.",
   ]
@@ -252,80 +249,140 @@ async function imageUrl(context: BuildContext, ref: AssetRef) {
   return asset.publicUrl ?? (await asset.dataUri());
 }
 
-/** Several tagged people, each with their own Character. */
-async function wan3CastMedia(
+/** Each tagged person or thing with the Element that takes its place, checked. */
+function trackedSwaps(
   inputs: PerformanceTransferInputs,
   context: BuildContext,
-  location: ResolvedMention | undefined,
 ) {
-  const swaps = movesSwaps(inputs, context);
-  const crops = swaps.filter((s) => s.crop).length;
+  return inputs.cast.map((swap) => {
+    const element = find(context, swap.character.elementId);
+    if (!element || (element.type !== "character" && element.type !== "thing"))
+      throw new Error(`Choose who @person${swap.person} becomes`);
+    return { ...swap, element };
+  });
+}
+
+/**
+ * Tagged swaps as one Comfy Cloud graph: SAM 3.1 tracks each tag from its
+ * click, and Wan 3.0 runs inside the graph with the clip, the tracks and the
+ * Elements' references, then the clip's sound goes back on.
+ */
+export async function wan3CastCloudRequest(
+  inputs: PerformanceTransferInputs,
+  context: BuildContext,
+): Promise<CloudWorkflowRequest> {
+  // A run may swap only Things, so no lead Character is required here.
+  const location = find(context, inputs.location?.elementId);
+  const swaps = trackedSwaps(inputs, context);
+  if (swaps.length > TRACK_COLOURS.length)
+    throw new Error(`Up to ${TRACK_COLOURS.length} swaps per run`);
+  const source = await context.asset(inputs.source);
+  if (!source.mediaType.startsWith("video/"))
+    throw new Error("Choose a video clip whose moves to copy");
   const placeRefs = location
     ? locationReferences(location).slice(
         0,
         Math.max(
           0,
-          Math.min(MAX_LOCATION_IMAGES, MAX_CAST_IMAGES - crops - swaps.length),
+          Math.min(MAX_LOCATION_IMAGES, MAX_CAST_IMAGES - swaps.length),
         ),
       )
     : [];
-  // The cut-outs, then as many views per Character as fit.
-  const perCharacter = Math.max(
+  // No cut-outs now: the tracks say who is who, so each Element gets more views.
+  const perElement = Math.max(
     1,
     Math.min(
       MAX_CHARACTER_IMAGES,
-      Math.floor((MAX_CAST_IMAGES - crops - placeRefs.length) / swaps.length),
+      Math.floor((MAX_CAST_IMAGES - placeRefs.length) / swaps.length),
     ),
   );
   const refs: AssetRef[] = [];
   const planned = swaps.map((swap) => {
-    const ordered = characterReferences(swap.character);
-    // One view each: the sheet, whose large portrait also carries the face.
     const views =
-      perCharacter === 1
-        ? [ordered.find((r) => r.view === "sheet") ?? ordered[0]].filter(
+      swap.element.type === "thing"
+        ? thingReferences(swap.element).map((asset) => ({
+            asset,
+            view: null,
+          }))
+        : characterReferences(swap.element);
+    const chosen =
+      perElement === 1 && swap.element.type !== "thing"
+        ? // One view each: the sheet, whose large portrait also carries the face.
+          [views.find((r) => r.view === "sheet") ?? views[0]].filter(
             (r) => r !== undefined,
           )
-        : ordered.slice(0, perCharacter);
-    if (!views.length)
-      throw new Error(
-        `${swap.character.name} needs an approved reference first`,
-      );
-    let crop: number | null = null;
-    if (swap.crop) {
-      refs.push(swap.crop);
-      crop = refs.length;
-    }
-    const images = views.map((view) => {
+        : views.slice(0, perElement);
+    if (!chosen.length)
+      throw new Error(`${swap.element.name} needs an approved reference first`);
+    const images = chosen.map((view) => {
       refs.push(view.asset);
       return { n: refs.length, view: view.view };
     });
-    return { ...swap, crop, images };
+    return { ...swap, images };
   });
   const locationImages = placeRefs.map((ref) => {
     refs.push(ref);
     return refs.length;
   });
-  // By URL: inline sheets made the request tens of megabytes.
-  const images = await Promise.all(
-    refs.map(async (ref) => {
-      const asset = await context.asset(ref);
-      return asset.publicUrl ?? (await asset.fetchableUrl());
-    }),
+  const references = await Promise.all(refs.map((ref) => context.asset(ref)));
+  const media: CloudMediaInput[] = [
+    {
+      ...WAN3_CAST_MEDIA_INPUTS.source,
+      url: await source.fetchableUrl(),
+      filename: mediaFilename("source", source.mediaType),
+      contentType: source.mediaType,
+    },
+  ];
+  for (const [i, reference] of references.entries())
+    media.push({
+      ...WAN3_CAST_MEDIA_INPUTS.reference(i),
+      url: await reference.fetchableUrl(),
+      filename: mediaFilename(`reference_${i}`, reference.mediaType),
+      contentType: reference.mediaType,
+    });
+  const clipSeconds = inputs.seconds;
+  const tracks = trackWindow(
+    clipSeconds ?? MOTION_ENGINES["wan-3"].maxSeconds,
+    swaps.map((s) => s.point.timeMs / 1000),
   );
-  const prompt = wan3CastPrompt({
+  const prompt = wan3TrackedCastPrompt({
     swaps: planned,
+    tracks,
+    clipSeconds,
     location,
     locationImages,
     direction: extraDirection(
       inputs,
       context.mentions,
-      [...swaps.map((s) => s.character.name), location?.name ?? ""].filter(
+      [...swaps.map((s) => s.element.name), location?.name ?? ""].filter(
         Boolean,
       ),
     ),
   });
-  return { images, prompt };
+  const duration = wan3Duration(clipSeconds);
+  return {
+    model: WAN3_CAST_MODEL_ID,
+    input: {
+      graph: wan3CastGraph({
+        targets: swaps.map((s) => ({
+          x: s.point.x,
+          y: s.point.y,
+          seconds: s.point.timeMs / 1000,
+          box: s.box,
+        })),
+        tracks,
+        wan: {
+          prompt,
+          resolution: WAN3_RESOLUTION[inputs.resolution],
+          duration: duration === -1 ? "auto" : String(duration),
+          seed: wan3Seed(inputs),
+          images: references.length,
+          sound: inputs.sound,
+        },
+      }),
+      media,
+    },
+  };
 }
 
 export async function wan3MovesRequest(
@@ -337,9 +394,12 @@ export async function wan3MovesRequest(
   if (!source.mediaType.startsWith("video/"))
     throw new Error("Choose a video clip whose moves to copy");
   const videoUrl = await source.fetchableUrl();
-  const { images, prompt } = inputs.cast.length
-    ? await wan3CastMedia(inputs, context, location)
-    : await wan3SoloMedia(inputs, context, character, location);
+  const { images, prompt } = await wan3SoloMedia(
+    inputs,
+    context,
+    character,
+    location,
+  );
   return wan3Body(inputs, videoUrl, images, prompt);
 }
 
@@ -406,13 +466,15 @@ function wan3Body(
         // The dub stage lays the clip's own sound over the result.
         audio: false,
         watermark: false,
-        // Wan takes a 31-bit seed and refuses the request (422) above it.
-        seed:
-          seedFrom(JSON.stringify([inputs.source, inputs.prompt])) % 2 ** 31,
+        seed: wan3Seed(inputs),
       },
     },
   };
 }
+
+/** Wan takes a 31-bit seed and refuses the request (422) above it. */
+const wan3Seed = (inputs: PerformanceTransferInputs) =>
+  seedFrom(JSON.stringify([inputs.source, inputs.prompt])) % 2 ** 31;
 
 /** Whole seconds within Wan's range; -1 lets Wan match the clip when unknown. */
 export function wan3Duration(seconds: number | undefined) {

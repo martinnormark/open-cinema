@@ -96,6 +96,7 @@ import {
 } from "./shot-checks-client";
 import {
   castFromWords,
+  clampBox,
   nextPerson,
   personMention,
   withoutPerson,
@@ -386,8 +387,6 @@ export function ReplacementStudio({
   );
   /** Copy the moves: people tagged on a frame, as `@person1`, `@person2`, … Not kept in drafts. */
   const [people, setPeople] = useState<ClipPerson[]>([]);
-  /** Cut-outs already saved to the library, so a retry does not upload again. */
-  const cutOuts = useRef(new Map<string, MediaItem>());
   const directionInput = useRef<HTMLTextAreaElement | null>(null);
   /** Progress of cutting the stretch out of a long clip, 0 to 1. */
   const [cutting, setCutting] = useState<number | null>(null);
@@ -447,12 +446,13 @@ export function ReplacementStudio({
     kind === "moves" ? elements.filter((e) => e.type === "location") : [];
   const place = locations.find((e) => e.id === locationId) ?? null;
   const placeReferences = place ? approvedReferences(place) : [];
-  /** Who each tagged person becomes, read from the words. */
-  const cast =
-    kind === "moves" && people.length
-      ? castFromWords(direction, people, candidates)
-      : [];
   const tagged = kind === "moves" && people.length > 0;
+  /** A tag can also be a thing (the ball), which becomes one of your Things. */
+  const castable = tagged
+    ? [...candidates, ...elements.filter((e) => e.type === "thing")]
+    : candidates;
+  /** Who each tagged person becomes, read from the words. */
+  const cast = tagged ? castFromWords(direction, people, castable) : [];
   const peopleMentions = useMemo(
     () =>
       people.map((p) => ({
@@ -513,7 +513,7 @@ export function ReplacementStudio({
       clipSeconds,
       pipeline,
       { extendPipeline, extendSeconds, areaAdds },
-      { engine, seconds: movesSeconds, resolution },
+      { engine, seconds: movesSeconds, resolution, tagged },
     ),
     preferences.unit,
   );
@@ -967,9 +967,9 @@ export function ReplacementStudio({
         }
       }
     }
-    const swaps = await castRequest();
-    if (!swaps) return null;
-    const lead = cast[0];
+    const swaps = castRequest();
+    // A Thing can be swapped too; the performer recorded is a Character when there is one.
+    const lead = cast.find((c) => c.element.type === "character") ?? cast[0];
     const character = lead
       ? {
           elementId: lead.element.id,
@@ -1000,34 +1000,15 @@ export function ReplacementStudio({
   }
 
   /**
-   * Each swap with its cut-out saved to the library, and the click moved into
-   * the time of the stretch that is sent. Null when a cut-out could not be saved.
+   * Each swap as where the person (or thing) was clicked, moved into the time
+   * of the stretch that is sent, with the pose model's box when it found a
+   * person. The graph segments and tracks them with SAM 3.1 from there.
    */
-  async function castRequest() {
+  function castRequest() {
     const offset = range ? range.start * 1000 : 0;
-    const swaps = [];
-    for (const pair of cast) {
+    return cast.map((pair) => {
       const person = people.find((p) => p.person === pair.person)!;
-      const key = `${person.person}@${person.timeMs}:${person.x}:${person.y}`;
-      let crop = cutOuts.current.get(key) ?? null;
-      if (!crop && person.blob) {
-        const [item] = await uploadFiles([
-          new File(
-            [person.blob],
-            `${source!.title.replace(/\.[^.]+$/, "")} ${personMention(person.person).slice(1)} ${formatTimecode(person.timeMs / 1000)}.jpg`,
-            { type: "image/jpeg" },
-          ),
-        ]);
-        if (!item) {
-          setError(
-            `${personMention(person.person)}’s cut-out could not be saved. Try again.`,
-          );
-          return null;
-        }
-        cutOuts.current.set(key, item);
-        crop = item;
-      }
-      swaps.push({
+      return {
         person: pair.person,
         character: {
           elementId: pair.element.id,
@@ -1038,10 +1019,9 @@ export function ReplacementStudio({
           y: person.y,
           timeMs: Math.max(0, Math.round(person.timeMs - offset)),
         },
-        ...(crop ? { crop: crop.ref } : {}),
-      });
-    }
-    return swaps;
+        ...(person.found && person.box ? { box: clampBox(person.box) } : {}),
+      };
+    });
   }
 
   async function submit() {
@@ -1864,7 +1844,13 @@ export function ReplacementStudio({
               id="revision-direction"
               value={direction}
               onValueChange={writeDirection}
-              types={elementType ? [elementType] : []}
+              types={
+                elementType
+                  ? tagged
+                    ? [elementType, "thing"]
+                    : [elementType]
+                  : []
+              }
               inputRef={directionInput}
               extra={peopleMentions}
               maxLength={1500}

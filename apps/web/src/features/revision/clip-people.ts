@@ -108,3 +108,15 @@ export function withoutPerson(text: string, person: number) {
     .replace(/\s{2,}/g, " ")
     .trim();
 }
+
+/** The pose model's box kept inside the frame, as the request takes it. */
+export function clampBox(box: Box): Box {
+  const x = Math.min(1, Math.max(0, box.x));
+  const y = Math.min(1, Math.max(0, box.y));
+  return {
+    x,
+    y,
+    w: Math.max(0.001, Math.min(1 - x, box.x + box.w - x)),
+    h: Math.max(0.001, Math.min(1 - y, box.y + box.h - y)),
+  };
+}

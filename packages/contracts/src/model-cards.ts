@@ -39,6 +39,13 @@ export const MODEL_CARDS: Record<string, ModelCard> = {
   "Kling 3.0 Omni": router("Kuaishou"),
   "Seedance 2.5": router("ByteDance"),
   "Wan 3.0": router("Alibaba (Tongyi Wan)"),
+  // SAM 3.1's open weights track who is who; Wan 3.0 stays a hosted model,
+  // called from the same Comfy Cloud graph.
+  "SAM 3.1 + Wan 3.0": {
+    maker: "Meta and Alibaba (Tongyi Wan)",
+    weights: "hosted",
+    runsOn: "Comfy Cloud",
+  },
   "FLUX 3 Klein + Wan Animate 2": cloud("Black Forest Labs and Alibaba"),
 };
 

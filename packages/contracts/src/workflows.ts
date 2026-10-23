@@ -172,6 +172,19 @@ export const castSwapSchema = z.object({
   point: framePointSchema,
   /** That person cut out of the frame, so the model sees who is meant. */
   crop: assetRefSchema.optional(),
+  /**
+   * The person's box on that frame (0–1), when the studio's pose model found
+   * them. SAM 3 segments the whole person from it; a click alone can catch
+   * only what is under it, such as a shirt number.
+   */
+  box: z
+    .object({
+      x: z.number().min(0).max(1),
+      y: z.number().min(0).max(1),
+      w: z.number().positive().max(1),
+      h: z.number().positive().max(1),
+    })
+    .optional(),
 });
 export type CastSwap = z.infer<typeof castSwapSchema>;
 
@@ -609,6 +622,7 @@ export const WORKFLOW_DESCRIPTORS = {
     output: "video",
     models: [
       "wan/wan3.0-video",
+      "comfy-cloud/sam3-wan3-cast",
       "comfy-cloud/wan-animate-2",
       "comfy-cloud/ltx-2.3-union-edges",
     ],

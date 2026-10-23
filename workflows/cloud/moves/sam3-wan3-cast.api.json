@@ -1,0 +1,749 @@
+{
+  "source": {
+    "class_type": "LoadVideo",
+    "inputs": {
+      "file": "source.mp4"
+    }
+  },
+  "source_parts": {
+    "class_type": "GetVideoComponents",
+    "inputs": {
+      "video": [
+        "source",
+        0
+      ]
+    }
+  },
+  "work": {
+    "class_type": "ImageScaleToTotalPixels",
+    "inputs": {
+      "image": [
+        "source_parts",
+        0
+      ],
+      "upscale_method": "bilinear",
+      "megapixels": 0.4,
+      "resolution_steps": 2
+    }
+  },
+  "work_size": {
+    "class_type": "GetImageSize",
+    "inputs": {
+      "image": [
+        "work",
+        0
+      ]
+    }
+  },
+  "sam": {
+    "class_type": "CheckpointLoaderSimple",
+    "inputs": {
+      "ckpt_name": "sam3.1_multiplex_fp16.safetensors"
+    }
+  },
+  "g250_index": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(1, min(a - 2, round(2.5 * b)))",
+      "values.a": [
+        "work_size",
+        2
+      ],
+      "values.b": [
+        "source_parts",
+        2
+      ]
+    }
+  },
+  "g250_frame": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "work",
+        0
+      ],
+      "batch_index": [
+        "g250_index",
+        1
+      ],
+      "length": 1
+    }
+  },
+  "p0_x": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "round(0.47 * a)",
+      "values.a": [
+        "work_size",
+        0
+      ]
+    }
+  },
+  "p0_y": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "round(0.3 * a)",
+      "values.a": [
+        "work_size",
+        1
+      ]
+    }
+  },
+  "p0_point": {
+    "class_type": "StringFormat",
+    "inputs": {
+      "values.a": [
+        "p0_x",
+        1
+      ],
+      "values.b": [
+        "p0_y",
+        1
+      ],
+      "f_string": "[{{\"x\": {a}, \"y\": {b}}}]"
+    }
+  },
+  "p0_detect": {
+    "class_type": "SAM3_Detect",
+    "inputs": {
+      "model": [
+        "sam",
+        0
+      ],
+      "image": [
+        "g250_frame",
+        0
+      ],
+      "threshold": 0.5,
+      "refine_iterations": 2,
+      "individual_masks": false,
+      "positive_coords": [
+        "p0_point",
+        0
+      ],
+      "bboxes": [
+        "p0_box",
+        0
+      ]
+    }
+  },
+  "p0_box_x": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(0, round(0.3 * a))",
+      "values.a": [
+        "work_size",
+        0
+      ]
+    }
+  },
+  "p0_box_y": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(0, round(0.13 * a))",
+      "values.a": [
+        "work_size",
+        1
+      ]
+    }
+  },
+  "p0_box_w": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(1, round(0.36 * a))",
+      "values.a": [
+        "work_size",
+        0
+      ]
+    }
+  },
+  "p0_box_h": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(1, round(0.58 * a))",
+      "values.a": [
+        "work_size",
+        1
+      ]
+    }
+  },
+  "p0_box": {
+    "class_type": "PrimitiveBoundingBox",
+    "inputs": {
+      "x": [
+        "p0_box_x",
+        1
+      ],
+      "y": [
+        "p0_box_y",
+        1
+      ],
+      "width": [
+        "p0_box_w",
+        1
+      ],
+      "height": [
+        "p0_box_h",
+        1
+      ]
+    }
+  },
+  "p1_x": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "round(0.17 * a)",
+      "values.a": [
+        "work_size",
+        0
+      ]
+    }
+  },
+  "p1_y": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "round(0.42 * a)",
+      "values.a": [
+        "work_size",
+        1
+      ]
+    }
+  },
+  "p1_point": {
+    "class_type": "StringFormat",
+    "inputs": {
+      "values.a": [
+        "p1_x",
+        1
+      ],
+      "values.b": [
+        "p1_y",
+        1
+      ],
+      "f_string": "[{{\"x\": {a}, \"y\": {b}}}]"
+    }
+  },
+  "p1_detect": {
+    "class_type": "SAM3_Detect",
+    "inputs": {
+      "model": [
+        "sam",
+        0
+      ],
+      "image": [
+        "g250_frame",
+        0
+      ],
+      "threshold": 0.5,
+      "refine_iterations": 2,
+      "individual_masks": false,
+      "positive_coords": [
+        "p1_point",
+        0
+      ]
+    }
+  },
+  "g250_masks": {
+    "class_type": "BatchMasksNode",
+    "inputs": {
+      "masks.mask0": [
+        "p0_detect",
+        0
+      ],
+      "masks.mask1": [
+        "p1_detect",
+        0
+      ]
+    }
+  },
+  "g250_ahead": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "work",
+        0
+      ],
+      "batch_index": [
+        "g250_index",
+        1
+      ],
+      "length": 4096
+    }
+  },
+  "g250_forward": {
+    "class_type": "SAM3_VideoTrack",
+    "inputs": {
+      "images": [
+        "g250_ahead",
+        0
+      ],
+      "model": [
+        "sam",
+        0
+      ],
+      "initial_mask": [
+        "g250_masks",
+        0
+      ],
+      "detection_threshold": 0.5,
+      "max_objects": 2,
+      "detect_interval": 1
+    }
+  },
+  "g250_before_length": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "a + 1",
+      "values.a": [
+        "g250_index",
+        1
+      ]
+    }
+  },
+  "g250_before": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "work",
+        0
+      ],
+      "batch_index": 0,
+      "length": [
+        "g250_before_length",
+        1
+      ]
+    }
+  },
+  "g250_behind": {
+    "class_type": "ReverseImageBatch",
+    "inputs": {
+      "images": [
+        "g250_before",
+        0
+      ]
+    }
+  },
+  "g250_backward": {
+    "class_type": "SAM3_VideoTrack",
+    "inputs": {
+      "images": [
+        "g250_behind",
+        0
+      ],
+      "model": [
+        "sam",
+        0
+      ],
+      "initial_mask": [
+        "g250_masks",
+        0
+      ],
+      "detection_threshold": 0.5,
+      "max_objects": 2,
+      "detect_interval": 1
+    }
+  },
+  "p0_forward": {
+    "class_type": "SAM3_TrackToMask",
+    "inputs": {
+      "track_data": [
+        "g250_forward",
+        0
+      ],
+      "object_indices": "0"
+    }
+  },
+  "p0_backward": {
+    "class_type": "SAM3_TrackToMask",
+    "inputs": {
+      "track_data": [
+        "g250_backward",
+        0
+      ],
+      "object_indices": "0"
+    }
+  },
+  "p0_forward_image": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "p0_forward",
+        0
+      ]
+    }
+  },
+  "p0_backward_image": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "p0_backward",
+        0
+      ]
+    }
+  },
+  "p0_backward_ordered": {
+    "class_type": "ReverseImageBatch",
+    "inputs": {
+      "images": [
+        "p0_backward_image",
+        0
+      ]
+    }
+  },
+  "p0_earlier": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "p0_backward_ordered",
+        0
+      ],
+      "batch_index": 0,
+      "length": [
+        "g250_index",
+        1
+      ]
+    }
+  },
+  "p0_whole": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "p0_earlier",
+        0
+      ],
+      "image2": [
+        "p0_forward_image",
+        0
+      ]
+    }
+  },
+  "p0_track": {
+    "class_type": "ImageToMask",
+    "inputs": {
+      "image": [
+        "p0_whole",
+        0
+      ],
+      "channel": "red"
+    }
+  },
+  "p1_forward": {
+    "class_type": "SAM3_TrackToMask",
+    "inputs": {
+      "track_data": [
+        "g250_forward",
+        0
+      ],
+      "object_indices": "1"
+    }
+  },
+  "p1_backward": {
+    "class_type": "SAM3_TrackToMask",
+    "inputs": {
+      "track_data": [
+        "g250_backward",
+        0
+      ],
+      "object_indices": "1"
+    }
+  },
+  "p1_forward_image": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "p1_forward",
+        0
+      ]
+    }
+  },
+  "p1_backward_image": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "p1_backward",
+        0
+      ]
+    }
+  },
+  "p1_backward_ordered": {
+    "class_type": "ReverseImageBatch",
+    "inputs": {
+      "images": [
+        "p1_backward_image",
+        0
+      ]
+    }
+  },
+  "p1_earlier": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "p1_backward_ordered",
+        0
+      ],
+      "batch_index": 0,
+      "length": [
+        "g250_index",
+        1
+      ]
+    }
+  },
+  "p1_whole": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "p1_earlier",
+        0
+      ],
+      "image2": [
+        "p1_forward_image",
+        0
+      ]
+    }
+  },
+  "p1_track": {
+    "class_type": "ImageToMask",
+    "inputs": {
+      "image": [
+        "p1_whole",
+        0
+      ],
+      "channel": "red"
+    }
+  },
+  "colour_0": {
+    "class_type": "EmptyImage",
+    "inputs": {
+      "width": [
+        "work_size",
+        0
+      ],
+      "height": [
+        "work_size",
+        1
+      ],
+      "batch_size": 1,
+      "color": 16718362
+    }
+  },
+  "fill_0": {
+    "class_type": "ImageCompositeMasked",
+    "inputs": {
+      "destination": [
+        "work",
+        0
+      ],
+      "source": [
+        "colour_0",
+        0
+      ],
+      "x": 0,
+      "y": 0,
+      "resize_source": false,
+      "mask": [
+        "p0_track",
+        0
+      ]
+    }
+  },
+  "colour_1": {
+    "class_type": "EmptyImage",
+    "inputs": {
+      "width": [
+        "work_size",
+        0
+      ],
+      "height": [
+        "work_size",
+        1
+      ],
+      "batch_size": 1,
+      "color": 1723903
+    }
+  },
+  "fill_1": {
+    "class_type": "ImageCompositeMasked",
+    "inputs": {
+      "destination": [
+        "fill_0",
+        0
+      ],
+      "source": [
+        "colour_1",
+        0
+      ],
+      "x": 0,
+      "y": 0,
+      "resize_source": false,
+      "mask": [
+        "p1_track",
+        0
+      ]
+    }
+  },
+  "tracks_start": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "round(0 * a)",
+      "values.a": [
+        "source_parts",
+        2
+      ]
+    }
+  },
+  "tracks_length": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(1, round(6.7 * a))",
+      "values.a": [
+        "source_parts",
+        2
+      ]
+    }
+  },
+  "tracks_frames": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "fill_1",
+        0
+      ],
+      "batch_index": [
+        "tracks_start",
+        1
+      ],
+      "length": [
+        "tracks_length",
+        1
+      ]
+    }
+  },
+  "tracks_video": {
+    "class_type": "CreateVideo",
+    "inputs": {
+      "images": [
+        "tracks_frames",
+        0
+      ],
+      "fps": [
+        "source_parts",
+        2
+      ]
+    }
+  },
+  "save_tracks": {
+    "class_type": "SaveVideo",
+    "inputs": {
+      "video": [
+        "tracks_video",
+        0
+      ],
+      "filename_prefix": "open_cinema/cast_tracks",
+      "format": "mp4",
+      "format.codec": "h264",
+      "format.codec.encoding": "re-encode",
+      "format.codec.encoding.crf": 20
+    }
+  },
+  "reference_0": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "reference-0.png"
+    }
+  },
+  "reference_1": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "reference-1.png"
+    }
+  },
+  "reference_2": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "reference-2.png"
+    }
+  },
+  "reference_3": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "reference-3.png"
+    }
+  },
+  "wan": {
+    "class_type": "Wan3ReferenceToVideoApi",
+    "inputs": {
+      "model": "wan3.0-video",
+      "model.prompt": "In Video 1, replace 2 subjects and leave everyone and everything else exactly as filmed. Video 2 is the same footage as Video 1 from 0.0 s to 6.7 s, with each subject to replace filled in one flat colour that stays on them throughout. It only shows who is who: the result has no flat colours, and nobody's face, hair or clothes come from Video 2. Person 1, filled in red in Video 2, becomes Cal, shown in Image 1 and Image 2: A man in his late sixties with swept-back silver hair, in a charcoal wool overcoat, navy sweater, dark trousers and black shoes. Take the face only from the close portrait in Image 1. Image 2 is a character sheet: body, build, hair from behind and clothing; the heads are left out of the full-body panels on purpose. Person 2, filled in blue in Video 2, becomes Cal, shown in Image 3 and Image 4: A man in his late sixties with swept-back silver hair, in a charcoal wool overcoat, navy sweater, dark trousers and black shoes. Take the face only from the close portrait in Image 3. Image 4 is a character sheet: body, build, hair from behind and clothing; the heads are left out of the full-body panels on purpose. Keep the place, the light and everyone else exactly as in Video 1. Each new person copies every step, gesture and expression of the person they replace, with the same timing, the same camera framing and the same camera movement as Video 1. Photorealistic.",
+      "model.resolution": "720P",
+      "model.ratio": "adaptive",
+      "model.duration": "8",
+      "model.audio": false,
+      "model.prompt_extend": false,
+      "model.reference_images.image1": [
+        "reference_0",
+        0
+      ],
+      "model.reference_images.image2": [
+        "reference_1",
+        0
+      ],
+      "model.reference_images.image3": [
+        "reference_2",
+        0
+      ],
+      "model.reference_images.image4": [
+        "reference_3",
+        0
+      ],
+      "model.reference_videos.video1": [
+        "source",
+        0
+      ],
+      "model.reference_videos.video2": [
+        "tracks_video",
+        0
+      ],
+      "seed": 20261030,
+      "watermark": false
+    }
+  },
+  "result_parts": {
+    "class_type": "GetVideoComponents",
+    "inputs": {
+      "video": [
+        "wan",
+        0
+      ]
+    }
+  },
+  "result_video": {
+    "class_type": "CreateVideo",
+    "inputs": {
+      "images": [
+        "result_parts",
+        0
+      ],
+      "fps": [
+        "result_parts",
+        2
+      ],
+      "audio": [
+        "source_parts",
+        1
+      ]
+    }
+  },
+  "save_result": {
+    "class_type": "SaveVideo",
+    "inputs": {
+      "video": [
+        "result_video",
+        0
+      ],
+      "filename_prefix": "open_cinema/cast",
+      "format": "mp4",
+      "format.codec": "h264",
+      "format.codec.encoding": "re-encode",
+      "format.codec.encoding.crf": 16
+    }
+  }
+}

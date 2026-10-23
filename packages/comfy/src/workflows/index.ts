@@ -75,7 +75,18 @@ export {
   wan3Duration,
   wan3MovesOutputs,
   wan3MovesPrompt,
+  wan3TrackedCastPrompt,
 } from "./moves";
+export {
+  SAM3_MODEL,
+  TRACK_COLOURS,
+  trackWindow,
+  WAN3_CAST_JOB_MODEL,
+  WAN3_CAST_LIMITS,
+  WAN3_CAST_MODEL_ID,
+  WAN3_CAST_OUTPUT_NODES,
+  wan3CastGraph,
+} from "./wan3-cast";
 export {
   WAN_ANIMATE_MODEL_ID,
   WAN_ANIMATE_OUTPUT_NODES,

@@ -35,10 +35,17 @@ export function estimateReplacement(
     engine: MotionEngine;
     seconds: number | null;
     resolution: MotionResolution;
+    /** Tagged people: Wan 3.0 also reads SAM 3.1's tracks. */
+    tagged?: boolean;
   } = { engine: "wan-3", seconds: sourceSeconds, resolution: "720p" },
 ): GenerationEstimate {
   if (kind === "moves")
-    return movesEstimate(moves.engine, moves.seconds, moves.resolution);
+    return movesEstimate(
+      moves.engine,
+      moves.seconds,
+      moves.resolution,
+      moves.tagged,
+    );
   if (kind === "object") return cloudEstimate("swap");
   if (kind === "area")
     return cloudEstimate(extend.areaAdds ? "area-add" : "area");

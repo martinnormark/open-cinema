@@ -81,7 +81,18 @@ import {
   WAN_ANIMATE_OUTPUT_NODES,
   wanAnimateGraph,
 } from "./wan-animate";
-import { moveKeyframePrompt, wanAnimatePrompt } from "./moves";
+import {
+  moveKeyframePrompt,
+  wan3TrackedCastPrompt,
+  wanAnimatePrompt,
+} from "./moves";
+import {
+  trackWindow,
+  WAN3_CAST_MEDIA_INPUTS,
+  WAN3_CAST_MODEL_ID,
+  WAN3_CAST_OUTPUT_NODES,
+  wan3CastGraph,
+} from "./wan3-cast";
 
 /**
  * Every ComfyUI graph the app runs on Comfy Cloud, built by the same functions
@@ -392,6 +403,67 @@ function moves(): WorkflowExport {
   };
 }
 
+/**
+ * Two tagged people on one frame of an 8 s clip, tracked by SAM 3.1, each
+ * becoming a Character on Wan 3.0 inside the graph (docs/copy-the-moves.md).
+ */
+function trackedCast(): WorkflowExport {
+  const tracks = trackWindow(8, [2.5]);
+  const references = 4;
+  const graph = wan3CastGraph({
+    targets: [
+      {
+        x: 0.47,
+        y: 0.3,
+        seconds: 2.5,
+        box: { x: 0.3, y: 0.13, w: 0.36, h: 0.58 },
+      },
+      { x: 0.17, y: 0.42, seconds: 2.5 },
+    ],
+    tracks,
+    wan: {
+      prompt: wan3TrackedCastPrompt({
+        swaps: [1, 2].map((person) => ({
+          person,
+          element: EXAMPLE_CHARACTER,
+          images: [
+            { n: person * 2 - 1, view: "face-closeup" as const },
+            { n: person * 2, view: "sheet" as const },
+          ],
+        })),
+        tracks,
+        clipSeconds: 8,
+        location: undefined,
+        locationImages: [],
+        direction: "",
+      }),
+      resolution: "720P",
+      duration: "8",
+      seed: SEED % 2 ** 31,
+      images: references,
+      sound: true,
+    },
+  });
+  return {
+    file: "moves/sam3-wan3-cast.api.json",
+    title:
+      "Copy the moves with tagged people: SAM 3.1 tracks who is who, Wan 3.0 swaps them (8 s)",
+    usedBy: `video.performance-transfer (${WAN3_CAST_MODEL_ID})`,
+    ...withFiles(graph, [
+      [WAN3_CAST_MEDIA_INPUTS.source, "source.mp4"],
+      ...Array.from(
+        { length: references },
+        (_, i) =>
+          [WAN3_CAST_MEDIA_INPUTS.reference(i), `reference-${i}.png`] as [
+            { node: string; field: string },
+            string,
+          ],
+      ),
+    ]),
+    outputs: WAN3_CAST_OUTPUT_NODES,
+  };
+}
+
 /** A Character as a resolved mention, for the exported examples. */
 const EXAMPLE_CHARACTER = {
   elementId: "example",
@@ -476,6 +548,7 @@ export function workflowExports(): WorkflowExport[] {
     performance("edges"),
     performance("edges-detailed"),
     moves(),
+    trackedCast(),
     recast(),
   ];
 }

@@ -95,6 +95,7 @@ it("is a Cloud graph with no follow-up stages", () => {
     "save_result",
     "save_keyframe",
     "save_control",
+    "save_tracks",
   ]);
 });
 

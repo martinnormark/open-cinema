@@ -821,6 +821,45 @@
     ]
   },
   {
+    "file": "moves/sam3-wan3-cast.api.json",
+    "title": "Copy the moves with tagged people: SAM 3.1 tracks who is who, Wan 3.0 swaps them (8 s)",
+    "usedBy": "video.performance-transfer (comfy-cloud/sam3-wan3-cast)",
+    "inputs": [
+      {
+        "node": "source",
+        "field": "file",
+        "file": "source.mp4"
+      },
+      {
+        "node": "reference_0",
+        "field": "image",
+        "file": "reference-0.png"
+      },
+      {
+        "node": "reference_1",
+        "field": "image",
+        "file": "reference-1.png"
+      },
+      {
+        "node": "reference_2",
+        "field": "image",
+        "file": "reference-2.png"
+      },
+      {
+        "node": "reference_3",
+        "field": "image",
+        "file": "reference-3.png"
+      }
+    ],
+    "outputs": [
+      "save_result",
+      "save_tracks"
+    ],
+    "models": [
+      "sam3.1_multiplex_fp16.safetensors"
+    ]
+  },
+  {
     "file": "experiments/ltx-recast.api.json",
     "title": "Recast on LTX 2.5 (experiment, not in the Worker)",
     "usedBy": null,
