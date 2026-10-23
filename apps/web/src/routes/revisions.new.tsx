@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { z } from "zod";
 import { ArrowLeft } from "lucide-react";
-import { PageHeader } from "@/components/page-header";
 import { parseAssetRefKey } from "@/features/library";
 import { ReplacementStudio } from "@/features/revision/replacement-studio";
+import { TaskHero } from "@/features/revision/task-hero";
+import { takeGoalForKind } from "@/features/start/goals";
 import { replacementKindSchema } from "@/features/revision/model";
 import { getProjectHome, getRevisionView } from "@/server/revisions";
 
@@ -34,13 +35,21 @@ export const Route = createFileRoute("/revisions/new")({
       draft: retry?.signedIn && retry.revision ? retry.decisions : null,
     };
   },
-  head: () => ({ meta: [{ title: "New revision · Open Cinema" }] }),
+  head: ({ match }) => ({
+    meta: [
+      {
+        title: `${takeGoalForKind(match.search.kind ?? "background").title} · Open Cinema`,
+      },
+    ],
+  }),
   component: NewRevision,
 });
 
 function NewRevision() {
   const { project, draft } = Route.useLoaderData();
   const search = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const kind = search.kind ?? draft?.kind ?? "background";
   return (
     <section
       className="mx-auto w-full max-w-7xl px-6 pt-8 pb-32 md:px-10 md:pt-10"
@@ -55,15 +64,20 @@ function NewRevision() {
           <ArrowLeft aria-hidden="true" className="size-3.5" /> {project.name}
         </Link>
       )}
-      <PageHeader
-        title="Change a take"
-        description="Pick what changes. Everything else stays as shot, and the original sits beside the result."
-      />
-      <div className="mt-8">
+      <TaskHero kind={kind} />
+      <div className="mt-10 md:mt-12">
         <ReplacementStudio
-          key={`${search.source ?? ""}-${search.kind ?? ""}-${search.element ?? ""}-${search.retry ?? ""}`}
+          key={`${search.source ?? ""}-${search.element ?? ""}-${search.retry ?? ""}`}
           initialSource={search.source ? parseAssetRefKey(search.source) : null}
-          initialKind={search.kind}
+          kind={kind}
+          kindChosen={search.kind !== undefined || !!draft?.kind}
+          onKind={(next) =>
+            void navigate({
+              search: (prev) => ({ ...prev, kind: next }),
+              replace: true,
+              resetScroll: false,
+            })
+          }
           initialElementId={search.element}
           projectId={project?.id}
           parentRevisionId={search.parent}

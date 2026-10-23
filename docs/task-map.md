@@ -46,4 +46,4 @@ These are goals creators ask for that we cannot do well enough to promise. Each 
 - A goal that needs an Element shows the creator's own; with none, it offers to make one.
 - Where the Element is the change (Replace background, Recast, Swap an object), the creator's only ready Element of that type is chosen for them on the front page and in the revision studio; with several, they pick. Typing `@Name` in the studio's words chooses that Element too, and switching between modes that take the same type keeps it.
 - `apps/web/test/start-goals.test.ts` fails if a revision mode has no goal, so a new mode cannot ship without a way in.
-- The sidebar holds Start, Studio, Elements, Sequences and Library (decided 2026-10-18). Activity opens from the Orb, Recipes from Studio, and Projects from Sequences.
+- The sidebar holds Start, Studio, Elements, Sequences and Library (decided 2026-10-18). Activity opens from the Orb, Recipes from Studio, and Projects from Sequences. On 2026-10-23 navigation moved to a top bar that also lists every take goal, each opening its task page with a hero (DESIGN.md, "The top bar").

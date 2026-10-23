@@ -241,14 +241,20 @@ const MOVES_RESOLUTIONS: Record<
 
 export function ReplacementStudio({
   initialSource,
-  initialKind,
+  kind,
+  kindChosen,
+  onKind,
   initialElementId,
   projectId,
   parentRevisionId,
   draft,
 }: {
   initialSource?: AssetRef | null;
-  initialKind?: ReplacementKind | undefined;
+  /** The mode, kept in the address so the top bar and the hero follow it. */
+  kind: ReplacementKind;
+  /** Chosen already (in the top bar, on the front page or by a retry). */
+  kindChosen: boolean;
+  onKind: (kind: ReplacementKind) => void;
   initialElementId?: string | undefined;
   projectId?: string | undefined;
   parentRevisionId?: string | undefined;
@@ -272,14 +278,9 @@ export function ReplacementStudio({
     sourceKey === null
       ? (videos[0] ?? null)
       : (videos.find((v) => assetRefKey(v.ref) === sourceKey) ?? null);
-  const [kind, setKind] = useState<ReplacementKind>(
-    draft?.kind ?? initialKind ?? "background",
-  );
-  // Once a mode is chosen (here, or on the front page) the ten options fold
-  // into one line; they open again from "Change".
-  const [pickingKind, setPickingKind] = useState(
-    !draft?.kind && initialKind === undefined,
-  );
+  // Once a mode is chosen (here, in the top bar or on the front page) the
+  // ten options fold into one line; they open again from "Change".
+  const [pickingKind, setPickingKind] = useState(!kindChosen);
   const kindToggle = useRef<HTMLButtonElement>(null);
   function closeKinds() {
     setPickingKind(false);
@@ -400,6 +401,19 @@ export function ReplacementStudio({
   const [maskEpoch, setMaskEpoch] = useState(0);
 
   const elementType = kindElementTypes[kind];
+  // The mode changes from the picker below or from the top bar; either way
+  // the choices that belonged to the old mode reset here, during render.
+  const [shownKind, setShownKind] = useState(kind);
+  if (shownKind !== kind) {
+    setShownKind(kind);
+    // Cal stays chosen from Redo a moment to Recast; a Location from Restyle to Replace background.
+    if (kindElementTypes[shownKind] !== elementType) {
+      setElementId(undefined);
+      setStateId(null);
+    }
+    setPendingKey(null);
+    setError("");
+  }
   const candidates = elementType
     ? elements.filter((e) => e.type === elementType)
     : [];
@@ -633,15 +647,7 @@ export function ReplacementStudio({
     );
 
   function chooseKind(next: ReplacementKind) {
-    if (next === kind) return;
-    setKind(next);
-    // Cal stays chosen from Redo a moment to Recast; a Location from Restyle to Replace background.
-    if (kindElementTypes[next] !== elementType) {
-      setElementId(undefined);
-      setStateId(null);
-    }
-    setPendingKey(null);
-    setError("");
+    if (next !== kind) onKind(next);
   }
   /** A mention of the mode's Element type in the words chooses that Element. */
   function writeDirection(next: string) {

@@ -1,23 +1,6 @@
 import { useRef, useState, type CSSProperties } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import {
-  Brush,
-  ChevronDown,
-  Expand,
-  FastForward,
-  Film,
-  Footprints,
-  Mountain,
-  Package,
-  Palette,
-  PenLine,
-  RotateCcw,
-  Sparkles,
-  Upload,
-  UserRound,
-  Video,
-  type LucideIcon,
-} from "lucide-react";
+import { ChevronDown, Upload } from "lucide-react";
 import {
   approvedMotionReferences,
   assetRefKey,
@@ -51,43 +34,10 @@ import {
   type TakeGoal,
   type WorldGoal,
 } from "./goals";
+import { GOAL_ICONS } from "./goal-icons";
 import { bringSampleTake } from "./starter";
 import { StarterWorld } from "./starter-card";
 import "./start.css";
-
-const GOAL_ICONS: Record<GoalId, LucideIcon> = {
-  move: Mountain,
-  recast: UserRound,
-  moves: Footprints,
-  swap: Package,
-  fix: Brush,
-  redo: RotateCcw,
-  longer: FastForward,
-  reframe: Expand,
-  effect: Sparkles,
-  look: Palette,
-  camera: Video,
-  shot: PenLine,
-  scene: Film,
-};
-
-/**
- * What each take goal looks like done, on real footage: a short loop in
- * public/examples, a wipe from the take to the result where both exist.
- */
-const EXAMPLES: Record<Exclude<GoalId, "shot" | "scene">, string> = {
-  move: "the kitchen table take, moved to a cottage by the sea",
-  recast: "the young man at the table, played by another Character",
-  moves: "a studio dance, performed by Cal at the Tide Mill",
-  swap: "the table lamp swapped for the storm lantern",
-  fix: "the glass on the table painted out",
-  redo: "a second and a half of his answer, acted again",
-  longer: "the kitchen take, carried on three seconds past its end",
-  reframe: "a wide take made vertical, the ceiling and floor drawn in",
-  effect: "day for night on a street-side take",
-  look: "a daytime café take restyled to evening",
-  camera: "the café take, filmed from a step further back",
-};
 
 /**
  * The front page: what you can do, as goals. A take goal starts from footage
@@ -419,7 +369,7 @@ function TakeStage({ goal }: { goal: TakeGoal }) {
           key={`example-${goal.id}`}
           className="start-swap absolute top-3 left-3 max-w-[calc(100%-1.5rem)] truncate rounded-sm bg-background/80 px-2 py-1 text-xs text-foreground/85"
         >
-          Example: {EXAMPLES[goal.id as keyof typeof EXAMPLES]}
+          Example: {goal.example}
         </p>
         <div className="relative flex flex-wrap items-end justify-between gap-x-6 gap-y-4 p-5 sm:p-6">
           <div className="min-w-0 max-w-sm">

@@ -139,7 +139,7 @@ Components never use the primitives directly; they use the roles below, which al
 
 ### Neutral (surfaces, darkest to lightest)
 
-`background` (app canvas) → `sidebar` (navigation rail) → `surface` (`card`: panels, cards, empty frames) → `elevated` (`popover`: menus, dialogs, the floating Orb) → `secondary`/`muted` (quiet fills, tab lists, tracks) → `hover` (`accent`: hover and highlighted rows) → `border`, `input` (hairlines; `input` is a step brighter for form controls).
+`background` (app canvas and the top bar) → `sidebar` (the navigation sheet on phones and tablets) → `surface` (`card`: panels, cards, empty frames) → `elevated` (`popover`: menus, dialogs, the floating Orb) → `secondary`/`muted` (quiet fills, tab lists, tracks) → `hover` (`accent`: hover and highlighted rows) → `border`, `input` (hairlines; `input` is a step brighter for form controls).
 
 ### Type colours
 
@@ -188,7 +188,19 @@ Use the `tabular` class for costs, durations, seeds, percentages and anything th
 
 ## Layout
 
-A collapsible sidebar rail (16rem, icon-only when collapsed) and a 3.5rem header, with page content in a centred column of at most 72rem (`max-w-6xl`), padded 1.5rem on phones and 3rem from `md`. Spacing is Tailwind's 0.25rem unit; group tightly inside a component and separate generously between groups, with more space above a heading than below it. On phones the sidebar becomes a sheet, the header carries the lockup, and the Orb moves into the header row so it never covers creative controls.
+A sticky 3.5rem top bar on the canvas colour, with page content below in a centred column of at most 72rem (`max-w-6xl`; task pages use 80rem, `max-w-7xl`), padded 1.5rem on phones and 3rem from `md`. Spacing is Tailwind's 0.25rem unit; group tightly inside a component and separate generously between groups, with more space above a heading than below it.
+
+### The top bar
+
+[`AppTopBar`](apps/web/src/components/app-top-bar.tsx), left to right: the lockup (it is the way home to Start), the places you make from (Studio, Sequences), a hairline, every way to change a take, then the shelves (Elements, Library) and Settings as an icon. The tasks are what creators came for, so they read a step brighter than the places around them, use one- or two-word labels (`short` in [`goals.ts`](apps/web/src/features/start/goals.ts)), and open the task page directly.
+
+- **Priority, not truncation.** From `lg` five tasks sit inline and the rest wait under "More"; from `xl` eight sit inline and "More" holds effects, looks and the camera. Never shrink the type or let the bar scroll to fit more.
+- **One lamp.** The current item carries a 2px tungsten line on the bar's bottom hairline, which glides between items on `transform` only (tabs sliding, `--duration-fast`). A task folded under "More" lights "More".
+- **Below `lg`** the places fold into a sheet from the left (`bg-sidebar`), the bar carries the menu button and the lockup, and the tasks become a strip of chips under the bar that scrolls sideways with faded ends; the current chip is tungsten-edged and centred in view. On phones the Orb moves into the bar's row so it never covers creative controls.
+
+### Task pages
+
+Each take goal has a page (`/revisions/new?kind=…`) that opens with a hero: the goal's icon in tungsten and its title (`text-title`, the page's `h1`), its promise in one sentence, what it keeps, and the goal done on real footage as a 16:9 loop on `bg-letterbox` with a scrim caption. The mode lives in the address, so the top bar, the hero and the studio's "What changes" stay in step; changing it swaps the hero in place (texts reveal, one stagger apart) and keeps the chosen take.
 
 ## Elevation & Depth
 
@@ -224,13 +236,13 @@ Assets: `apps/web/public/favicon.svg` (and `favicon.png`, `apple-touch-icon.png`
 - **Captions over media:** `bg-scrim/85 text-on-media text-caption`, `rounded-md` (the film's caption pill).
 - **Job state:** `.job-status` with a dot that repeats the word, never replaces it; live state breathes in tungsten, progress fills move by `transform`.
 - **End card:** the film's closing frame (`.end-card` in `styles.css`): a tungsten flood with the ink mark, display type in ink, secondary text tinted from the ink (never grey), and an ink pill action with tungsten type. Used where the reel runs out (the not-found page). Not for errors, which stay quiet in `EmptyState`, and never inside the working studio.
-- **Real work on screen:** each take goal on the front page plays a short loop of that mode done on real footage (`apps/web/public/examples`); where the studio is empty it offers the Tide Mill starter world ([`starter-world.ts`](apps/web/src/features/start/starter-world.ts)). Use media the studio actually made; never stock.
+- **Real work on screen:** each take goal on the front page and at the top of its task page plays a short loop of that mode done on real footage (`apps/web/public/examples`); where the studio is empty it offers the Tide Mill starter world ([`starter-world.ts`](apps/web/src/features/start/starter-world.ts)). Use media the studio actually made; never stock.
 
 ### Motion
 
 Two registers, both tokens in `styles.css`:
 
-- **Interface** (transitions.dev scale, `--duration-*`, `--ease-smooth-out`), matched by purpose, not nearest number. Dialogs, menus and selects open in `--duration-fast` (250ms) and close in `--duration-quick` (150ms); dialogs scale from 0.96, menus from 0.97. The mobile sidebar sheet opens in `--duration-slow` and closes in `--duration-medium`. A chosen option in a list moves as one sliding fill. Pictures still loading resolve in with `img-reveal`; cached pictures never wait.
+- **Interface** (transitions.dev scale, `--duration-*`, `--ease-smooth-out`), matched by purpose, not nearest number. Dialogs, menus and selects open in `--duration-fast` (250ms) and close in `--duration-quick` (150ms); dialogs scale from 0.96, menus from 0.97. The navigation sheet opens in `--duration-slow` and closes in `--duration-medium`; the top bar's lamp glides in `--duration-fast`. A chosen option in a list moves as one sliding fill. Pictures still loading resolve in with `img-reveal`; cached pictures never wait.
 - **Brand** (from the film): arrivals on `--ease-expo-out` with a short blur-to-sharp resolve, the mark landing on `--ease-back-out` from scale 0.2 and -20°, exits faster than entrances on `--ease-exit`, and choreography on the film's beat, `--duration-beat` (469ms, 128 BPM). Brand motion is for brand moments only: the end card, and any future splash or reveal. One authored moment per screen.
 
 Every animation is `transform`, `opacity`, `filter` or `clip-path`, and is subject to the 60 fps requirement in [AGENTS.md](AGENTS.md). `prefers-reduced-motion: reduce` removes animation and transition globally; state must still read from text.

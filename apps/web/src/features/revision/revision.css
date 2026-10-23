@@ -337,3 +337,33 @@
 .kind-picker-label {
   animation: clip-person-status var(--duration-quick) ease-in-out;
 }
+
+/* Task hero: when the task changes its lines rise in, one stagger apart
+   (transitions.dev texts reveal), and the new example resolves over the
+   letterbox while the old one is already gone. Nothing waits on it. */
+.task-hero-line {
+  animation: task-hero-line var(--duration-very-slow) var(--ease-smooth-out)
+    calc(var(--line, 0) * var(--duration-stagger) * 2) backwards;
+}
+@keyframes task-hero-line {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+    filter: blur(3px);
+  }
+}
+.task-hero-clip {
+  animation: task-hero-clip var(--duration-slow) ease-in-out;
+}
+@keyframes task-hero-clip {
+  from {
+    opacity: 0;
+    filter: blur(2px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .task-hero-line,
+  .task-hero-clip {
+    animation: none;
+  }
+}

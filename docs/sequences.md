@@ -4,7 +4,7 @@ A sequence turns an idea into shots that belong together. Each shot keeps the
 project's cast, places and look, and is approved on its own, so continuity is
 built one decision at a time rather than hoped for in one long generation.
 
-Creators find it under **Sequences** in the sidebar (`/sequences`).
+Creators find it under **Sequences** in the top bar (`/sequences`).
 
 ## Planning
 

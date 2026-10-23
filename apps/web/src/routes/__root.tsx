@@ -6,15 +6,10 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import type { CSSProperties, ReactNode } from "react";
-import { AppSidebar } from "@/components/app-sidebar";
-import { BrandLockup, BrandMark } from "@/components/brand-mark";
+import { AppTopBar } from "@/components/app-top-bar";
+import { BrandMark } from "@/components/brand-mark";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar";
 import { GenerationOrb } from "@/features/generation/orb";
 import stylesUrl from "@/styles.css?url";
 
@@ -83,34 +78,21 @@ export const Route = createRootRoute({
 
 function AppLayout() {
   return (
-    <SidebarProvider>
+    <div className="flex min-h-svh flex-col">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground"
       >
         Skip to content
       </a>
-      <AppSidebar />
-      <SidebarInset>
-        <header className="studio-header flex h-14 shrink-0 items-center gap-3 border-b border-border px-3 md:px-4">
-          <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
-          {/* The sidebar carries the lockup on desktop; a phone shows it here. */}
-          <Link
-            to="/"
-            className="rounded-sm md:hidden"
-            aria-label="Open Cinema"
-          >
-            <BrandLockup className="text-lg" />
-          </Link>
-        </header>
-        <main id="main-content" tabIndex={-1} className="flex-1 outline-none">
-          <Outlet />
-        </main>
-      </SidebarInset>
+      <AppTopBar />
+      <main id="main-content" tabIndex={-1} className="flex-1 outline-none">
+        <Outlet />
+      </main>
       <aside aria-label="Generation activity">
         <GenerationOrb />
       </aside>
-    </SidebarProvider>
+    </div>
   );
 }
 
