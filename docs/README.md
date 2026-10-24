@@ -36,6 +36,7 @@ Primary entry points: [developer documentation](https://docs.comfy.org/developme
 - [Task map](task-map.md): the goals on the front page, the best workflow behind each today, what is missing and which Elements feed it.
 - [Take edits](take-edits.md): Make it longer, Redo a moment, Fix an area and Reframe; the workflows, the test runs behind each, costs and licences.
 - [Camera moves, Object Swap, Restyle and re-staging](revision-modes.md): the FLUX and LTX graphs on Comfy Cloud, their guardrails, check runs and limits.
+- [Change presets](change-presets.md): tested starting points for each revision mode, adapted from Scenario's ALTER skill, and how they fill the studio.
 - [Effects on a real take, built on LTX](vfx-ltx.md): the LTX VFX survey, the three effects (clear the set, add water, day for night), the graph, check runs and limits; our VFX-with-LTX entry.
 - [Third-party IP](third-party-ip.md): every model and LoRA the app uses, its provider and licence, and what the no-borrowed-IP rule removed.
 - [Re-stage IC-LoRA](restage-ic-lora.md): the plan for training our own re-staging adapter on LTX 2.3: data, trainer, compute and reach.

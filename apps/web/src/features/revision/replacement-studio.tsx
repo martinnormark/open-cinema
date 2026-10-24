@@ -117,6 +117,14 @@ import {
   type RevisionDecisions,
   type WardrobeIntent,
 } from "./model";
+import {
+  presetById,
+  sentenceCase,
+  presetFields,
+  presetsFor,
+  type ChangePreset,
+  type SlotValues,
+} from "./presets";
 import "./revision.css";
 
 /** What the player learns once the clip's metadata loads. */
@@ -298,6 +306,9 @@ export function ReplacementStudio({
     draft?.draft?.stateId ?? null,
   );
   const [direction, setDirection] = useState(draft?.direction ?? "");
+  /** A change preset fills the fields below from one or two short slots. */
+  const [presetId, setPresetId] = useState<string | null>(null);
+  const [slotValues, setSlotValues] = useState<SlotValues>({});
   const [target, setTarget] = useState<Target | null>(
     draft?.targetPoint ?? null,
   );
@@ -410,9 +421,11 @@ export function ReplacementStudio({
       setElementId(undefined);
       setStateId(null);
     }
+    setPresetId(null);
     setPendingKey(null);
     setError("");
   }
+  const preset = presetById(presetId);
   const candidates = elementType
     ? elements.filter((e) => e.type === elementType)
     : [];
@@ -645,6 +658,31 @@ export function ReplacementStudio({
     problems.push(
       `Copying the moves needs a clip of at least ${MOTION_LIMITS.minSeconds} seconds.`,
     );
+
+  /** Writes the preset's fields; the creator can still edit every one. */
+  function applyPreset(next: ChangePreset, values: SlotValues) {
+    const fields = presetFields(next, values);
+    setDirection(fields.direction);
+    if (next.wardrobe) setWardrobe(next.wardrobe);
+    if (fields.wardrobeNote !== null) setWardrobeNote(fields.wardrobeNote);
+    if (next.effect) setEffect(next.effect);
+    if (next.aspect) setAspectChoice(next.aspect);
+    setPendingKey(null);
+  }
+  /** Choosing the chosen preset again lets it go; the words stay. */
+  function choosePreset(next: ChangePreset) {
+    if (next.id === presetId) return setPresetId(null);
+    const values: SlotValues = {};
+    setPresetId(next.id);
+    setSlotValues(values);
+    applyPreset(next, values);
+  }
+  function writeSlot(key: string, value: string) {
+    if (!preset) return;
+    const values = { ...slotValues, [key]: value };
+    setSlotValues(values);
+    applyPreset(preset, values);
+  }
 
   function chooseKind(next: ReplacementKind) {
     if (next !== kind) onKind(next);
@@ -1498,6 +1536,21 @@ export function ReplacementStudio({
           </p>
         </fieldset>
 
+        {presetsFor(kind).length > 0 && (
+          <PresetChoice
+            presets={presetsFor(kind)}
+            preset={preset}
+            values={slotValues}
+            onPreset={choosePreset}
+            onSlot={writeSlot}
+            edited={
+              !!preset &&
+              presetFields(preset, slotValues).direction !== direction
+            }
+            onRestore={() => preset && applyPreset(preset, slotValues)}
+          />
+        )}
+
         {kind === "object" && (
           <fieldset className="revision-reveal">
             <legend className="text-sm font-medium">What is replaced</legend>
@@ -1513,7 +1566,11 @@ export function ReplacementStudio({
                 setPendingKey(null);
               }}
               maxLength={200}
-              placeholder="The table lamp with the white shade"
+              placeholder={
+                preset?.replaced
+                  ? sentenceCase(preset.replaced)
+                  : "The table lamp with the white shade"
+              }
               aria-label="The object to replace"
               className="mt-2 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
             />
@@ -3711,6 +3768,106 @@ function AreaHint({
           </Button>
         )}
       </div>
+    </fieldset>
+  );
+}
+
+/**
+ * Tested starting points for the mode. A chosen preset opens its one or two
+ * slots; what is typed there rewrites the words below, which stay editable.
+ */
+function PresetChoice({
+  presets,
+  preset,
+  values,
+  onPreset,
+  onSlot,
+  edited,
+  onRestore,
+}: {
+  presets: readonly ChangePreset[];
+  preset: ChangePreset | null;
+  values: SlotValues;
+  onPreset: (preset: ChangePreset) => void;
+  onSlot: (key: string, value: string) => void;
+  /** The words no longer match the preset; slots would overwrite them. */
+  edited: boolean;
+  onRestore: () => void;
+}) {
+  return (
+    <fieldset>
+      <legend className="text-sm font-medium">Start from a preset</legend>
+      <ul className="mt-2 flex flex-wrap gap-1.5">
+        {presets.map((option) => {
+          const on = option.id === preset?.id;
+          return (
+            <li key={option.id}>
+              <button
+                type="button"
+                aria-pressed={on}
+                onClick={() => onPreset(option)}
+                className={cn(
+                  "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  on
+                    ? "border-tungsten/70 bg-surface text-foreground"
+                    : "border-border text-muted-foreground hover:bg-surface hover:text-foreground",
+                )}
+              >
+                {on && <Check aria-hidden="true" className="size-3" />}
+                {option.name}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      {preset && (
+        <div key={preset.id} className="revision-reveal mt-3 grid gap-3">
+          <p className="text-xs leading-5 text-muted-foreground">
+            {preset.result}
+            {preset.slots.length > 0 &&
+              !edited &&
+              " A gap left empty uses its example."}
+          </p>
+          {edited ? (
+            <p className="flex flex-wrap items-center gap-x-2 text-xs leading-5 text-muted-foreground">
+              You have changed the words, so the preset’s gaps are put away.
+              <button
+                type="button"
+                onClick={onRestore}
+                className="inline-flex items-center gap-1 rounded-sm text-foreground underline underline-offset-2 outline-none hover:text-tungsten focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <RotateCcw aria-hidden="true" className="size-3" />
+                Use the preset’s words
+              </button>
+            </p>
+          ) : (
+            preset.slots.map((slot) => (
+              <div key={slot.key}>
+                <label
+                  htmlFor={`preset-${slot.key}`}
+                  className="text-xs font-medium"
+                >
+                  {slot.label}
+                </label>
+                <input
+                  id={`preset-${slot.key}`}
+                  value={values[slot.key] ?? ""}
+                  onChange={(event) => onSlot(slot.key, event.target.value)}
+                  maxLength={200}
+                  placeholder={slot.example}
+                  className="mt-1.5 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                />
+              </div>
+            ))
+          )}
+          {preset.reference && (
+            <p className="text-xs leading-5 text-muted-foreground">
+              <span className="text-foreground">Works best: </span>
+              {preset.reference}
+            </p>
+          )}
+        </div>
+      )}
     </fieldset>
   );
 }
