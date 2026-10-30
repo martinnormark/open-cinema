@@ -39,7 +39,6 @@ function element(type: ElementType, references: ElementReference[]): Element {
   return {
     id: "e",
     ownerId: "me",
-    projectId: null,
     type,
     name: "Lantern",
     handle: "Lantern",

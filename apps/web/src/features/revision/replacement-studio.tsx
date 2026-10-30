@@ -256,7 +256,6 @@ export function ReplacementStudio({
   kindChosen,
   onKind,
   initialElementId,
-  projectId,
   parentRevisionId,
   draft,
 }: {
@@ -267,7 +266,6 @@ export function ReplacementStudio({
   kindChosen: boolean;
   onKind: (kind: ReplacementKind) => void;
   initialElementId?: string | undefined;
-  projectId?: string | undefined;
   parentRevisionId?: string | undefined;
   /** A failed revision's choices, for "Try again". Read once, at mount. */
   draft?: RevisionDecisions | null | undefined;
@@ -1354,7 +1352,6 @@ export function ReplacementStudio({
       const result = await submitRevision({
         data: {
           idempotencyKey: key,
-          projectId,
           parentRevisionId,
           intent: intentSentence(),
           request,
@@ -2131,18 +2128,6 @@ export function ReplacementStudio({
                   {card.runsOn}
                 </span>
               )}
-            </dd>
-            <dt className="text-muted-foreground">Project look</dt>
-            <dd>
-              {kind === "background"
-                ? projectId
-                  ? "Palette, light and texture follow the project"
-                  : "None: no project chosen"
-                : kind === "restyle"
-                  ? "Not applied: the style you choose sets the look"
-                  : kind === "character"
-                    ? "Not applied: a recast changes the person, not the look"
-                    : "Not applied: the result keeps the source’s look"}
             </dd>
             {shouldShowEstimate(preferences, "video") && (
               <>

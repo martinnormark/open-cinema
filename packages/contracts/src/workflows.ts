@@ -33,7 +33,7 @@ const prompt = z.string().trim().min(3).max(2000);
 /** A short noun phrase for something in the frame, e.g. "the dancer on the left". */
 const objectPhraseSchema = z.string().trim().min(3).max(200);
 const mentions = z.array(elementMentionSchema).max(8).default([]);
-/** The project look, shot overrides and recipe this generation was directed with. */
+/** The look, shot choices and recipe this generation was directed with. */
 const direction = directionSnapshotSchema.optional();
 
 export const imageAspectRatioSchema = z.enum([
@@ -160,7 +160,7 @@ export const backgroundReplaceInputsSchema = z.object({
    * travels too far for Kling to hold the new setting.
    */
   pipeline: backgroundPipelineSchema.default("kling"),
-  /** The project look the new setting should follow (palette, light, texture). */
+  /** The look the new setting should follow (palette, light, texture). */
   direction,
 });
 export type BackgroundReplaceInputs = z.infer<
@@ -490,7 +490,6 @@ export type GenerationRequestInput = z.input<typeof generationRequestSchema>;
 export const workflowCommandSchema = z.object({
   idempotencyKey: z.string().uuid(),
   request: generationRequestSchema,
-  projectId: z.string().min(1).optional(),
   /** Set when this generation is a selective revision of an existing source. */
   revision: z
     .object({

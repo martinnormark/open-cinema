@@ -61,13 +61,9 @@ const withShots = { shots: { include: { takes: true } } } as const;
 export async function listSequences(
   db: DatabaseContext,
   scope: OwnerScope,
-  filter: { projectId?: string } = {},
 ): Promise<SequenceSummary[]> {
   const rows = await getClient(db).sequence.findMany({
-    where: {
-      ownerId: scope.ownerId,
-      ...(filter.projectId ? { projectId: filter.projectId } : {}),
-    },
+    where: { ownerId: scope.ownerId },
     include: withShots,
     orderBy: { updatedAt: "desc" },
     take: 100,

@@ -35,7 +35,6 @@ function Revision() {
     <RevisionView
       key={view.revision.id}
       revision={view.revision}
-      project={view.project}
       decisions={view.decisions}
       history={view.history}
       checks={view.checks}

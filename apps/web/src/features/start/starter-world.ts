@@ -136,18 +136,6 @@ const manifest = {
   version: WORLD_VERSION,
   exportedAt: "2026-10-22T00:00:00.000Z",
   studio: { workflows: [], capabilities: [] },
-  project: {
-    name: "The Tide Mill",
-    direction:
-      "A flooded brick tide mill on the salt marsh, the morning after a storm. Grey skies, still water, cold light, and one warm lantern.",
-    look: {
-      palette: "cool-muted",
-      lighting: "overcast",
-      lens: "normal-35",
-      texture: "film-35",
-      pacing: "measured",
-    },
-  },
   elements: [
     {
       key: "cal",

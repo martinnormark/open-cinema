@@ -4,7 +4,6 @@ import type {
   GenerationRequest,
   ImageAspectRatio,
   Look,
-  Project,
   ShotDirection,
 } from "@open-cinema/contracts";
 import { mentionPayload, type useMentions } from "@/features/elements/mentions";
@@ -86,26 +85,18 @@ export function studioRequest(
     : { workflowKind: "image.flux", inputs: base };
 }
 
-/**
- * The direction a studio shot carries. The project look shown here is a
- * preview; the server records the project's current look at submission.
- */
+/** The direction a studio shot carries: its look, shot choices and recipe. */
 export function studioDirection(
-  project: Project | null,
   overrides: Look,
   shot: ShotDirection,
   recipe: { id: string; version: number; name: string } | null,
 ): DirectionSnapshot | undefined {
   const any =
-    project ||
     recipe ||
     Object.keys(overrides).length > 0 ||
     Object.values(shot).some(Boolean);
   if (!any) return undefined;
   return {
-    ...(project
-      ? { project: { id: project.id, name: project.name, look: project.look } }
-      : {}),
     overrides,
     shot,
     ...(recipe ? { recipe } : {}),

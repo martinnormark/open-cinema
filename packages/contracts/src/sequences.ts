@@ -123,7 +123,6 @@ export type Shot = z.infer<typeof shotSchema>;
 export const sequenceSchema = z.object({
   id: z.string(),
   ownerId: z.string(),
-  projectId: z.string().nullable(),
   title: z.string(),
   /** The rough idea or script the plan was made from. */
   idea: z.string(),
@@ -160,7 +159,6 @@ export type ShotDraft = z.infer<typeof shotDraftSchema>;
 export type ShotDraftInput = z.input<typeof shotDraftSchema>;
 
 export const createSequenceInputSchema = z.object({
-  projectId: z.string().min(1).optional(),
   title: z.string().trim().min(1).max(120),
   idea: z.string().trim().max(8000).default(""),
   shots: z.array(shotDraftSchema).max(MAX_SEQUENCE_SHOTS).default([]),
@@ -235,8 +233,7 @@ export function approvedTake(shot: Shot, role: TakeRole): ShotTake | null {
 
 /**
  * The shot's direction as one prompt: what the frame shows, then framing and
- * camera language. Identity stays in the mentions; the project's look is
- * added on submission from the project itself, as for every other shot.
+ * camera language. Identity stays in the mentions.
  */
 export function composeShotPrompt(
   shot: Pick<Shot, "prompt" | "beat" | "framing" | "camera"> &
@@ -256,7 +253,7 @@ export function composeShotPrompt(
 /** Ask the planner for shots from an idea, using the creator's Elements. */
 export const planSequenceInputSchema = z.object({
   idea: z.string().trim().min(3).max(8000),
-  /** The project's portrayal, so beats are framed to match it. */
+  /** A look to frame the beats to, if the creator gives one. */
   direction: z.string().max(2000).default(""),
   /** Handles the planner may use in prompts, with what each one is. */
   elements: z

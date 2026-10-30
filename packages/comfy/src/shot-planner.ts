@@ -83,7 +83,7 @@ function system(input: ReturnType<typeof planSequenceInputSchema.parse>) {
     "Use the creator's Elements wherever they fit, written as @Handle, or @Handle:state to show one of its listed states. Do not invent new handles or states; describe anything else in plain words.",
     "Keep each prompt under 60 words, concrete and visual. Keep the creator's own wording and intent.",
     input.direction
-      ? `The project's look (applied separately, do not repeat it): ${input.direction}`
+      ? `The look (applied separately, do not repeat it): ${input.direction}`
       : "",
     `Elements:\n${cast}`,
     `Answer only by calling ${TOOL.name} once.`,

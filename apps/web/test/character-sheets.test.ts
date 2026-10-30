@@ -39,7 +39,6 @@ const wet = {
 const cal: Element = {
   id: "cal",
   ownerId: "me",
-  projectId: null,
   type: "character",
   name: "Cal",
   handle: "Cal",

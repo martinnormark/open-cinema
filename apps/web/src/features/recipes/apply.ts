@@ -6,7 +6,6 @@ import {
   type Element,
   type ElementState,
   type Look,
-  type Project,
   type RecipeSpec,
 } from "@open-cinema/contracts";
 import { stateHandle } from "@/features/elements/model";
@@ -31,24 +30,15 @@ export function recipePrompt(spec: RecipeSpec, choices: SlotChoices) {
   return renderRecipe(spec.template, bindings);
 }
 
-/**
- * The direction a recipe applies with. Its look overrides the project's where
- * it says something; "keep the project look" applies only its shot choices.
- */
+/** The direction a recipe applies with: its look and its shot choices. */
 export function recipeDirection(
   recipe: { id: string; version: number; name: string },
   spec: RecipeSpec,
-  project: Project | null,
-  keepProjectLook: boolean,
 ): DirectionSnapshot {
-  const overrides: Look =
-    project && keepProjectLook
-      ? {}
-      : Object.fromEntries(Object.entries(spec.look).filter(([, v]) => v));
+  const overrides: Look = Object.fromEntries(
+    Object.entries(spec.look).filter(([, v]) => v),
+  );
   return {
-    ...(project
-      ? { project: { id: project.id, name: project.name, look: project.look } }
-      : {}),
     overrides,
     shot: spec.shot,
     recipe,

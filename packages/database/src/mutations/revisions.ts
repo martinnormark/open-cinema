@@ -20,7 +20,6 @@ export async function createRevision(
     workflowKind: WorkflowKind;
     intent: string;
     jobId?: string;
-    projectId?: string;
     parentRevisionId?: string;
   },
 ): Promise<Revision> {
@@ -38,7 +37,6 @@ export async function createRevision(
     data: {
       id: crypto.randomUUID(),
       ownerId: scope.ownerId,
-      projectId: input.projectId ?? null,
       parentRevisionId: input.parentRevisionId ?? null,
       sourceType: input.source.type,
       ...source,

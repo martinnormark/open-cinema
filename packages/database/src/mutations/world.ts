@@ -19,7 +19,6 @@ import {
   createElement,
   createElementState,
 } from "./elements";
-import { createProject } from "./projects";
 import { createRecipe } from "./recipes";
 import { addTake, createSequence, setTakeStatus } from "./sequences";
 
@@ -88,14 +87,6 @@ export async function importWorld(
     return assetId ? { type: "media-asset" as const, assetId } : null;
   };
 
-  const project = manifest.project
-    ? await createProject(db, scope, {
-        name: manifest.project.name,
-        direction: manifest.project.direction,
-        look: manifest.project.look,
-      })
-    : null;
-
   const renamed = new Map<string, string>();
   for (const element of manifest.elements) {
     const wanted = elementHandleSchema.safeParse(element.handle).success
@@ -106,7 +97,6 @@ export async function importWorld(
       name: element.name.slice(0, 80),
       handle: wanted,
       description: element.description,
-      ...(project ? { projectId: project.id } : {}),
     });
     if (created.handle !== element.handle)
       renamed.set(element.handle, created.handle);
@@ -173,7 +163,6 @@ export async function importWorld(
   const sequences: WorldImportResult["sequences"] = [];
   for (const world of manifest.sequences) {
     const sequence = await createSequence(db, scope, {
-      ...(project ? { projectId: project.id } : {}),
       title: world.title,
       idea: renameMentions(world.idea, renamed),
       shots: world.shots.map((shot) => ({
@@ -220,7 +209,6 @@ export async function importWorld(
   }
 
   return {
-    projectId: project?.id ?? null,
     elements: manifest.elements.length,
     recipes,
     sequences,

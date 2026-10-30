@@ -17,14 +17,13 @@ export function toMediaAsset(row: MediaAssetRow): MediaAsset {
 export async function listMediaAssets(
   db: DatabaseContext,
   scope: OwnerScope,
-  filter: { kind?: MediaKind; projectId?: string } = {},
+  filter: { kind?: MediaKind } = {},
 ): Promise<MediaAsset[]> {
   const rows = await getClient(db).mediaAsset.findMany({
     where: {
       ownerId: scope.ownerId,
       status: "ready",
       ...(filter.kind ? { kind: filter.kind } : {}),
-      ...(filter.projectId ? { projectId: filter.projectId } : {}),
     },
     orderBy: { createdAt: "desc" },
     take: 200,

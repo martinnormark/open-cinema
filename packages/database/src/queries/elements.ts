@@ -34,13 +34,12 @@ export function toElement(row: ElementRow): Element {
 export async function listElements(
   db: DatabaseContext,
   scope: OwnerScope,
-  filter: { type?: ElementType; projectId?: string } = {},
+  filter: { type?: ElementType } = {},
 ): Promise<Element[]> {
   const rows = await getClient(db).element.findMany({
     where: {
       ownerId: scope.ownerId,
       ...(filter.type ? { type: filter.type } : {}),
-      ...(filter.projectId ? { projectId: filter.projectId } : {}),
     },
     include,
     orderBy: { updatedAt: "desc" },

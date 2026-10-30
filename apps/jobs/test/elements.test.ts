@@ -7,7 +7,6 @@ import {
   createElement,
   createElementState,
   createPendingMediaAsset,
-  createProject,
   createRevision,
   markMediaAssetReady,
   setRevisionStatus,
@@ -47,12 +46,10 @@ it("authors an Element sheet with owner-checked references, approval versioning,
   const db = createDatabase(env.DB);
   const owner = { ownerId: crypto.randomUUID() };
   const stranger = { ownerId: crypto.randomUUID() };
-  const project = await createProject(db, owner, { name: "Harbor film" });
 
   const mara = await createElement(db, owner, {
     type: "character",
     name: "Mara Vey",
-    projectId: project.id,
   });
   expect(mara).toMatchObject({ handle: "MaraVey", version: 1 });
   const second = await createElement(db, owner, {

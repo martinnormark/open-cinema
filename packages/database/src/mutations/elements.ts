@@ -63,7 +63,6 @@ export async function createElement(
     data: {
       id: crypto.randomUUID(),
       ownerId: scope.ownerId,
-      projectId: data.projectId ?? null,
       type: data.type,
       name: data.name,
       handle,

@@ -303,7 +303,6 @@ export type RevisionDecisions = z.infer<typeof revisionDecisionsSchema>;
 
 export const revisionSubmissionSchema = z.object({
   idempotencyKey: z.string().uuid(),
-  projectId: z.string().min(1).optional(),
   parentRevisionId: z.string().min(1).optional(),
   intent: z.string().trim().min(1).max(2000),
   request: z.unknown(),

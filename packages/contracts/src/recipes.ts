@@ -161,8 +161,8 @@ const TYPE_LABELS: Record<ElementType, string> = {
 
 /**
  * A recipe draft from a generation that worked: each mentioned Element becomes
- * a slot of its type, and the look it was made with (project look plus shot
- * overrides) becomes the recipe's own, so it travels to other projects.
+ * a slot of its type, and the look it was made with becomes the recipe's own,
+ * so it travels to other shots.
  */
 export function recipeFromGeneration(
   request: GenerationRequest,

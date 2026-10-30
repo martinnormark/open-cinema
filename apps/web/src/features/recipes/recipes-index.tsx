@@ -56,7 +56,7 @@ export function RecipesIndex() {
           </p>
         ) : recipes.length === 0 ? (
           <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
-            None yet. Under any shot in a project, choose{" "}
+            None yet. Under any finished shot in the Studio or Activity, choose{" "}
             <span className="text-foreground">Save as recipe</span> to keep its
             prompt, look and Element roles; or open an example above and make it
             your own.

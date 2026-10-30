@@ -1,10 +1,9 @@
 import { z } from "zod";
 
 /**
- * Project direction: a shared look that every shot in a project inherits, and
- * the directing choices a single shot makes on top of it. Identity lives on
- * Elements, state on their states, and portrayal here, so a shot override never
- * rewrites the project or an approved Element.
+ * Direction: the look a shot is made with and the directing choices it makes.
+ * Identity lives on Elements, state on their states, and portrayal here, so a
+ * shot's direction never rewrites an approved Element.
  */
 
 export interface DirectionOption {
@@ -263,7 +262,7 @@ export const SHOT_FIELD_LABELS: Record<ShotField, string> = {
 
 /**
  * Directing choices a shot makes. Each was checked to make a visible
- * difference on FLUX 3 (see docs/project-direction.md); camera moves are a
+ * difference on FLUX 3 (see docs/direction.md); camera moves are a
  * separate preset set.
  */
 export const SHOT_OPTIONS: Record<ShotField, readonly DirectionOption[]> = {
@@ -346,10 +345,13 @@ export type ShotDirection = z.infer<typeof shotDirectionSchema>;
 
 /**
  * The direction a generation was made with, stored with its inputs so a result
- * records the project look at that moment, what this shot overrode, and the
- * recipe it came from.
+ * records the look it chose, its shot choices and the recipe it came from.
  */
 export const directionSnapshotSchema = z.object({
+  /**
+   * Legacy: the look of the project a shot was filed under. Projects are gone
+   * and nothing writes this, but stored generations still carry it.
+   */
   project: z
     .object({
       id: z.string().min(1),
@@ -357,7 +359,7 @@ export const directionSnapshotSchema = z.object({
       look: lookSchema,
     })
     .optional(),
-  /** Per-shot changes to the project look; an empty value turns a field off. */
+  /** The shot's look; over a legacy project look, an empty value turns a field off. */
   overrides: lookSchema.default({}),
   shot: shotDirectionSchema.default({}),
   recipe: z
@@ -371,7 +373,7 @@ export const directionSnapshotSchema = z.object({
 export type DirectionSnapshot = z.infer<typeof directionSnapshotSchema>;
 export type DirectionSnapshotInput = z.input<typeof directionSnapshotSchema>;
 
-/** The project look with this shot's overrides applied. */
+/** The shot's look, over a legacy project look where one was recorded. */
 export function effectiveLook(
   snapshot: Pick<DirectionSnapshotInput, "project" | "overrides">,
 ): Look {
@@ -446,7 +448,7 @@ export function directionPrompt(
   return `${parts.map((p) => p.replace(/[.\s]+$/, "")).join("; ")}.`;
 }
 
-/** A project's look alone as prompt language, for summaries and planning. */
+/** A look alone as prompt language, for summaries and planning. */
 export function lookPrompt(look: Look, medium: "image" | "video"): string {
   return directionPrompt({ overrides: look }, medium);
 }
@@ -465,7 +467,7 @@ export function withDirection(
 
 /**
  * For a selective revision only the look of what is regenerated can follow the
- * project: framing, lens and pacing belong to the source take.
+ * look: framing, lens and pacing belong to the source take.
  */
 export function revisionDirectionPrompt(
   snapshot: DirectionSnapshotInput | undefined,
@@ -478,6 +480,6 @@ export function revisionDirectionPrompt(
     phrase(LOOK_OPTIONS.texture, look.texture, "video"),
   ].filter((p): p is string => !!p);
   return parts.length
-    ? `Match the project's look in the new setting: ${parts.join("; ")}.`
+    ? `Match this look in the new setting: ${parts.join("; ")}.`
     : "";
 }

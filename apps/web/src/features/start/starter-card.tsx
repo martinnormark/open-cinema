@@ -31,7 +31,7 @@ const CAST = [
 /**
  * The offer of a world to start from, wherever the studio would otherwise be
  * empty. The three Elements are shown as they will arrive; one button brings
- * them, the project look and the scene in as the creator's own.
+ * them and the scene in as the creator's own.
  */
 export function StarterWorld({
   signedOut,
@@ -102,9 +102,8 @@ export function StarterWorld({
             Start from the Tide Mill
           </h2>
           <p className="mt-1 text-sm leading-6 text-muted-foreground">
-            A cast, a place and a prop with approved references, a project look,
-            and a four-shot scene to carry on. It all arrives as yours to
-            change.
+            A cast, a place and a prop with approved references, and a four-shot
+            scene to carry on. It all arrives as yours to change.
           </p>
         </div>
         {starter.phase === "done" ? (

@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { LOOK_NOTES_MAX, lookSchema, type Look } from "./direction";
 
 export const mediaKindSchema = z.enum(["image", "video"]);
 export type MediaKind = z.infer<typeof mediaKindSchema>;
@@ -32,7 +31,6 @@ export type MediaAssetStatus = z.infer<typeof mediaAssetStatusSchema>;
 export const mediaAssetSchema = z.object({
   id: z.string(),
   ownerId: z.string(),
-  projectId: z.string().nullable().default(null),
   kind: mediaKindSchema,
   status: mediaAssetStatusSchema,
   mediaType: z.string(),
@@ -79,7 +77,6 @@ export function mediaKindFor(mediaType: string): MediaKind | null {
 }
 
 export const createMediaAssetInputSchema = z.object({
-  projectId: z.string().min(1).optional(),
   filename: z.string().trim().min(1).max(255),
   mediaType: z.string().min(1),
   sizeBytes: z.number().int().positive(),
@@ -91,50 +88,3 @@ export const createMediaAssetInputSchema = z.object({
   hasAudio: z.boolean().optional(),
 });
 export type CreateMediaAssetInput = z.infer<typeof createMediaAssetInputSchema>;
-
-/**
- * Folds a project's old free-text direction into its look's notes. Projects
- * once had both; the structured look is now the only one. The text is kept
- * where it was until the look is next saved, so nothing is lost either way.
- */
-export function lookWithDirection(look: Look, direction: string): Look {
-  const text = direction.trim().replace(/\s+/g, " ");
-  if (!text) return look;
-  const notes = [look.notes?.trim(), text].filter(Boolean).join(". ");
-  if (notes.length <= LOOK_NOTES_MAX) return { ...look, notes };
-  const cut = notes.slice(0, LOOK_NOTES_MAX);
-  return { ...look, notes: cut.slice(0, cut.lastIndexOf(" ")).trim() || cut };
-}
-
-export const projectSchema = z
-  .object({
-    id: z.string(),
-    ownerId: z.string(),
-    name: z.string(),
-    /** Legacy free text, folded into `look` on read (see lookWithDirection). */
-    direction: z.string().default(""),
-    /** The shared look every shot in the project inherits. */
-    look: lookSchema.catch({}).default({}),
-    createdAt: z.string(),
-    updatedAt: z.string(),
-  })
-  .transform(({ direction, ...project }) => ({
-    ...project,
-    look: lookWithDirection(project.look, direction),
-  }));
-export type Project = z.output<typeof projectSchema>;
-
-export const createProjectInputSchema = z.object({
-  name: z.string().trim().min(1).max(120),
-  look: lookSchema.optional(),
-  /** Legacy free text (old world bundles), folded into the look's notes. */
-  direction: z.string().trim().max(4000).optional(),
-});
-export type CreateProjectInput = z.infer<typeof createProjectInputSchema>;
-
-export const updateProjectInputSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().trim().min(1).max(120).optional(),
-  look: lookSchema.optional(),
-});
-export type UpdateProjectInput = z.infer<typeof updateProjectInputSchema>;

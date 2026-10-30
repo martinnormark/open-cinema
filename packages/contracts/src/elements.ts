@@ -258,7 +258,6 @@ export type ElementState = z.infer<typeof elementStateSchema>;
 export const elementSchema = z.object({
   id: z.string(),
   ownerId: z.string(),
-  projectId: z.string().nullable().default(null),
   type: elementTypeSchema,
   name: z.string(),
   /** The `@` mention token, unique per owner. */
@@ -412,7 +411,6 @@ export const createElementInputSchema = z.object({
   name: z.string().trim().min(1).max(80),
   handle: elementHandleSchema.optional(),
   description: z.string().trim().max(4000).optional(),
-  projectId: z.string().min(1).optional(),
 });
 export type CreateElementInput = z.infer<typeof createElementInputSchema>;
 

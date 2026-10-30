@@ -3,25 +3,18 @@ import { env } from "@open-cinema/runtime";
 import { z } from "zod";
 import { createDatabase } from "@open-cinema/database";
 import {
-  getProject,
   getRevision,
-  listProjects,
   listRevisions,
   resolveAssetRef,
 } from "@open-cinema/database/queries";
-import {
-  createProject,
-  setRevisionStatus,
-} from "@open-cinema/database/mutations";
+import { setRevisionStatus } from "@open-cinema/database/mutations";
 import {
   commandResultSchema,
-  createProjectInputSchema,
   generationRequestSchema,
   revisionSchema,
   setRevisionStatusInputSchema,
   workflowCommandSchema,
   type CommandResult,
-  type Project,
   type Revision,
 } from "@open-cinema/contracts";
 import {
@@ -132,55 +125,15 @@ async function readPending(ownerId: string, revisionId: string) {
   }
 }
 
-export interface ProjectSummary extends Project {
-  revisionCount: number;
-  lastRevisionAt: string | null;
-}
-
-export const getProjects = createServerFn({ method: "GET" }).handler(
-  async (): Promise<{ signedIn: boolean; projects: ProjectSummary[] }> => {
-    const session = await optionalSession();
-    if (!session) return { signedIn: false, projects: [] };
-    const scope = { ownerId: session.userId };
-    const [projects, revisions] = await Promise.all([
-      listProjects(db(), scope),
-      listRevisions(db(), scope),
-    ]);
-    return {
-      signedIn: true,
-      projects: projects.map((project) => {
-        const own = revisions.filter((r) => r.projectId === project.id);
-        return {
-          ...project,
-          revisionCount: own.length,
-          lastRevisionAt: own[0]?.createdAt ?? null,
-        };
-      }),
-    };
-  },
-);
-
-export const startProject = createServerFn({ method: "POST" })
-  .validator(createProjectInputSchema)
-  .handler(async ({ data }) => {
-    requireSameOrigin();
-    const session = await requireSession();
-    return createProject(db(), { ownerId: session.userId }, data);
-  });
-
-export const getProjectHome = createServerFn({ method: "GET" })
-  .validator(z.object({ projectId: z.string().min(1).max(100) }))
-  .handler(async ({ data }) => {
+/** Every revision, newest first, for the Revisions list. */
+export const getRevisionsHome = createServerFn({ method: "GET" }).handler(
+  async () => {
     const session = await optionalSession();
     if (!session) return { signedIn: false as const };
-    const scope = { ownerId: session.userId };
-    const project = await getProject(db(), scope, data.projectId);
-    if (!project) return { signedIn: true as const, project: null };
-    const revisions = await listRevisions(db(), scope, {
-      projectId: project.id,
-    });
-    return { signedIn: true as const, project, revisions };
-  });
+    const revisions = await listRevisions(db(), { ownerId: session.userId });
+    return { signedIn: true as const, revisions };
+  },
+);
 
 export interface RevisionEntry {
   revision: Revision;
@@ -201,12 +154,9 @@ export const getRevisionView = createServerFn({ method: "GET" })
       (await readPending(session.userId, data.revisionId))?.revision ??
       null;
     if (!revision) return { signedIn: true as const, revision: null };
-    const [lineage, project] = await Promise.all([
-      listRevisions(db(), scope, { source: revision.source }),
-      revision.projectId
-        ? getProject(db(), scope, revision.projectId)
-        : Promise.resolve(null),
-    ]);
+    const lineage = await listRevisions(db(), scope, {
+      source: revision.source,
+    });
     if (!lineage.some((entry) => entry.id === revision.id))
       lineage.unshift(revision);
     const history: RevisionEntry[] = await Promise.all(
@@ -218,7 +168,6 @@ export const getRevisionView = createServerFn({ method: "GET" })
     return {
       signedIn: true as const,
       revision,
-      project,
       checks: CHECKED_KINDS.has(revision.workflowKind)
         ? await readChecks(session.userId, revision.id)
         : null,
@@ -270,7 +219,6 @@ export const submitRevision = createServerFn({ method: "POST" })
       workflowCommandSchema.parse({
         idempotencyKey: data.idempotencyKey,
         request: request.data,
-        projectId: data.projectId,
         revision: {
           intent: data.intent,
           parentRevisionId: data.parentRevisionId,
@@ -302,7 +250,6 @@ export const submitRevision = createServerFn({ method: "POST" })
     const revision = revisionSchema.parse({
       id: job.id,
       ownerId: session.userId,
-      projectId: data.projectId ?? null,
       parentRevisionId: data.parentRevisionId ?? null,
       source,
       result: null,

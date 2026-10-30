@@ -3,7 +3,6 @@ import { env } from "@open-cinema/runtime";
 import { z } from "zod";
 import { readWorldManifest, WorldFormatError } from "@open-cinema/contracts";
 import { createDatabase } from "@open-cinema/database";
-import { listProjects } from "@open-cinema/database/queries";
 import { importWorld } from "@open-cinema/database/mutations";
 import { optionalSession, requireSameOrigin, requireSession } from "./session";
 
@@ -11,13 +10,7 @@ export const getWorldHome = createServerFn({ method: "GET" }).handler(
   async () => {
     const session = await optionalSession();
     if (!session) return { signedIn: false as const };
-    const projects = await listProjects(createDatabase(env.DB), {
-      ownerId: session.userId,
-    });
-    return {
-      signedIn: true as const,
-      projects: projects.map((p) => ({ id: p.id, name: p.name })),
-    };
+    return { signedIn: true as const };
   },
 );
 

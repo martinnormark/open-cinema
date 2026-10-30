@@ -14,8 +14,8 @@ Open Cinema is an early preview and our entry to Comfy's [Open Source Higgsfield
 - **Revise a take** in the revision studio: replace its background, recast a person as a Character (experimental and outside the MVP; see [known limitations](docs/known-limitations.md)), swap an object (Object Swap), restyle it, or re-stage the camera, then compare original and result before keeping it.
 - **Copy the moves** from any clip, a dance, a stunt or a gesture, onto one of your Characters, in the clip's place or one of your Locations, with Wan 3.0 on Comfy Router or the open-weights Wan Animate 2 on Comfy Cloud. Click people or things on a frame to say who becomes whom; SAM 3.1 tracks each of them through the clip in a Comfy Cloud graph that runs Wan 3.0 ([docs/copy-the-moves.md](docs/copy-the-moves.md)).
 - **See which model made what.** Every mode names its model, maker, open or hosted weights and where it runs before you generate, and every result and Activity entry says "Made with" the same.
-- **Direct a project** with a persistent look and per-shot direction, and save what works as **Recipes**.
-- **Plan Sequences** of shots from a rough idea, and move Elements, Recipes, a project's look and Sequences between projects or installations as a **World** bundle.
+- **Direct each shot** with a look and directing choices, and save what works as **Recipes**.
+- **Plan Sequences** of shots from a rough idea, and move Elements, Recipes and Sequences between installations as a **World** bundle.
 - **Follow every job** in Activity or from the floating Orb, cancel work in flight and recover jobs that need attention.
 
 ## Example outputs

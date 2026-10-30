@@ -93,6 +93,8 @@ Run one replica per volume. This is a single-process deployment; do not point tw
 
 Restore the complete volume, not only the catalog. Startup applies pending SQL migrations and resumes jobs from saved provider receipts and wake times. After a failed upgrade, restore the backup before running an older image whose schema may be incompatible.
 
+Migration `0011_drop_projects.sql` permanently deletes projects: their names and looks. Elements, media, revisions, sequences and generations filed under a project are kept. Back up before upgrading past it if those looks matter.
+
 Legacy world bundles remain importable; the `r2Key` metadata field is retained as a storage-neutral compatibility field. Existing hosted databases and buckets are **not automatically migrated**. Use the app's world export/import for reusable creative assets, or plan a separate full data transfer if old generation history must also move. Never copy runtime emulation directories into the new data volume.
 
 `GET /healthz` reports server readiness after migrations. Inspect logs with `docker compose logs -f studio`. On shutdown, the scheduler drains in-flight work until the container's stop deadline; persisted watchdogs recover interrupted work on the next start.

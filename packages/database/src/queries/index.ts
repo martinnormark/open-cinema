@@ -4,10 +4,8 @@ export {
   getJobContext,
   getJobOutput,
   listJobs,
-  listProjectJobs,
   type JobContext,
 } from "./jobs";
-export { getProject, listProjects } from "./projects";
 export { getRecipe, listRecipes } from "./recipes";
 export { getMediaAsset, listMediaAssets, resolveAssetRef } from "./media";
 export {

@@ -1,6 +1,6 @@
 /**
  * Makes the starter recipe collection's example images (and the shot-control
- * comparison in docs/project-direction.md) on Comfy Router, with exactly the
+ * comparison in docs/direction.md) on Comfy Router, with exactly the
  * prompt each recipe builds in the studio. Development only: it talks to
  * Router through HTTPS_PROXY, whose credential the proxy injects.
  *

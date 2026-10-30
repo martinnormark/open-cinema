@@ -2,9 +2,7 @@ import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, Download, Play, Plus } from "lucide-react";
 import {
-  lookPrompt,
   approvedTake,
-  type Project,
   type Revision,
   type Sequence,
   type Shot,
@@ -23,12 +21,10 @@ import { exportShotList } from "./export";
 
 export function SequenceBoard({
   initial,
-  project,
   revisions,
   note,
 }: {
   initial: Sequence;
-  project: Project | null;
   revisions: Revision[];
   note?: string | undefined;
 }) {
@@ -41,7 +37,6 @@ export function SequenceBoard({
   const { snapshot } = useGeneration();
   const { elements } = useElements();
   const jobs = snapshot?.jobs ?? [];
-  const direction = project ? lookPrompt(project.look, "video") : "";
   const playable = sequence.shots.filter((shot) => shotPicture(shot));
 
   async function apply(work: Promise<Sequence>) {
@@ -71,22 +66,12 @@ export function SequenceBoard({
       className="mx-auto w-full max-w-6xl px-6 pt-8 pb-32 md:px-12 md:pt-10"
       aria-labelledby="page-title"
     >
-      {project ? (
-        <Link
-          to="/projects/$projectId"
-          params={{ projectId: project.id }}
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground no-underline hover:text-foreground"
-        >
-          <ArrowLeft aria-hidden="true" className="size-3.5" /> {project.name}
-        </Link>
-      ) : (
-        <Link
-          to="/sequences"
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground no-underline hover:text-foreground"
-        >
-          <ArrowLeft aria-hidden="true" className="size-3.5" /> Sequences
-        </Link>
-      )}
+      <Link
+        to="/sequences"
+        className="inline-flex items-center gap-1 text-xs text-muted-foreground no-underline hover:text-foreground"
+      >
+        <ArrowLeft aria-hidden="true" className="size-3.5" /> Sequences
+      </Link>
       <header className="mt-3 flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0 flex-1">
           <h1 id="page-title" className="sr-only">
@@ -110,17 +95,12 @@ export function SequenceBoard({
             maxLength={120}
             className="-mx-1.5 w-full max-w-2xl rounded-md bg-transparent px-1.5 text-title font-semibold outline-none hover:bg-surface focus-visible:bg-surface focus-visible:ring-2 focus-visible:ring-ring/50"
           />
-          {direction && (
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-              <span className="text-foreground">Look</span> · {direction}
-            </p>
-          )}
         </div>
         <div className="flex shrink-0 gap-2">
           <Button
             variant="outline"
             disabled={!sequence.shots.length}
-            onClick={() => exportShotList(sequence, project)}
+            onClick={() => exportShotList(sequence)}
           >
             <Download aria-hidden="true" /> Shot list
           </Button>
@@ -162,7 +142,6 @@ export function SequenceBoard({
               index={index}
               count={sequence.shots.length}
               previous={sequence.shots[index - 1] ?? null}
-              project={project}
               elements={elements}
               jobs={jobs}
               revisions={revisions}

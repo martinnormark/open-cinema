@@ -13,7 +13,6 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ActivityRouteImport } from './routes/activity'
 import { Route as ElementsRouteImport } from './routes/elements'
 import { Route as LibraryRouteImport } from './routes/library'
-import { Route as ProjectsRouteImport } from './routes/projects'
 import { Route as RecipesRouteImport } from './routes/recipes'
 import { Route as SequencesRouteImport } from './routes/sequences'
 import { Route as SettingsRouteImport } from './routes/settings'
@@ -23,11 +22,10 @@ import { Route as ApiHealthRouteImport } from './routes/api.health'
 import { Route as ElementsIndexRouteImport } from './routes/elements.index'
 import { Route as ElementsElementIdRouteImport } from './routes/elements.$elementId'
 import { Route as ElementsNewRouteImport } from './routes/elements.new'
-import { Route as ProjectsIndexRouteImport } from './routes/projects.index'
-import { Route as ProjectsProjectIdRouteImport } from './routes/projects.$projectId'
 import { Route as RecipesIndexRouteImport } from './routes/recipes.index'
 import { Route as RecipesRecipeIdRouteImport } from './routes/recipes.$recipeId'
 import { Route as RecipesNewRouteImport } from './routes/recipes.new'
+import { Route as RevisionsIndexRouteImport } from './routes/revisions.index'
 import { Route as RevisionsRevisionIdRouteImport } from './routes/revisions.$revisionId'
 import { Route as RevisionsNewRouteImport } from './routes/revisions.new'
 import { Route as SequencesIndexRouteImport } from './routes/sequences.index'
@@ -56,11 +54,6 @@ const ElementsRoute = ElementsRouteImport.update({
 const LibraryRoute = LibraryRouteImport.update({
   id: '/library',
   path: '/library',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProjectsRoute = ProjectsRouteImport.update({
-  id: '/projects',
-  path: '/projects',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RecipesRoute = RecipesRouteImport.update({
@@ -108,16 +101,6 @@ const ElementsNewRoute = ElementsNewRouteImport.update({
   path: '/new',
   getParentRoute: () => ElementsRoute,
 } as any)
-const ProjectsIndexRoute = ProjectsIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => ProjectsRoute,
-} as any)
-const ProjectsProjectIdRoute = ProjectsProjectIdRouteImport.update({
-  id: '/$projectId',
-  path: '/$projectId',
-  getParentRoute: () => ProjectsRoute,
-} as any)
 const RecipesIndexRoute = RecipesIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -132,6 +115,11 @@ const RecipesNewRoute = RecipesNewRouteImport.update({
   id: '/new',
   path: '/new',
   getParentRoute: () => RecipesRoute,
+} as any)
+const RevisionsIndexRoute = RevisionsIndexRouteImport.update({
+  id: '/revisions/',
+  path: '/revisions/',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const RevisionsRevisionIdRoute = RevisionsRevisionIdRouteImport.update({
   id: '/revisions/$revisionId',
@@ -184,7 +172,6 @@ export interface FileRoutesByFullPath {
   '/activity': typeof ActivityRoute
   '/elements': typeof ElementsRouteWithChildren
   '/library': typeof LibraryRoute
-  '/projects': typeof ProjectsRouteWithChildren
   '/recipes': typeof RecipesRouteWithChildren
   '/sequences': typeof SequencesRouteWithChildren
   '/settings': typeof SettingsRoute
@@ -193,15 +180,14 @@ export interface FileRoutesByFullPath {
   '/api/health': typeof ApiHealthRoute
   '/elements/$elementId': typeof ElementsElementIdRoute
   '/elements/new': typeof ElementsNewRoute
-  '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/recipes/$recipeId': typeof RecipesRecipeIdRoute
   '/recipes/new': typeof RecipesNewRoute
   '/revisions/$revisionId': typeof RevisionsRevisionIdRoute
   '/revisions/new': typeof RevisionsNewRoute
   '/sequences/$sequenceId': typeof SequencesSequenceIdRoute
   '/elements/': typeof ElementsIndexRoute
-  '/projects/': typeof ProjectsIndexRoute
   '/recipes/': typeof RecipesIndexRoute
+  '/revisions/': typeof RevisionsIndexRoute
   '/sequences/': typeof SequencesIndexRoute
   '/api/jobs/output': typeof ApiJobsOutputRoute
   '/api/jobs/stream': typeof ApiJobsStreamRoute
@@ -219,15 +205,14 @@ export interface FileRoutesByTo {
   '/api/health': typeof ApiHealthRoute
   '/elements/$elementId': typeof ElementsElementIdRoute
   '/elements/new': typeof ElementsNewRoute
-  '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/recipes/$recipeId': typeof RecipesRecipeIdRoute
   '/recipes/new': typeof RecipesNewRoute
   '/revisions/$revisionId': typeof RevisionsRevisionIdRoute
   '/revisions/new': typeof RevisionsNewRoute
   '/sequences/$sequenceId': typeof SequencesSequenceIdRoute
   '/elements': typeof ElementsIndexRoute
-  '/projects': typeof ProjectsIndexRoute
   '/recipes': typeof RecipesIndexRoute
+  '/revisions': typeof RevisionsIndexRoute
   '/sequences': typeof SequencesIndexRoute
   '/api/jobs/output': typeof ApiJobsOutputRoute
   '/api/jobs/stream': typeof ApiJobsStreamRoute
@@ -241,7 +226,6 @@ export interface FileRoutesById {
   '/activity': typeof ActivityRoute
   '/elements': typeof ElementsRouteWithChildren
   '/library': typeof LibraryRoute
-  '/projects': typeof ProjectsRouteWithChildren
   '/recipes': typeof RecipesRouteWithChildren
   '/sequences': typeof SequencesRouteWithChildren
   '/settings': typeof SettingsRoute
@@ -250,15 +234,14 @@ export interface FileRoutesById {
   '/api/health': typeof ApiHealthRoute
   '/elements/$elementId': typeof ElementsElementIdRoute
   '/elements/new': typeof ElementsNewRoute
-  '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/recipes/$recipeId': typeof RecipesRecipeIdRoute
   '/recipes/new': typeof RecipesNewRoute
   '/revisions/$revisionId': typeof RevisionsRevisionIdRoute
   '/revisions/new': typeof RevisionsNewRoute
   '/sequences/$sequenceId': typeof SequencesSequenceIdRoute
   '/elements/': typeof ElementsIndexRoute
-  '/projects/': typeof ProjectsIndexRoute
   '/recipes/': typeof RecipesIndexRoute
+  '/revisions/': typeof RevisionsIndexRoute
   '/sequences/': typeof SequencesIndexRoute
   '/api/jobs/output': typeof ApiJobsOutputRoute
   '/api/jobs/stream': typeof ApiJobsStreamRoute
@@ -273,7 +256,6 @@ export interface FileRouteTypes {
     | '/activity'
     | '/elements'
     | '/library'
-    | '/projects'
     | '/recipes'
     | '/sequences'
     | '/settings'
@@ -282,15 +264,14 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/elements/$elementId'
     | '/elements/new'
-    | '/projects/$projectId'
     | '/recipes/$recipeId'
     | '/recipes/new'
     | '/revisions/$revisionId'
     | '/revisions/new'
     | '/sequences/$sequenceId'
     | '/elements/'
-    | '/projects/'
     | '/recipes/'
+    | '/revisions/'
     | '/sequences/'
     | '/api/jobs/output'
     | '/api/jobs/stream'
@@ -308,15 +289,14 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/elements/$elementId'
     | '/elements/new'
-    | '/projects/$projectId'
     | '/recipes/$recipeId'
     | '/recipes/new'
     | '/revisions/$revisionId'
     | '/revisions/new'
     | '/sequences/$sequenceId'
     | '/elements'
-    | '/projects'
     | '/recipes'
+    | '/revisions'
     | '/sequences'
     | '/api/jobs/output'
     | '/api/jobs/stream'
@@ -329,7 +309,6 @@ export interface FileRouteTypes {
     | '/activity'
     | '/elements'
     | '/library'
-    | '/projects'
     | '/recipes'
     | '/sequences'
     | '/settings'
@@ -338,15 +317,14 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/elements/$elementId'
     | '/elements/new'
-    | '/projects/$projectId'
     | '/recipes/$recipeId'
     | '/recipes/new'
     | '/revisions/$revisionId'
     | '/revisions/new'
     | '/sequences/$sequenceId'
     | '/elements/'
-    | '/projects/'
     | '/recipes/'
+    | '/revisions/'
     | '/sequences/'
     | '/api/jobs/output'
     | '/api/jobs/stream'
@@ -360,7 +338,6 @@ export interface RootRouteChildren {
   ActivityRoute: typeof ActivityRoute
   ElementsRoute: typeof ElementsRouteWithChildren
   LibraryRoute: typeof LibraryRoute
-  ProjectsRoute: typeof ProjectsRouteWithChildren
   RecipesRoute: typeof RecipesRouteWithChildren
   SequencesRoute: typeof SequencesRouteWithChildren
   SettingsRoute: typeof SettingsRoute
@@ -369,6 +346,7 @@ export interface RootRouteChildren {
   ApiHealthRoute: typeof ApiHealthRoute
   RevisionsRevisionIdRoute: typeof RevisionsRevisionIdRoute
   RevisionsNewRoute: typeof RevisionsNewRoute
+  RevisionsIndexRoute: typeof RevisionsIndexRoute
   ApiJobsOutputRoute: typeof ApiJobsOutputRoute
   ApiJobsStreamRoute: typeof ApiJobsStreamRoute
   ApiMediaIdRoute: typeof ApiMediaIdRoute
@@ -404,13 +382,6 @@ declare module '@tanstack/react-router' {
       path: '/library'
       fullPath: '/library'
       preLoaderRoute: typeof LibraryRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/projects': {
-      id: '/projects'
-      path: '/projects'
-      fullPath: '/projects'
-      preLoaderRoute: typeof ProjectsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/recipes': {
@@ -476,20 +447,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ElementsNewRouteImport
       parentRoute: typeof ElementsRoute
     }
-    '/projects/': {
-      id: '/projects/'
-      path: '/'
-      fullPath: '/projects/'
-      preLoaderRoute: typeof ProjectsIndexRouteImport
-      parentRoute: typeof ProjectsRoute
-    }
-    '/projects/$projectId': {
-      id: '/projects/$projectId'
-      path: '/$projectId'
-      fullPath: '/projects/$projectId'
-      preLoaderRoute: typeof ProjectsProjectIdRouteImport
-      parentRoute: typeof ProjectsRoute
-    }
     '/recipes/': {
       id: '/recipes/'
       path: '/'
@@ -510,6 +467,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/recipes/new'
       preLoaderRoute: typeof RecipesNewRouteImport
       parentRoute: typeof RecipesRoute
+    }
+    '/revisions/': {
+      id: '/revisions/'
+      path: '/revisions'
+      fullPath: '/revisions/'
+      preLoaderRoute: typeof RevisionsIndexRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/revisions/$revisionId': {
       id: '/revisions/$revisionId'
@@ -593,20 +557,6 @@ const ElementsRouteWithChildren = ElementsRoute._addFileChildren(
   ElementsRouteChildren,
 )
 
-interface ProjectsRouteChildren {
-  ProjectsProjectIdRoute: typeof ProjectsProjectIdRoute
-  ProjectsIndexRoute: typeof ProjectsIndexRoute
-}
-
-const ProjectsRouteChildren: ProjectsRouteChildren = {
-  ProjectsProjectIdRoute: ProjectsProjectIdRoute,
-  ProjectsIndexRoute: ProjectsIndexRoute,
-}
-
-const ProjectsRouteWithChildren = ProjectsRoute._addFileChildren(
-  ProjectsRouteChildren,
-)
-
 interface RecipesRouteChildren {
   RecipesRecipeIdRoute: typeof RecipesRecipeIdRoute
   RecipesNewRoute: typeof RecipesNewRoute
@@ -641,7 +591,6 @@ const rootRouteChildren: RootRouteChildren = {
   ActivityRoute: ActivityRoute,
   ElementsRoute: ElementsRouteWithChildren,
   LibraryRoute: LibraryRoute,
-  ProjectsRoute: ProjectsRouteWithChildren,
   RecipesRoute: RecipesRouteWithChildren,
   SequencesRoute: SequencesRouteWithChildren,
   SettingsRoute: SettingsRoute,
@@ -650,6 +599,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiHealthRoute: ApiHealthRoute,
   RevisionsRevisionIdRoute: RevisionsRevisionIdRoute,
   RevisionsNewRoute: RevisionsNewRoute,
+  RevisionsIndexRoute: RevisionsIndexRoute,
   ApiJobsOutputRoute: ApiJobsOutputRoute,
   ApiJobsStreamRoute: ApiJobsStreamRoute,
   ApiMediaIdRoute: ApiMediaIdRoute,

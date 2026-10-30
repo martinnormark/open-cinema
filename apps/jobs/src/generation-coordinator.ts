@@ -301,7 +301,6 @@ export class GenerationCoordinator implements GenerationCoordinatorApi {
             ? definition.displayModel(command.request.inputs as never)
             : definition.displayModel,
         workflowKind: command.request.workflowKind,
-        projectId: command.projectId ?? null,
         seed: null,
 
         progress: null,

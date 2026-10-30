@@ -1,6 +1,5 @@
 import {
   capabilityIdSchema,
-  parseMentionHandles,
   WORKFLOW_DESCRIPTORS,
   WORLD_FORMAT,
   WORLD_VERSION,
@@ -13,7 +12,6 @@ import {
 import type { DatabaseContext } from "../client";
 import { getJob, getJobOutput } from "./jobs";
 import { getMediaAsset } from "./media";
-import { getProject } from "./projects";
 import { listElements } from "./elements";
 import { listRecipes } from "./recipes";
 import { getSequence, listSequences } from "./sequences";
@@ -25,44 +23,22 @@ export interface WorldFile {
 }
 
 /**
- * Everything a world bundle carries for one project, or for the whole studio
- * when no project is given: its Elements (with every reference not rejected),
- * all recipes, its sequences with their approved takes, and the media those
- * point at. Only the caller's records are read; storage keys come from those
+ * Everything a world bundle carries for the whole studio: its Elements (with
+ * every reference not rejected), all recipes, its sequences with their
+ * approved takes, and the media those point at. Only the caller's records are read; storage keys come from those
  * records, never from the request.
  */
 export async function collectWorld(
   db: DatabaseContext,
   scope: OwnerScope,
-  options: { projectId?: string; now?: Date } = {},
-): Promise<{ manifest: WorldManifestInput; files: WorldFile[] } | null> {
-  const project = options.projectId
-    ? await getProject(db, scope, options.projectId)
-    : null;
-  if (options.projectId && !project) return null;
-  const projectFilter = project ? { projectId: project.id } : {};
-
-  const summaries = await listSequences(db, scope, projectFilter);
+  options: { now?: Date } = {},
+): Promise<{ manifest: WorldManifestInput; files: WorldFile[] }> {
+  const summaries = await listSequences(db, scope);
   const sequences = (
     await Promise.all(summaries.map((s) => getSequence(db, scope, s.id)))
   ).filter((s) => s !== null);
 
-  // A project's own Elements, plus studio-wide ones its shots mention.
-  const all = await listElements(db, scope);
-  const mentioned = new Set(
-    sequences.flatMap((s) =>
-      s.shots.flatMap((shot) =>
-        parseMentionHandles(`${shot.prompt} ${shot.staging} ${shot.beat}`),
-      ),
-    ),
-  );
-  const elements = project
-    ? all.filter(
-        (e) =>
-          e.projectId === project.id ||
-          (e.projectId === null && mentioned.has(e.handle)),
-      )
-    : all;
+  const elements = await listElements(db, scope);
   const recipes = await listRecipes(db, scope);
 
   const media = new Map<string, WorldMedia>();
@@ -222,12 +198,6 @@ export async function collectWorld(
         })),
         capabilities: [...capabilityIdSchema.options],
       },
-      project: project
-        ? {
-            name: project.name,
-            look: project.look,
-          }
-        : null,
       elements: worldElements,
       recipes: worldRecipes,
       sequences: worldSequences,

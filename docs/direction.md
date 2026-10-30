@@ -1,17 +1,19 @@
-# Project direction, combined states and recipes
+# Direction, combined states and recipes
 
 > Deployment update (2026-10-30): the application now runs entirely in Docker with Bun, SQLite and private file storage. Infrastructure references and earlier verification results below describe the previous implementation. Use [deployment](deployment.md) and [architecture](../ARCHITECTURE.md) for current setup.
 
-This covers roadmap issues #8 and #9 (Phase 2 of #2): a persistent look per project with per-shot overrides, richer Element states, and recipes that keep direction worth reusing.
+This covers roadmap issues #8 and #9 (Phase 2 of #2): per-shot looks and directing choices, richer Element states, and recipes that keep direction worth reusing.
+
+> Projects were removed on 2026-10-30 because creators could not tell which project they were in or how to change it. Migration `0011_drop_projects.sql` drops the `Project` table and every `projectId` column. A shared look now travels as a recipe.
 
 ## Direction
 
-- **Project look.** Palette, lighting, lens, texture, pacing and free notes. It is edited on the project page and stored in `Project.look`. It is the project's only direction: projects used to also carry a free-text `direction`, which Sequences appended as "Look: …". That text is now folded into the look's notes when a project is read (`lookWithDirection`, cut to 300 characters at a word) and the old column is cleared the next time the look is saved, so existing projects keep what they said. Sequences get the look the same way the studio does, stamped on the server from the project.
-- **Shot direction.** Framing, focus and performance, chosen per shot in the studio under "Direct this shot". A shot can also override any look field for itself; overrides are tinted and counted ("1 changed"), and the project is never changed from the studio.
-- **Snapshot.** Each request carries `inputs.direction` (`directionSnapshotSchema`): the project and its look as of submission, the overrides, the shot choices and the recipe used. On submit, the server re-reads the project look from D1 and checks the project belongs to the caller (`apps/web/src/server/direction.ts`). Shots already made keep the look they were made with, and the project's Shots grid flags "Made with an earlier look".
+- **Look.** Palette, lighting, lens, texture, pacing and free notes, chosen per shot in the studio under "Direct this shot" (`overrides` in the snapshot) or carried by a recipe.
+- **Shot direction.** Framing, focus and performance, chosen per shot in the studio under "Direct this shot".
+- **Snapshot.** Each request carries `inputs.direction` (`directionSnapshotSchema`): the look, the shot choices and the recipe used. On submit, the server checks that a personal recipe belongs to the caller and drops anything else (`apps/web/src/server/direction.ts`). Generations made before projects were removed still carry `direction.project`; it is read, never written, so their recorded look stays as it was.
 - **Prompting.** `withDirection` appends camera language after the creator's words: the shot's phrases first, then the look's. Pacing only applies to video. Background replacement keeps only palette, lighting and texture, because framing and lens belong to the source take. Recast adds none. Camera moves (LTX-2 camera LoRA) carry direction too.
 - **Video wording.** LTX draws the camera it is told about, so lens and film-stock presets carry a separate `video` phrase that describes the picture ("wide-angle perspective", "fine film grain") without naming lenses, millimetres, halation or vignetting. `LTX_FRAME_ARTEFACT` lists the words to keep out and `apps/web/test/direction.test.ts` checks every preset against it; the Cloud LTX graphs also add "vignette, dark corners, circular frame, keyhole mask, fisheye" to their negative prompt. Router's LTX takes no negative prompt. A creator's own words are passed through as written.
-- **Revisions.** `submitRevision` stamps the same snapshot, so direction is kept across generation and revisions.
+- **Revisions.** `submitRevision` stamps the same snapshot. The revision studio sets no look of its own, so revisions carry none.
 
 ## States and combinations
 
@@ -24,9 +26,9 @@ This covers roadmap issues #8 and #9 (Phase 2 of #2): a persistent look per proj
 
 - A recipe has a template with `{slot}` placeholders (Character, Location or Thing), optional `[groups]` that drop out when their slot is empty, a look, shot choices, a frame or length, building blocks and notes.
 - Personal recipes live in the D1 `Recipe` table. Changing the spec or name bumps the version and moves the previous one to `history` (newest first, at most 20) with the creator's "what changed" note. Restoring saves the old version as a new one. Updates check the version, so two tabs cannot overwrite each other.
-- **Save as recipe** under any finished shot (project Shots grid or studio results) turns its prompt into a template: each mentioned Element becomes a slot and the shot's effective look and direction are kept. The result becomes the recipe's cover.
+- **Save as recipe** under any finished shot (studio results or Activity) turns its prompt into a template: each mentioned Element becomes a slot and the shot's effective look and direction are kept. The result becomes the recipe's cover.
 - **Built-in examples** (`apps/web/src/features/recipes/collection.ts`) each show the treatment on one subject plus alternatives on the same subject. "Make it my own" copies one into your recipes.
-- **Applying** a recipe means choosing Elements for its slots, with their states. You also choose whether to use the recipe's look or the project's. Compatibility notes say what is missing, which building blocks are not in the studio yet, and how each Element will be carried (references or description only). Generate submits directly; Open in studio hands the prompt and direction to the studio.
+- **Applying** a recipe means choosing Elements for its slots, with their states. The recipe's look and shot choices come with it. Compatibility notes say what is missing, which building blocks are not in the studio yet, and how each Element will be carried (references or description only). Generate submits directly; Open in studio hands the prompt and direction to the studio.
 - **Building blocks** (`packages/contracts/src/capabilities.ts`) name each model, adapter and technique with its purpose, influence, media, what it reads and its limits. Only Lightricks' own LTX adapters are listed; per the competition rule, no community LoRA is used.
 
 ## Tested differences (live, 2026-10-17)
@@ -50,4 +52,4 @@ Spend: about 19 FLUX images (about 5–6 credits each) and 3 four-second LTX 2.5
 
 ## Idea: a custom IC-LoRA
 
-Router's LTX is text-only, so a Character's face cannot carry into text-to-video. Training our own LTX IC-LoRA on a project's approved Element references and look would fix that, and the weights would be our own IP under the competition rule. For example, condition on a reference sheet and generate the Character in motion. A smaller first step would be a project-look LoRA trained on the shots a creator approves.
+Router's LTX is text-only, so a Character's face cannot carry into text-to-video. Training our own LTX IC-LoRA on approved Element references and a look would fix that, and the weights would be our own IP under the competition rule. For example, condition on a reference sheet and generate the Character in motion. A smaller first step would be a look LoRA trained on the shots a creator approves.

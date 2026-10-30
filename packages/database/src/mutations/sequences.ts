@@ -57,19 +57,11 @@ export async function createSequence(
   const data = createSequenceInputSchema.parse(input);
   await ensureUser(db, scope);
   const client = getClient(db);
-  if (data.projectId) {
-    const project = await client.project.findFirst({
-      where: { id: data.projectId, ownerId: scope.ownerId },
-      select: { id: true },
-    });
-    if (!project) throw new Error("That project is not available");
-  }
   const id = crypto.randomUUID();
   await client.sequence.create({
     data: {
       id,
       ownerId: scope.ownerId,
-      projectId: data.projectId ?? null,
       title: data.title,
       idea: data.idea,
       shots: {

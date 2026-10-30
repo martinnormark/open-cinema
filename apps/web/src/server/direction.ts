@@ -1,6 +1,6 @@
 import "@tanstack/react-start/server-only";
 import type { DatabaseContext } from "@open-cinema/database";
-import { getProject, getRecipe } from "@open-cinema/database/queries";
+import { getRecipe } from "@open-cinema/database/queries";
 import { recordRecipeUse } from "@open-cinema/database/mutations";
 import {
   generationRequestSchema,
@@ -15,9 +15,9 @@ type Stamped =
   { ok: true; command: WorkflowCommand } | { ok: false; error: string };
 
 /**
- * Files a command under its project and records the project look as it is
- * now, read from SQLite rather than trusted from the browser. A shot's overrides
- * and directing choices stay in the command; the project itself is unchanged.
+ * Records the direction a command carries: the shot's look, its directing
+ * choices and the recipe it came from, checked against SQLite. A legacy
+ * project look sent by the browser is dropped.
  */
 export async function stampDirection(
   db: DatabaseContext,
@@ -25,15 +25,7 @@ export async function stampDirection(
   command: WorkflowCommand,
 ): Promise<Stamped> {
   const current = requestDirection(command.request);
-  if (!command.projectId && !current) return { ok: true, command };
-  const project = command.projectId
-    ? await getProject(db, scope, command.projectId)
-    : null;
-  if (command.projectId && !project)
-    return {
-      ok: false,
-      error: "That project is no longer available. Choose another.",
-    };
+  if (!current) return { ok: true, command };
   // A recast replaces a person, not the look; it carries no direction.
   if (command.request.workflowKind === "video.character-replace")
     return { ok: true, command };
@@ -48,9 +40,6 @@ export async function stampDirection(
     overrides: current?.overrides ?? {},
     shot: current?.shot ?? {},
     ...(recipe ? { recipe } : {}),
-    ...(project
-      ? { project: { id: project.id, name: project.name, look: project.look } }
-      : {}),
   };
   return {
     ok: true,

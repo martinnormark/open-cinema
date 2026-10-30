@@ -30,7 +30,6 @@ export async function createPendingMediaAsset(
     data: {
       id: input.id,
       ownerId: scope.ownerId,
-      projectId: data.projectId ?? null,
       kind,
       status: "pending",
       mediaType: data.mediaType,

@@ -192,7 +192,7 @@ A sticky 3.5rem top bar on the canvas colour, with page content below in a centr
 
 ### The top bar
 
-`AppTopBar` groups the workspace into three stable areas using shadcn dropdown menus: **Create** (Studio, Sequences, Recipes), **Revise** (all take changes), and **World** (Elements, Library, Projects, Move your world). Settings stays a labelled link. Do not add generic More menus or expose individual revision tools as top-level navigation.
+`AppTopBar` groups the workspace into three stable areas using shadcn dropdown menus: **Create** (Studio, Sequences, Recipes), **Revise** (all take changes and the list of your revisions), and **World** (Elements, Library, Move your world). Settings stays a labelled link. Do not add generic More menus or expose individual revision tools as top-level navigation.
 
 The current area stays lit with the existing tungsten underline on all its child routes. The selected destination has a filled row and tungsten icon inside its menu. A persistent location row below the header shows area → page, including World → Move your world and Revise → the selected task. This context remains visible on mobile when the main navigation folds into a grouped shadcn Sheet below `md`. The Sheet uses the same destinations and highlights only the actual selected page.
 

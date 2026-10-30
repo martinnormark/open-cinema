@@ -19,7 +19,6 @@ import {
   type Element,
   type GenerationRequest,
   type Job,
-  type Project,
   type Revision,
   type Sequence,
   type Shot,
@@ -89,7 +88,6 @@ export function ShotRow({
   index,
   count,
   previous,
-  project,
   elements,
   jobs,
   revisions,
@@ -100,7 +98,6 @@ export function ShotRow({
   index: number;
   count: number;
   previous: Shot | null;
-  project: Project | null;
   elements: readonly Element[];
   jobs: readonly Job[];
   revisions: readonly Revision[];
@@ -168,18 +165,14 @@ export function ShotRow({
   async function generate(role: TakeRole, request: GenerationRequest) {
     // An interrupted request keeps its key, so trying the same take again
     // finds the job it may already have started instead of running it twice.
-    const body = JSON.stringify([request, project?.id]);
+    const body = JSON.stringify(request);
     const key =
       pending.current?.body === body
         ? pending.current.key
         : crypto.randomUUID();
     pending.current = { key, body };
     const result = await submitWorkflow({
-      data: {
-        idempotencyKey: key,
-        request,
-        ...(project ? { projectId: project.id } : {}),
-      },
+      data: { idempotencyKey: key, request },
     });
     pending.current = null;
     if (!result.ok) throw new Error(result.error);
@@ -325,7 +318,6 @@ export function ShotRow({
               shot={shot}
               index={index}
               count={count}
-              project={project}
               motion={motionKey}
               busy={!!busy}
               onMove={(direction) =>
@@ -788,7 +780,6 @@ function ShotMenu({
   shot,
   index,
   count,
-  project,
   motion,
   busy,
   onMove,
@@ -797,7 +788,6 @@ function ShotMenu({
   shot: Shot;
   index: number;
   count: number;
-  project: Project | null;
   motion: string | null;
   busy: boolean;
   onMove: (direction: "earlier" | "later") => void;
@@ -819,13 +809,7 @@ function ShotMenu({
         {motion && (
           <>
             <DropdownMenuItem asChild>
-              <Link
-                to="/revisions/new"
-                search={{
-                  source: motion,
-                  ...(project ? { project: project.id } : {}),
-                }}
-              >
+              <Link to="/revisions/new" search={{ source: motion }}>
                 <Wand2 aria-hidden="true" /> Revise this take
               </Link>
             </DropdownMenuItem>

@@ -17,10 +17,8 @@ import {
 } from "@open-cinema/contracts";
 import { createDatabase } from "@open-cinema/database";
 import {
-  getProject,
   getSequence,
   listRevisions,
-  listProjects,
   listSequences,
 } from "@open-cinema/database/queries";
 import {
@@ -53,11 +51,8 @@ export const getSequencesHome = createServerFn({ method: "GET" }).handler(
     const session = await optionalSession();
     if (!session) return { signedIn: false as const };
     const scope = { ownerId: session.userId };
-    const [sequences, projects] = await Promise.all([
-      listSequences(db(), scope),
-      listProjects(db(), scope),
-    ]);
-    return { signedIn: true as const, sequences, projects };
+    const sequences = await listSequences(db(), scope);
+    return { signedIn: true as const, sequences };
   },
 );
 
@@ -69,9 +64,6 @@ export const getSequenceView = createServerFn({ method: "GET" })
     const scope = { ownerId: session.userId };
     const sequence = await getSequence(db(), scope, data.sequenceId);
     if (!sequence) return { signedIn: true as const, sequence: null };
-    const project = sequence.projectId
-      ? await getProject(db(), scope, sequence.projectId)
-      : null;
     // Revisions of each shot's approved take, so a kept background swap or
     // recast can replace that one shot without touching the others.
     const sources = sequence.shots.flatMap((shot) => {
@@ -83,7 +75,7 @@ export const getSequenceView = createServerFn({ method: "GET" })
         sources.map((source) => listRevisions(db(), scope, { source })),
       )
     ).flat();
-    return { signedIn: true as const, sequence, project, revisions };
+    return { signedIn: true as const, sequence, revisions };
   });
 
 export const planMySequence = createServerFn({ method: "POST" })

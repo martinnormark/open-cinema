@@ -133,7 +133,6 @@ export type RevisionStatus = z.infer<typeof revisionStatusSchema>;
 export const revisionSchema = z.object({
   id: z.string(),
   ownerId: z.string(),
-  projectId: z.string().nullable().default(null),
   /** Branching: the revision this one was made from, if any. */
   parentRevisionId: z.string().nullable().default(null),
   source: assetRefSchema,

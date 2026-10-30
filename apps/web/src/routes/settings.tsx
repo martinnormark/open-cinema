@@ -89,7 +89,7 @@ function Settings() {
 
           <SettingsSection
             title="Your world"
-            description="Save Elements, recipes, a project's look and its sequences as one file, or bring one in from another studio."
+            description="Save your Elements, recipes and sequences as one file, or bring one in from another studio."
           >
             <Link
               to="/world"

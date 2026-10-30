@@ -11,7 +11,6 @@ import {
   addShot,
   addTake,
   createPendingMediaAsset,
-  createProject,
   createSequence,
   deleteShot,
   markMediaAssetReady,
@@ -46,12 +45,7 @@ it("plans, orders and edits shots in an owner-scoped sequence", async () => {
   const db = createDatabase(env.DB);
   const owner = { ownerId: crypto.randomUUID() };
   const stranger = { ownerId: crypto.randomUUID() };
-  const project = await createProject(db, owner, {
-    name: "Harbor",
-    direction: "Teal and amber, 35mm",
-  });
   const sequence = await createSequence(db, owner, {
-    projectId: project.id,
     title: "Arrival",
     idea: "Mara arrives. She reads.",
     shots: [
@@ -65,9 +59,6 @@ it("plans, orders and edits shots in an owner-scoped sequence", async () => {
     durationSeconds: 5,
     continuity: "fresh",
   });
-  await expect(
-    createSequence(db, stranger, { title: "x", projectId: project.id }),
-  ).rejects.toThrow(/project/);
   expect(await getSequence(db, stranger, sequence.id)).toBeNull();
 
   // Insert between, then move: order follows sortOrder, not creation.
@@ -108,7 +99,7 @@ it("plans, orders and edits shots in an owner-scoped sequence", async () => {
 
   const afterDelete = await deleteShot(db, owner, moved!.shots[2]!.id);
   expect(afterDelete!.shots).toHaveLength(2);
-  const [summary] = await listSequences(db, owner, { projectId: project.id });
+  const [summary] = await listSequences(db, owner);
   expect(summary).toMatchObject({
     shotCount: 2,
     approvedCount: 0,

@@ -48,7 +48,6 @@ const state = (id: string, name: string, kind: "wardrobe" | "emotion") => ({
 const cal: Element = {
   id: "cal",
   ownerId: "owner",
-  projectId: null,
   type: "character",
   name: "Cal",
   handle: "Cal",

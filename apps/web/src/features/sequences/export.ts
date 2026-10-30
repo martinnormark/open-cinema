@@ -1,9 +1,6 @@
 import {
   approvedTake,
   composeShotPrompt,
-  lookPrompt,
-  withDirection,
-  type Project,
   type Sequence,
 } from "@open-cinema/contracts";
 import { assetUrl } from "@/features/elements/model";
@@ -13,7 +10,7 @@ import { playedSeconds } from "./model";
  * Production material: the plan as a shot list, with each shot's direction,
  * the exact prompts its approved takes were made with, and where to fetch them.
  */
-export function exportShotList(sequence: Sequence, project: Project | null) {
+export function exportShotList(sequence: Sequence) {
   const origin = window.location.origin;
   const url = (path: string) => new URL(path, origin).href;
   let at = 0;
@@ -33,11 +30,7 @@ export function exportShotList(sequence: Sequence, project: Project | null) {
       durationSeconds: playedSeconds(shot),
       startsAtSeconds: start,
       continuity: shot.continuity,
-      direction: withDirection(
-        composeShotPrompt(shot, { role: "motion" }),
-        project ? { overrides: project.look } : undefined,
-        "video",
-      ),
+      direction: composeShotPrompt(shot, { role: "motion" }),
       keyframe: keyframe?.asset
         ? {
             url: url(assetUrl(keyframe.asset)),
@@ -60,9 +53,6 @@ export function exportShotList(sequence: Sequence, project: Project | null) {
     exportedAt: new Date().toISOString(),
     title: sequence.title,
     idea: sequence.idea,
-    project: project
-      ? { name: project.name, look: lookPrompt(project.look, "video") }
-      : null,
     runningTimeSeconds: at,
     shots,
   };

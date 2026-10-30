@@ -21,9 +21,8 @@ import { WORKFLOW_DESCRIPTORS, type WorkflowKind } from "./workflows";
 
 /**
  * A world bundle carries a creator's reusable assets and their context to
- * another project or another installation: Elements with their states and
- * reference sheets, recipes with their history, a project's look, sequences
- * with their approved takes, and every media file they point at.
+ * another installation: Elements with their states and reference sheets,
+ * recipes with their history, sequences with their approved takes, and every media file they point at.
  *
  * Media is referenced by path inside the bundle and carries its provenance
  * (the upload's filename, or the workflow, model and prompt that made it), so
@@ -161,6 +160,7 @@ export const worldManifestSchema = z.object({
       .default([]),
     capabilities: z.array(z.string()).default([]),
   }),
+  /** Legacy: older bundles carried a project's look. It is not imported. */
   project: z
     .object({
       name: z.string().min(1).max(120),
@@ -239,6 +239,12 @@ export function worldAdaptations(
   );
   const capabilities = new Set(available.capabilities);
   const notes: WorldAdaptation[] = [];
+  if (manifest.project)
+    notes.push({
+      subject: `Project “${manifest.project.name}”`,
+      change:
+        "This studio has no projects, so it is not created. Its Elements, recipes and sequences come across on their own; its look is not applied to new shots.",
+    });
   const gone = new Map<string, number>();
   for (const media of manifest.media)
     if (
@@ -296,7 +302,6 @@ export function worldMediaPath(sourceKey: string, mediaType: string): string {
 
 /** What `importWorld` reports back: what was created, and what changed. */
 export const worldImportResultSchema = z.object({
-  projectId: z.string().nullable(),
   elements: z.number().int().nonnegative(),
   recipes: z.number().int().nonnegative(),
   sequences: z.array(z.object({ id: z.string(), title: z.string() })),

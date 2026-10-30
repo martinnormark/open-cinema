@@ -32,7 +32,6 @@ function ref(id: string, view: ReferenceView) {
 const estate = (...references: ReturnType<typeof ref>[]): Element => ({
   id: "estate",
   ownerId: "me",
-  projectId: null,
   type: "location",
   name: "Estate",
   handle: "Estate",

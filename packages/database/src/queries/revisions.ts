@@ -34,13 +34,12 @@ export function toRevision(row: RevisionRow): Revision {
 export async function listRevisions(
   db: DatabaseContext,
   scope: OwnerScope,
-  filter: { source?: AssetRef; projectId?: string } = {},
+  filter: { source?: AssetRef } = {},
 ): Promise<Revision[]> {
   const source = filter.source;
   const rows = await getClient(db).revision.findMany({
     where: {
       ownerId: scope.ownerId,
-      ...(filter.projectId ? { projectId: filter.projectId } : {}),
       ...(source?.type === "media-asset"
         ? { sourceAssetId: source.assetId }
         : source?.type === "job-output"

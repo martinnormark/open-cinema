@@ -21,7 +21,6 @@ export async function applyJobSnapshot(
     prompt: job.prompt,
     model: job.model,
     workflowKind: job.workflowKind,
-    projectId: job.projectId,
     seed: job.seed,
     progress: job.progress,
     error: job.error,
@@ -107,7 +106,6 @@ async function projectRevision(
     create: {
       id: job.id,
       ownerId: job.ownerId,
-      projectId: job.projectId,
       parentRevisionId: revision.parentRevisionId ?? null,
       sourceType: source.type,
       ...(source.type === "media-asset"

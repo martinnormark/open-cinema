@@ -13,7 +13,6 @@ import { requireSameOrigin, requireSession } from "./session";
  * Submits any registered workflow kind, e.g. `image.flux-reference` with
  * `references: AssetRef[]` and `mentions`, or `video.ltx` with a `firstFrame`.
  * The coordinator owner-checks every ref and resolves media only at submission.
- * A command with a project is filed under it with the project's current look.
  */
 export const submitWorkflow = createServerFn({ method: "POST" })
   .validator(workflowCommandSchema)

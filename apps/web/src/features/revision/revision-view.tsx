@@ -17,7 +17,6 @@ import {
   resultOutputs,
   type AssetRef,
   type Job,
-  type Project,
   type Revision,
 } from "@open-cinema/contracts";
 import { Badge } from "@/components/ui/badge";
@@ -101,13 +100,11 @@ function phaseVariant(phase: RevisionPhase) {
 
 export function RevisionView({
   revision,
-  project,
   decisions,
   history,
   checks,
 }: {
   revision: Revision;
-  project: Project | null;
   decisions: RevisionDecisions | null;
   history: RevisionEntry[];
   checks: ResultChecks | null;
@@ -248,22 +245,12 @@ export function RevisionView({
       aria-labelledby="page-title"
     >
       <nav aria-label="Breadcrumb" className="text-xs text-muted-foreground">
-        {project ? (
-          <Link
-            to="/projects/$projectId"
-            params={{ projectId: project.id }}
-            className="inline-flex items-center gap-1 no-underline hover:text-foreground"
-          >
-            <ArrowLeft aria-hidden="true" className="size-3.5" /> {project.name}
-          </Link>
-        ) : (
-          <Link
-            to="/revisions/new"
-            className="inline-flex items-center gap-1 no-underline hover:text-foreground"
-          >
-            <ArrowLeft aria-hidden="true" className="size-3.5" /> New revision
-          </Link>
-        )}
+        <Link
+          to="/revisions"
+          className="inline-flex items-center gap-1 no-underline hover:text-foreground"
+        >
+          <ArrowLeft aria-hidden="true" className="size-3.5" /> Revisions
+        </Link>
       </nav>
       <header className="mt-3 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
@@ -393,7 +380,6 @@ export function RevisionView({
                     search={{
                       source: assetRefKey(result),
                       parent: revision.id,
-                      project: revision.projectId ?? undefined,
                     }}
                   >
                     <GitBranch aria-hidden="true" /> Revise this result
@@ -516,7 +502,6 @@ function PendingStage({
               search={{
                 source: assetRefKey(revision.source),
                 kind,
-                project: revision.projectId ?? undefined,
                 retry: revision.id,
               }}
             >

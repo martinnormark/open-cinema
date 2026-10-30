@@ -262,10 +262,7 @@ export function RecipeEditor({
         <ShotControls shot={shot} onChange={setShot} />
       </Section>
 
-      <Section
-        title="Look"
-        description="Where the recipe says nothing, the project’s look applies."
-      >
+      <Section title="Look">
         <LookControls look={look} onChange={setLook} />
       </Section>
 

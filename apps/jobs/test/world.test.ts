@@ -13,7 +13,6 @@ import {
   createElement,
   createElementState,
   createPendingMediaAsset,
-  createProject,
   createRecipe,
   createSequence,
   importWorld,
@@ -49,21 +48,15 @@ async function readyImage(
   return { type: "media-asset" as const, assetId: id };
 }
 
-it("carries a project's world to another studio and adapts what does not fit", async () => {
+it("carries a studio's world to another studio and adapts what does not fit", async () => {
   const db = createDatabase(env.DB);
   const source = { ownerId: crypto.randomUUID() };
   const target = { ownerId: crypto.randomUUID() };
 
-  const project = await createProject(db, source, {
-    name: "Harbor",
-    direction: "Teal and amber",
-    look: { palette: "teal and amber" },
-  });
   const mara = await createElement(db, source, {
     type: "character",
     name: "Mara",
     description: "Auburn hair, green coat",
-    projectId: project.id,
   });
   const wet = await createElementState(db, source, {
     elementId: mara.id,
@@ -92,7 +85,6 @@ it("carries a project's world to another studio and adapts what does not fit", a
     status: "approved",
     view: "sheet",
   });
-  // A studio-wide Element only comes along when the project's shots use it.
   await createElement(db, source, { type: "thing", name: "Lantern" });
   await createElement(db, source, { type: "thing", name: "Unrelated" });
   const rain = await createRecipe(db, source, {
@@ -114,7 +106,6 @@ it("carries a project's world to another studio and adapts what does not fit", a
     },
   });
   const sequence = await createSequence(db, source, {
-    projectId: project.id,
     title: "Arrival",
     shots: [{ title: "Door", prompt: "@Mara:wet holds up @Lantern" }],
   });
@@ -127,21 +118,25 @@ it("carries a project's world to another studio and adapts what does not fit", a
     approve: true,
   });
 
-  const collected = await collectWorld(db, source, { projectId: project.id });
-  expect(collected).not.toBeNull();
-  const { manifest: raw, files } = collected!;
-  expect(raw.elements!.map((e) => e.name).sort()).toEqual(["Lantern", "Mara"]);
+  const { manifest: raw, files } = await collectWorld(db, source);
+  expect(raw.elements!.map((e) => e.name).sort()).toEqual([
+    "Lantern",
+    "Mara",
+    "Unrelated",
+  ]);
   // The rejected reference stays behind; the three others travel.
   expect(files).toHaveLength(3);
   expect(
     files.every((f) => f.r2Key.startsWith(`uploads/${source.ownerId}/`)),
   ).toBe(true);
-  expect(await collectWorld(db, target, { projectId: project.id })).toBeNull();
+  expect((await collectWorld(db, target)).manifest.elements).toEqual([]);
 
   // What another studio would read: JSON, plus a recipe and a result it can't run.
   const json = JSON.parse(
     JSON.stringify({
       ...raw,
+      // Older bundles carried a project's look.
+      project: { name: "Harbor", look: { palette: "teal and amber" } },
       recipes: [
         ...raw.recipes!,
         {
@@ -183,13 +178,12 @@ it("carries a project's world to another studio and adapts what does not fit", a
   expect(result.renamed).toEqual([{ from: "Mara", to: "Mara2" }]);
   expect(result.recipes).toBe(2);
   expect(result.adaptations.map((a) => a.subject)).toEqual([
+    "Project “Harbor”",
     "1 result made with “video.hologram”",
     "Recipe “Hologram”",
     "Recipe “Broken”",
   ]);
-  const elements = await listElements(db, target, {
-    projectId: result.projectId!,
-  });
+  const elements = await listElements(db, target);
   const imported = elements.find((e) => e.handle === "Mara2")!;
   expect(imported.references.map((r) => r.view).sort()).toEqual([
     "face-closeup",
@@ -213,7 +207,6 @@ it("carries a project's world to another studio and adapts what does not fit", a
   expect(rainCopy.history[0]!.spec.template).toBe("{character} in the rain");
 
   const copy = await getSequence(db, target, result.sequences[0]!.id);
-  expect(copy!.projectId).toBe(result.projectId);
   expect(copy!.shots[0]!.prompt).toBe("@Mara2:wet holds up @Lantern");
   expect<unknown>(approvedTake(copy!.shots[0]!, "keyframe")?.asset).toEqual({
     type: "media-asset",

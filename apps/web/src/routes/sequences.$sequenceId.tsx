@@ -46,7 +46,6 @@ function SequencePage() {
     <SequenceBoard
       key={view.sequence.id}
       initial={view.sequence}
-      project={view.project}
       revisions={view.revisions}
       note={note}
     />

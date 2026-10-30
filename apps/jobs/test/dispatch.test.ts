@@ -265,7 +265,6 @@ it("upgrades a v4 Router checkpoint and submits its stored request unchanged", a
     delete execution.workflowKind;
     delete execution.mentions;
     delete record.jobs[0].workflowKind;
-    delete record.jobs[0].projectId;
     await state.storage.put("coordinator", record);
   });
   await restartJobs();
@@ -334,7 +333,6 @@ it("projects a selective revision with its job and settles it once the result is
     prompt: "Move this scene to the harbor at dusk",
     model: "Bria",
     workflowKind: "video.background-replace",
-    projectId: null,
     seed: null,
     progress: null,
     outputs: [],
@@ -669,6 +667,7 @@ it("combines one state per kind in a mention and writes the shot's direction int
               stateIds: [id("Frightened")],
             },
           ],
+          // A stored legacy project look still sits under the shot's look.
           direction: {
             project: {
               id: "p1",

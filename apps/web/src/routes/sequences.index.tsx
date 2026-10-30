@@ -1,14 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { z } from "zod";
 import { Clapperboard } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { SequencesIndex } from "@/features/sequences/sequences-index";
 import { getSequencesHome } from "@/server/sequences";
 
 export const Route = createFileRoute("/sequences/")({
-  validateSearch: z.object({ project: z.string().max(100).optional() }),
   loader: () => getSequencesHome(),
   head: () => ({ meta: [{ title: "Sequences · Open Cinema" }] }),
   component: Sequences,
@@ -16,7 +14,6 @@ export const Route = createFileRoute("/sequences/")({
 
 function Sequences() {
   const home = Route.useLoaderData();
-  const search = Route.useSearch();
   if (!home.signedIn)
     return (
       <section className="mx-auto w-full max-w-6xl space-y-8 px-6 py-10 md:px-12 md:py-14">
@@ -40,11 +37,5 @@ function Sequences() {
         </EmptyState>
       </section>
     );
-  return (
-    <SequencesIndex
-      sequences={home.sequences}
-      projects={home.projects}
-      initialProjectId={search.project}
-    />
-  );
+  return <SequencesIndex sequences={home.sequences} />;
 }

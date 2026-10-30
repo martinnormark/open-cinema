@@ -13,7 +13,6 @@ model User {
   createdAt DateTime        @default(now())
   workflows Workflow[]
   jobs      GenerationJob[]
-  projects  Project[]
   elements  Element[]
   media     MediaAsset[]
   revisions Revision[]
@@ -49,7 +48,6 @@ model GenerationJob {
   prompt           String      @default("")
   model            String      @default("FLUX 3 Image Klein")
   workflowKind     String      @default("image.flux")
-  projectId        String?
   seed             Int?
   progress         Float?
   createdAt        DateTime    @default(now())
@@ -79,30 +77,10 @@ model JobOutput {
   @@index([jobId])
 }
 
-model Project {
-  id        String       @id
-  ownerId   String
-  owner     User         @relation(fields: [ownerId], references: [id])
-  name      String
-  direction String       @default("")
-  /// The shared look (palette, lighting, lens, texture, pacing) as JSON.
-  look      Json         @default("{}")
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
-  elements  Element[]
-  media     MediaAsset[]
-  revisions Revision[]
-  sequences Sequence[]
-
-  @@index([ownerId, updatedAt])
-}
-
 model Element {
   id          String             @id
   ownerId     String
   owner       User               @relation(fields: [ownerId], references: [id])
-  projectId   String?
-  project     Project?           @relation(fields: [projectId], references: [id], onDelete: SetNull)
   type        String
   name        String
   handle      String
@@ -160,8 +138,6 @@ model MediaAsset {
   id          String   @id
   ownerId     String
   owner       User     @relation(fields: [ownerId], references: [id])
-  projectId   String?
-  project     Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
   kind        String
   status      String
   mediaType   String
@@ -188,8 +164,6 @@ model Revision {
   id               String   @id
   ownerId          String
   owner            User     @relation(fields: [ownerId], references: [id])
-  projectId        String?
-  project          Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
   parentRevisionId String?
   sourceType       String
   sourceAssetId    String?
@@ -215,8 +189,6 @@ model Sequence {
   id        String   @id
   ownerId   String
   owner     User     @relation(fields: [ownerId], references: [id])
-  projectId String?
-  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
   title     String
   idea      String   @default("")
   createdAt DateTime @default(now())
@@ -224,25 +196,24 @@ model Sequence {
   shots     Shot[]
 
   @@index([ownerId, updatedAt])
-  @@index([projectId])
 }
 
 model Shot {
-  id              String      @id
+  id              String     @id
   sequenceId      String
-  sequence        Sequence    @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  sequence        Sequence   @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
   sortOrder       Int
   title           String
-  beat            String      @default("")
-  prompt          String      @default("")
+  beat            String     @default("")
+  prompt          String     @default("")
   /// Who stands where, which side the camera is on, what the light does.
-  staging         String      @default("")
+  staging         String     @default("")
   framing         String
   camera          String
   durationSeconds Int
-  continuity      String      @default("fresh")
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  continuity      String     @default("fresh")
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
   takes           ShotTake[]
 
   @@index([sequenceId, sortOrder])

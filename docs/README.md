@@ -16,7 +16,7 @@ Researched on **2026-10-16** from official Comfy sources. These files summarize 
 | Platform overview      | [Developer overview](developer-overview.md)           | Choose an integration path                          |
 | Workflow execution     | [Workflow APIs and SDKs](workflow-apis-and-sdks.md)   | Run graphs from an application and retrieve results |
 | Hosted model access    | [Comfy Router](comfy-router.md)                       | Invoke partner models through one API               |
-| Hosting and deployment | [Deployment](comfy-hosting.md)                           | Cloud, managed endpoints, or self-hosted execution  |
+| Hosting and deployment | [Deployment](comfy-hosting.md)                        | Cloud, managed endpoints, or self-hosted execution  |
 | Backend extensions     | [Custom nodes](custom-nodes.md)                       | Add Python processing and model integrations        |
 | Editor extensions      | [Frontend extensions](frontend-extensions.md)         | Add UI behavior, panels, commands, and widgets      |
 | Distribution           | [Registry and publishing](registry-and-publishing.md) | Version and distribute reusable node packages       |
@@ -30,7 +30,7 @@ Primary entry points: [developer documentation](https://docs.comfy.org/developme
 - [Generation MVP](generation-mvp.md): the first image pipeline, its job lifecycle, consistency rules and local verification.
 - [Sign-in and public deployment](auth.md): the `AUTH_MODE` options and how to put a deployment behind Cloudflare Access.
 - [Design system](../DESIGN.md): the identity, tokens, typography, colour and motion rules for the studio.
-- [Project direction, combined states and recipes](project-direction.md): the project look, per-shot direction, state kinds and recipes.
+- [Direction, combined states and recipes](direction.md): per-shot looks and direction, state kinds and recipes.
 - [Elements: the default path](elements.md): the anchor-first next step shared by Characters, Locations and Things, the defaults the app decides, Thing turnarounds, and which references a mention sends.
 - [Character sheets](character-sheets.md): the three-panel sheet, close portraits with and without a smile, states as sheets of their own, and how heads are removed from the full-body panels.
 - [Character recast on LTX 2.5](recast-ltx.md): an all-Lightricks open-weights recast graph, its live comparison with Kling, and the proposal for our own recast IC-LoRA.

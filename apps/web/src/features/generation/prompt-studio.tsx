@@ -7,7 +7,6 @@ import {
   type GenerationRequest,
   type ImageAspectRatio,
   type Look,
-  type Project,
   type ShotDirection,
   type WorkflowCommandInput,
 } from "@open-cinema/contracts";
@@ -40,11 +39,6 @@ import {
   useCostPreferences,
 } from "@/features/settings/preferences";
 import { StudioDirection } from "@/features/direction/studio-direction";
-import {
-  reloadProjects,
-  setCurrentProject,
-  useProjects,
-} from "@/features/direction/projects";
 import { acceptSnapshot, reconnectGeneration, useGeneration } from "./store";
 import { takeStudioDraft, type StudioDraft } from "./draft";
 import {
@@ -70,14 +64,7 @@ const ASPECTS = [
   { value: "9:16", label: "Vertical" },
 ] as const satisfies readonly { value: ImageAspectRatio; label: string }[];
 
-export function PromptStudio({
-  introduction,
-  projectId,
-}: {
-  introduction: ReactNode;
-  /** A project chosen by link, e.g. "Make a shot" on a project page. */
-  projectId?: string;
-}) {
+export function PromptStudio({ introduction }: { introduction: ReactNode }) {
   const { snapshot, connection } = useGeneration();
   const form = useRef<HTMLFormElement>(null);
   const [ideasOpen, setIdeasOpen] = useState(false);
@@ -90,15 +77,6 @@ export function PromptStudio({
   const [overrides, setOverrides] = useState<Look>(draft?.overrides ?? {});
   const [shot, setShot] = useState<ShotDirection>(draft?.shot ?? {});
   const [recipe, setRecipe] = useState(draft?.recipe ?? null);
-  const projects = useProjects();
-  // A linked project wins until the creator picks another.
-  const [chosen, setChosen] = useState<string | null | undefined>(projectId);
-  const selectedId = chosen !== undefined ? chosen : projects.currentId;
-  const project = projects.projects.find((p) => p.id === selectedId) ?? null;
-  function chooseProject(id: string | null) {
-    setChosen(id);
-    setCurrentProject(id);
-  }
   const [camera, setCamera] = useState<CameraMove | null>(
     draft?.camera ?? null,
   );
@@ -113,7 +91,7 @@ export function PromptStudio({
     referencesOffered &&
     (source ?? (prefersReferences(mentions) ? "references" : "words")) ===
       "references";
-  const direction = studioDirection(project, overrides, shot, recipe);
+  const direction = studioDirection(overrides, shot, recipe);
   const request = studioRequest(
     prompt,
     mentions,
@@ -133,7 +111,6 @@ export function PromptStudio({
       await beginLocalSession();
       reconnectGeneration();
       await reloadElements();
-      await reloadProjects();
     } catch {
       setError(
         "Local sessions are unavailable. Check AUTH_MODE and LOCAL_MVP_ENABLED in your .env file.",
@@ -153,7 +130,6 @@ export function PromptStudio({
     const command: WorkflowCommandInput = uncertain ?? {
       idempotencyKey: crypto.randomUUID(),
       request,
-      ...(project ? { projectId: project.id } : {}),
     };
     setBusy(true);
     setError("");
@@ -341,9 +317,6 @@ export function PromptStudio({
           </div>
           <MentionSummary mentions={mentions} className="mt-3" />
           <StudioDirection
-            projects={projects.projects}
-            project={project}
-            onProject={chooseProject}
             overrides={overrides}
             onOverrides={setOverrides}
             shot={shot}
@@ -470,7 +443,6 @@ export function PromptStudio({
                   ? `LTX-2 with the ${CAMERA_MOVES[request.inputs.camera].label.toLowerCase()} camera LoRA · ${request.inputs.durationSeconds} s · 720p with sound · on Comfy Cloud`
                   : `LTX 2.5 Fast · ${request.inputs.durationSeconds} s · 720p with sound`
                 : `FLUX 3 · 1K ${aspect === "1:1" ? "square" : aspect}`}
-            {project && ` · filed under ${project.name}`}
             {request.workflowKind === "image.flux-reference" &&
               ` · ${request.inputs.references.length} ${request.inputs.references.length === 1 ? "reference" : "references"} from your Elements`}
             {shouldShowEstimate(preferences, medium) &&

@@ -11,6 +11,7 @@ export const capabilityIdSchema = z.enum([
   "flux-image",
   "flux-references",
   "character-sheets",
+  // Shown as "Look"; the id stays because saved recipes store it.
   "project-look",
   "ltx-video",
   "flux-video",
@@ -99,12 +100,11 @@ export const CAPABILITIES: Record<CapabilityId, Capability> = {
   },
   "project-look": {
     id: "project-look",
-    name: "Project look",
+    name: "Look",
     kind: "technique",
     purpose:
-      "Palette, lighting, lens, texture and pacing shared by every shot in a project.",
-    influence:
-      "Written into each prompt as camera language; a shot can override any field without changing the project.",
+      "Palette, lighting, lens, texture and pacing chosen for a shot or carried by a recipe.",
+    influence: "Written into each prompt as camera language.",
     media: ["image", "video"],
     uses: [],
     readsReferences: false,

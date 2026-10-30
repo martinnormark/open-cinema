@@ -2,7 +2,6 @@ export { createWorkflow } from "./workflows";
 export { ensureUser } from "./users";
 
 export { applyJobSnapshot } from "./jobs";
-export { createProject, updateProject } from "./projects";
 export {
   createRecipe,
   deleteRecipe,

@@ -16,7 +16,6 @@ import {
   templateSlotKeys,
   type Element,
   type ElementState,
-  type Project,
   type Recipe,
   type RecipeSlot,
   type RecipeSpec,
@@ -30,13 +29,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 import { assetUrl, elementTypes } from "@/features/elements/model";
 import { resolveMentions } from "@/features/elements/mentions";
 import { useElements } from "@/features/elements/store";
 import { DirectionChips, directionParts } from "@/features/direction/controls";
-import { setCurrentProject, useProjects } from "@/features/direction/projects";
 import { openInStudio } from "@/features/generation/draft";
 import { studioRequest } from "@/features/generation/request";
 import { acceptSnapshot } from "@/features/generation/store";
@@ -436,7 +433,7 @@ function Preview({ view }: { view: RecipeView }) {
 /** The template with its slots marked, the source subjects and the treatment. */
 function Treatment({ view }: { view: RecipeView }) {
   const { spec } = view;
-  const parts = directionParts(spec.look, undefined, spec.shot, spec.medium);
+  const parts = directionParts(spec.look, spec.shot, spec.medium);
   const pieces = spec.template.split(/(\{[a-z][a-z0-9]{0,19}\}|\[|\])/);
   const slotLabel = (key: string) =>
     spec.slots.find((s) => s.key === key)?.label ?? key;
@@ -510,20 +507,13 @@ function Treatment({ view }: { view: RecipeView }) {
   );
 }
 
-const NO_PROJECT = "none";
-
 /** Cast your own Elements into the recipe's slots and generate. */
 function UseRecipe({ view }: { view: RecipeView }) {
   const { spec } = view;
   const navigate = useNavigate();
   const { elements, status } = useElements();
-  const projects = useProjects();
   const preferences = useCostPreferences();
   const [choices, setChoices] = useState<SlotChoices>({});
-  const [chosenProject, setChosenProject] = useState<
-    string | null | undefined
-  >();
-  const [keepProjectLook, setKeepProjectLook] = useState(false);
   const [busy, setBusy] = useState(false);
   // Kept until a definite answer, so retrying an interrupted request finds
   // the job it may already have started instead of running it twice. A
@@ -534,18 +524,12 @@ function UseRecipe({ view }: { view: RecipeView }) {
   } | null>(null);
   const [error, setError] = useState("");
   const [started, setStarted] = useState<string | null>(null);
-  const projectId =
-    chosenProject !== undefined ? chosenProject : projects.currentId;
-  const project: Project | null =
-    projects.projects.find((p) => p.id === projectId) ?? null;
   const prompt = recipePrompt(spec, choices);
   const notes = compatibility(spec, choices);
   const blocked = notes.some((n) => n.level === "blocker");
   const direction = recipeDirection(
     { id: view.id, version: view.version, name: view.name },
     spec,
-    project,
-    keepProjectLook,
   );
   const mentions = resolveMentions(prompt, elements);
   const request = studioRequest(
@@ -563,16 +547,12 @@ function UseRecipe({ view }: { view: RecipeView }) {
     setBusy(true);
     setError("");
     setStarted(null);
-    const body = JSON.stringify([request, project?.id]);
+    const body = JSON.stringify(request);
     const key = pending?.body === body ? pending.key : crypto.randomUUID();
     setPending({ key, body });
     try {
       const result = await submitWorkflow({
-        data: {
-          idempotencyKey: key,
-          request,
-          ...(project ? { projectId: project.id } : {}),
-        },
+        data: { idempotencyKey: key, request },
       });
       setPending(null);
       if (result.ok) {
@@ -611,63 +591,9 @@ function UseRecipe({ view }: { view: RecipeView }) {
               }
             />
           ))}
-        <div>
-          <label htmlFor="recipe-project" className="text-sm font-medium">
-            Project
-          </label>
-          <Select
-            value={project?.id ?? NO_PROJECT}
-            onValueChange={(value) => {
-              const id = value === NO_PROJECT ? null : value;
-              setChosenProject(id);
-              setCurrentProject(id);
-            }}
-          >
-            <SelectTrigger id="recipe-project" className="mt-2 w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NO_PROJECT}>No project</SelectItem>
-              {projects.projects.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {project && (
-            <div className="mt-3">
-              <p
-                id="recipe-look-label"
-                className="text-xs text-muted-foreground"
-              >
-                Look
-              </p>
-              <ToggleGroup
-                type="single"
-                variant="outline"
-                size="sm"
-                value={keepProjectLook ? "project" : "recipe"}
-                onValueChange={(value) =>
-                  value && setKeepProjectLook(value === "project")
-                }
-                aria-labelledby="recipe-look-label"
-                className="mt-1.5"
-              >
-                <ToggleGroupItem value="recipe" className="px-3">
-                  Recipe’s look
-                </ToggleGroupItem>
-                <ToggleGroupItem value="project" className="px-3">
-                  {project.name}’s look
-                </ToggleGroupItem>
-              </ToggleGroup>
-            </div>
-          )}
-        </div>
         <DirectionChips
           parts={directionParts(
             direction.overrides,
-            direction.project?.look,
             direction.shot,
             spec.medium,
           )}
@@ -729,9 +655,6 @@ function UseRecipe({ view }: { view: RecipeView }) {
                 ...(spec.medium === "video" ? { camera: spec.camera } : {}),
                 recipe: { id: view.id, version: view.version, name: view.name },
               });
-              // "No project" must not leave the shot filed under, and lit by,
-              // whichever project the studio last had open.
-              setCurrentProject(project?.id ?? null);
               void navigate({ to: "/studio" });
             }}
           >
@@ -745,22 +668,10 @@ function UseRecipe({ view }: { view: RecipeView }) {
           {shouldShowEstimate(preferences, spec.medium) &&
             estimate.credits &&
             ` · about ${formatCost(estimate.credits, preferences.unit)}`}
-          {project && ` · filed under ${project.name}`}
         </p>
         {started && (
           <p role="status" className="text-sm leading-6">
-            Generating.{" "}
-            {project ? (
-              <Link
-                to="/projects/$projectId"
-                params={{ projectId: project.id }}
-              >
-                Follow it in {project.name}
-              </Link>
-            ) : (
-              <Link to="/library">It lands in your Library</Link>
-            )}
-            .
+            Generating. <Link to="/library">It lands in your Library</Link>.
           </p>
         )}
         {error && (

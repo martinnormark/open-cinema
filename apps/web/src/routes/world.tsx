@@ -1,14 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { z } from "zod";
 import { PackageOpen } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { WorldPage } from "@/features/world/world-page";
 import { getWorldHome } from "@/server/world";
 
 export const Route = createFileRoute("/world")({
-  validateSearch: z.object({ project: z.string().max(100).optional() }),
   loader: () => getWorldHome(),
   head: () => ({ meta: [{ title: "Move your world · Open Cinema" }] }),
   component: World,
@@ -16,7 +14,6 @@ export const Route = createFileRoute("/world")({
 
 function World() {
   const home = Route.useLoaderData();
-  const search = Route.useSearch();
   if (!home.signedIn)
     return (
       <section className="mx-auto w-full max-w-6xl space-y-8 px-6 py-10 md:px-12 md:py-14">
@@ -40,7 +37,5 @@ function World() {
         </EmptyState>
       </section>
     );
-  return (
-    <WorldPage projects={home.projects} initialProjectId={search.project} />
-  );
+  return <WorldPage />;
 }

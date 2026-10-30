@@ -97,7 +97,6 @@ export const jobSchema = z.object({
   prompt: z.string().default(""),
   model: z.string().default("FLUX 3 Image Klein"),
   workflowKind: workflowKindSchema.default("image.flux"),
-  projectId: z.string().nullable().default(null),
   seed: z.number().int().nonnegative().nullable().default(null),
   progress: z.number().min(0).max(1).nullable().default(null),
   /** Creator-facing step of a multi-step job, e.g. "Locking the performers". */

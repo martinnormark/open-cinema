@@ -5,7 +5,7 @@ import {
   ChevronDown,
   ChevronRight,
   BookOpen,
-  Folder,
+  History,
   PackageOpen,
   Clapperboard,
   Film,
@@ -60,13 +60,21 @@ const groups = [
   },
   {
     title: "Revise",
-    items: takeGoals.map((goal) => ({
-      title: goal.title,
-      to: "/revisions/new",
-      icon: GOAL_ICONS[goal.id],
-      description: goal.promise,
-      kind: goal.kind,
-    })),
+    items: [
+      ...takeGoals.map((goal) => ({
+        title: goal.title,
+        to: "/revisions/new",
+        icon: GOAL_ICONS[goal.id],
+        description: goal.promise,
+        kind: goal.kind,
+      })),
+      {
+        title: "Your revisions",
+        to: "/revisions",
+        icon: History,
+        description: "Every change you made to a take",
+      },
+    ],
   },
   {
     title: "World",
@@ -82,12 +90,6 @@ const groups = [
         to: "/library",
         icon: Images,
         description: "Uploads and generated media",
-      },
-      {
-        title: "Projects",
-        to: "/projects",
-        icon: Folder,
-        description: "A shared direction for your shots",
       },
       {
         title: "Move your world",
@@ -112,7 +114,6 @@ export function AppTopBar() {
   const search = location.search as {
     kind?: ReplacementKind;
     source?: string;
-    project?: string;
   };
   const isRevision = location.pathname.startsWith("/revisions/");
   const current = (item: Destination) =>
@@ -121,7 +122,8 @@ export function AppTopBar() {
         location.pathname === "/revisions/new" &&
         (search.kind ?? "background") === item.kind
       : location.pathname === item.to ||
-        location.pathname.startsWith(`${item.to}/`);
+        // A single revision belongs to the Revise menu, not to its list.
+        (!isRevision && location.pathname.startsWith(`${item.to}/`));
   const group =
     groups.find((g) => g.items.some(current)) ??
     (isRevision ? groups[1] : undefined);
@@ -139,9 +141,6 @@ export function AppTopBar() {
           search: {
             kind: item.kind,
             ...(isRevision && search.source ? { source: search.source } : {}),
-            ...(isRevision && search.project
-              ? { project: search.project }
-              : {}),
           },
         }
       : {}),

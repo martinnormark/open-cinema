@@ -104,25 +104,3 @@ export async function getJobContext(
     ...contextFrom(row),
   };
 }
-
-/** Every generation filed under a project, newest first, with its request. */
-export async function listProjectJobs(
-  db: DatabaseContext,
-  scope: OwnerScope,
-  projectId: string,
-): Promise<JobContext[]> {
-  const rows = await getClient(db).generationJob.findMany({
-    where: { ownerId: scope.ownerId, projectId },
-    include: { outputs: true },
-    orderBy: { createdAt: "desc" },
-    take: 100,
-  });
-  return rows.map((row) => ({
-    job: jobSchema.parse({
-      ...row,
-      createdAt: row.createdAt.toISOString(),
-      updatedAt: row.updatedAt.toISOString(),
-    }),
-    ...contextFrom(row),
-  }));
-}
