@@ -1,6 +1,5 @@
-import { env } from "./runtime";
-import { applyMigrations } from "./runtime";
-import { beforeAll, expect, it } from "bun:test";
+import { applyMigrations, env, reset } from "./runtime";
+import { beforeEach, expect, it } from "bun:test";
 import { approvedReferences, missingViews } from "@open-cinema/contracts";
 import { createDatabase } from "@open-cinema/database";
 import {
@@ -23,7 +22,10 @@ import {
   listRevisions,
 } from "@open-cinema/database/queries";
 
-beforeAll(() => applyMigrations(env.DB, env.TEST_MIGRATIONS));
+beforeEach(async () => {
+  await reset();
+  await applyMigrations(env.DB, env.TEST_MIGRATIONS);
+});
 
 async function readyUpload(
   db: ReturnType<typeof createDatabase>,

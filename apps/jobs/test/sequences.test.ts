@@ -1,6 +1,5 @@
-import { env } from "./runtime";
-import { applyMigrations } from "./runtime";
-import { beforeAll, expect, it } from "bun:test";
+import { applyMigrations, env, reset } from "./runtime";
+import { beforeEach, expect, it } from "bun:test";
 import {
   approvedTake,
   composeShotPrompt,
@@ -22,7 +21,10 @@ import {
 } from "@open-cinema/database/mutations";
 import { getSequence, listSequences } from "@open-cinema/database/queries";
 
-beforeAll(() => applyMigrations(env.DB, env.TEST_MIGRATIONS));
+beforeEach(async () => {
+  await reset();
+  await applyMigrations(env.DB, env.TEST_MIGRATIONS);
+});
 
 async function readyImage(
   db: ReturnType<typeof createDatabase>,

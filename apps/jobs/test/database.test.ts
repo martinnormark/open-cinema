@@ -1,6 +1,5 @@
-import { env } from "./runtime";
-import { applyMigrations } from "./runtime";
-import { beforeAll, expect, it } from "bun:test";
+import { applyMigrations, env, reset } from "./runtime";
+import { beforeEach, expect, it } from "bun:test";
 import { createDatabase } from "@open-cinema/database";
 import { createWorkflow, ensureUser } from "@open-cinema/database/mutations";
 import {
@@ -9,7 +8,10 @@ import {
   listJobs,
 } from "@open-cinema/database/queries";
 
-beforeAll(() => applyMigrations(env.DB, env.TEST_MIGRATIONS));
+beforeEach(async () => {
+  await reset();
+  await applyMigrations(env.DB, env.TEST_MIGRATIONS);
+});
 
 it("runs Prisma queries and mutations against SQLite with ownership isolation", async () => {
   const db = createDatabase(env.DB);
