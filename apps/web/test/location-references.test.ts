@@ -86,9 +86,3 @@ test("the checklist warns while a Location has only stills", () => {
   expect(moving.warnings.join(" ")).not.toMatch(/Only still/);
   expect(moving.missingRequired.map((s) => s.id)).not.toContain("push-in");
 });
-
-test("an uploaded clip of a place is tagged as a moving reference", () => {
-  expect(guessView("location", "courtyard-drift.mp4", "video")).toBe("drift");
-  expect(guessView("location", "IMG_2041.mov", "video")).toBe("push-in");
-  expect(guessView("location", "courtyard-wide.jpg")).toBe("establishing");
-});

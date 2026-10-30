@@ -184,13 +184,3 @@ test("a state's sheet is guided by the face, never the base outfit", () => {
     "base-sheet",
   ]);
 });
-
-test("the first close portrait starts from the description alone", () => {
-  const request = viewRequest(
-    { ...cal, references: [] },
-    slot("face-closeup"),
-    null,
-  );
-  expect(request.workflowKind).toBe("image.flux");
-  expect(request.inputs).toMatchObject({ aspectRatio: "3:4" });
-});

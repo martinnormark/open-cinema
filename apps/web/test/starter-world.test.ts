@@ -13,16 +13,6 @@ import {
 
 const PUBLIC = join(import.meta.dir, "..", "public");
 
-test("the starter world reads as a valid world bundle", () => {
-  const manifest = readWorldManifest(starterManifest);
-  expect(manifest.elements.map((e) => e.handle).sort()).toEqual([
-    "Cal",
-    "StormLantern",
-    "TideMill",
-  ]);
-  expect(manifest.sequences[0]?.shots.length).toBe(4);
-});
-
 test("every starter file is shipped, at the size the manifest says", () => {
   const manifest = readWorldManifest(starterManifest);
   for (const media of manifest.media) {

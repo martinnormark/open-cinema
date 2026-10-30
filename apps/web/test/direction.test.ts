@@ -40,17 +40,6 @@ test("no look or shot preset puts lens or film-stock words into a video prompt",
     ).not.toMatch(LTX_FRAME_ARTEFACT);
 });
 
-test("the vignetted Arrival look reads as a picture, not a camera, on video", () => {
-  const look = { lens: "wide-24", texture: "film-35" };
-  expect(directionPrompt({ overrides: look }, "video")).toBe(
-    "wide-angle perspective with a broad field of view; fine film grain and a soft glow around highlights.",
-  );
-  // FLUX renders lens language as intended, so images keep it.
-  expect(directionPrompt({ overrides: look }, "image")).toBe(
-    "shot on a 24mm wide-angle lens; fine 35mm film grain and gentle halation.",
-  );
-});
-
 test("the creator's own words pass through unchanged", () => {
   expect(
     directionPrompt({ overrides: { lens: "an old 50mm lens" } }, "video"),

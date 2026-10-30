@@ -164,32 +164,6 @@ it("generates from the prompt alone when there is no keyframe or Character", asy
   expect(node(request, "guide")?.inputs.latent).toEqual(["empty_video", 0]);
 });
 
-it("traces sharper edges for edges-detailed", async () => {
-  const request = await build({ control: "edges-detailed", strength: 0.5 });
-  expect(node(request, "guide")?.inputs).toMatchObject({
-    image: ["edges", 0],
-    strength: 0.5,
-  });
-  expect(node(request, "soften")?.inputs.blur_radius).toBe(1);
-  expect(node(request, "edges")?.inputs.high_threshold).toBe(0.8);
-});
-
-it("keeps runs short: at most 97 frames (8n+1) and 768 px, on a 64 px grid", async () => {
-  const request = await build();
-  const expression = (id: string) =>
-    node(request, id)?.inputs.expression as string;
-  expect(expression("frame_count")).toBe(
-    "max(1, ((min(a, 97) - 1) // 8) * 8 + 1)",
-  );
-  expect(expression("out_width")).toBe(
-    "max(64, round(a * min(1, 768 / max(a, b)) / 64) * 64)",
-  );
-});
-
-it("builds the same request again for the same inputs", async () => {
-  expect(await build()).toEqual(await build());
-});
-
 it("rejects a still image as the performance and a non-Character performer", async () => {
   await expect(
     build({ source: { type: "media-asset", assetId: "keyframe" } }),

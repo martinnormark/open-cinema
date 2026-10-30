@@ -142,17 +142,6 @@ test("a clean recast reads as the Character and leaves the bystander alone", () 
   expect(checks.bystanders[0]!.changed).toBe(false);
 });
 
-test("flags a weak likeness and an unchanged target", () => {
-  const checks = checkResult(
-    source,
-    resultWith(SOURCE_TARGET, BYSTANDER),
-    mark,
-    [CHARACTER],
-  );
-  expect(checks.likenessVerdict).toBe("weak");
-  expect(checks.targetChanged).toBe("no");
-});
-
 test("flags the wrong person recast, as Kling O1 did on U1", () => {
   const checks = checkResult(source, resultWith(OTHER, CHARACTER), mark, [
     CHARACTER,

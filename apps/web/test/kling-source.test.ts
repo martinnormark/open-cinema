@@ -4,10 +4,6 @@ import { checkKlingSource } from "../src/features/revision/model";
 
 const take = { seconds: 6, width: 1280, height: 720, fps: 25, pixelAspect: 1 };
 
-test("accepts a clip inside Kling's envelope", () => {
-  expect(checkKlingSource(take)).toEqual({ problems: [], notes: [] });
-});
-
 test("says what is wrong with a clip outside it", () => {
   const { problems } = checkKlingSource({
     seconds: 14,

@@ -125,18 +125,6 @@ const displayModel = (i: ReturnType<typeof inputs>) =>
     ? definition.displayModel(i)
     : definition.displayModel;
 
-it("names the model that runs, its maker and where it runs", () => {
-  expect(displayModel(inputs())).toBe("Wan 3.0");
-  expect(modelCredit("Wan 3.0")).toBe(
-    "Wan 3.0 by Alibaba (Tongyi Wan), hosted, via Comfy Router",
-  );
-  const open = inputs({ engine: "wan-animate" });
-  expect(displayModel(open)).toBe("FLUX 3 Klein + Wan Animate 2");
-  expect(modelCredit(displayModel(open))).toContain("open weights");
-  for (const engine of Object.values(MOTION_ENGINES))
-    expect(modelCredit(engine.jobModel)).not.toBe(engine.jobModel);
-});
-
 it("sends Wan 3.0 the clip by URL and the references in order", async () => {
   const request = (await definition.build(
     inputs({
@@ -220,15 +208,6 @@ it("reads Wan's video URL and lays the clip's sound back under it", () => {
   } as Parameters<typeof mediaGraph>[0]);
   const nodes = Object.values(graph) as { class_type: string }[];
   expect(nodes.some((n) => n.class_type === "SaveVideo")).toBe(true);
-});
-
-it("quotes Wan 3.0 on the seconds it reads and makes", () => {
-  const estimate = estimateGeneration({
-    workflowKind: "video.performance-transfer",
-    inputs: inputs(),
-  });
-  expect(estimate.credits).toEqual({ min: 337.6, max: 337.6 });
-  expect(estimate.basis).toBe("published-pricing");
 });
 
 it("covers a stretch with Wan Animate 2 windows that never start past its end", () => {

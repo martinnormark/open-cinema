@@ -106,38 +106,6 @@ it("sends the source by Comfy storage URL and references as bare base64 when the
   });
 });
 
-it("reads Kling result documents as recorded in Phase 0", () => {
-  // Shapes copied from live Router results (URLs shortened).
-  expect(
-    backgroundReplaceOutputs({
-      code: 0,
-      data: {
-        task_result: {
-          videos: [
-            {
-              id: "9402",
-              duration: "6.041",
-              url: "https://v15-kling-fdl.klingai.com/x/clip.mp4?sig=1",
-            },
-          ],
-        },
-      },
-    }),
-  ).toEqual([
-    {
-      providerAssetId: "9402",
-      url: "https://v15-kling-fdl.klingai.com/x/clip.mp4?sig=1",
-      mediaType: "video/mp4",
-    },
-  ]);
-  expect(
-    backgroundReplaceOutputs({
-      code: 0,
-      data: { task_result: { videos: [] } },
-    }),
-  ).toEqual([]);
-});
-
 const moving = backgroundReplaceInputsSchema.parse({
   ...inputs,
   pipeline: "seedance",

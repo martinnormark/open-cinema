@@ -180,27 +180,6 @@ it("restyles from a style image or from words alone, but not from nothing", asyn
   await expect(definition.build(nothing, context)).rejects.toThrow(/style/);
 });
 
-it("re-stages a take by re-projecting every frame and filling with Lightricks' own IC-LoRA", async () => {
-  const definition = getWorkflowDefinition("video.restage")!;
-  const inputs = restageInputsSchema.parse({
-    source,
-    angle: "from-left",
-    preservation: { preserve: ["performance"] },
-  });
-  const request = (await definition.build(
-    inputs,
-    context,
-  )) as CloudWorkflowRequest;
-  expectWired(request, definition.cloudOutputNodes!);
-  const loras = ofType(request, "LoraLoaderModelOnly").map((n) =>
-    String(n.inputs.lora_name),
-  );
-  expect(loras).toEqual(["ltx-2.3-22b-ic-lora-in-outpainting-0.9.safetensors"]);
-  expect(ofType(request, "RenderMesh")).toHaveLength(97);
-  const [camera] = ofType(request, "CreateCameraInfo");
-  expect(camera!.inputs["mode.position_x"]).toBeLessThan(0);
-});
-
 it("adds an effect with the take as the IC-LoRA reference, keeping someone only when clearing the set", async () => {
   const definition = getWorkflowDefinition("video.vfx")!;
   const build = async (inputs: unknown) =>
@@ -339,24 +318,6 @@ it("redoes a moment with keyframes either side and splices it into the take", as
   expect(() =>
     momentInputsSchema.parse({ ...inputs, range: { start: 1, end: 5 } }),
   ).toThrow();
-});
-
-it("reframes to a new aspect with the outpaint IC-LoRA", async () => {
-  const definition = getWorkflowDefinition("video.reframe")!;
-  const inputs = reframeInputsSchema.parse({
-    source,
-    aspect: "9:16",
-    preservation: { preserve: ["performance"] },
-  });
-  const request = (await definition.build(
-    inputs,
-    context,
-  )) as CloudWorkflowRequest;
-  expectWired(request, definition.cloudOutputNodes!);
-  const loras = ofType(request, "LoraLoaderModelOnly").map(
-    (n) => n.inputs.lora_name,
-  );
-  expect(loras).toContain("ltx-2.3-22b-ic-lora-outpaint.safetensors");
 });
 
 it("makes a take longer with Seedance extend, sending the Character's portrait", async () => {

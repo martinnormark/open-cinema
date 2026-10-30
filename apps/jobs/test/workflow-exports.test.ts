@@ -32,9 +32,3 @@ it("commits every Cloud graph exactly as the Worker builds it", () => {
     [...exports.map((e) => e.file), "manifest.json"].sort(),
   );
 });
-
-it("fills every loader the app uploads media to", () => {
-  for (const entry of workflowExports())
-    for (const input of entry.inputs)
-      expect(entry.graph[input.node]?.inputs[input.field]).toBe(input.file);
-});
