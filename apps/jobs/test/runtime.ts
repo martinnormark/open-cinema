@@ -67,7 +67,10 @@ export async function reset() {
   env.GENERATED_ASSETS = new FileAssetStore(join(directory, "assets"));
   service = new JobService(directory, env);
 }
-export function applyMigrations(filename: string, names: string[]) {
+export async function applyMigrations(filename: string, names: string[]) {
+  // Match startup: migrations finish before Prisma opens the catalog. Bun's
+  // SQLite and libsql must not keep the same WAL open across migration setup.
+  await closeDatabases();
   migrateDatabase(filename, names);
 }
 export async function runWake(coordinator: GenerationCoordinator) {
