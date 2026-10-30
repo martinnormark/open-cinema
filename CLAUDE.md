@@ -2,4 +2,4 @@
 
 @AGENTS.md
 
-Before any UI work, read [DESIGN.md](DESIGN.md): it defines the Open Cinema identity and tokens, and `bun run --cwd apps/web test` enforces them.
+Use AGENTS.md as the shared source of repository instructions. Follow its task-based reading map for Docker deployment, the Comfy workflow package and UI work; load detailed guides only when relevant. Keep shared rules there or in the linked guides rather than duplicating them here.
