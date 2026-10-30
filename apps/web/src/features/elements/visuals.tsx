@@ -120,7 +120,7 @@ export function SessionRequired({ className }: { className?: string }) {
               startSession()
                 .catch(() =>
                   setError(
-                    "Local testing is not configured. Set up the local session variables in apps/web/.dev.vars.",
+                    "Local sessions are unavailable. Check AUTH_MODE and LOCAL_MVP_ENABLED in your .env file.",
                   ),
                 )
                 .finally(() => setBusy(false));

@@ -1,7 +1,14 @@
-import { env } from "cloudflare:workers";
-import { reset } from "cloudflare:test";
-import { beforeAll, afterAll, beforeEach, afterEach, expect, it } from "vitest";
-import { setupNetwork } from "@msw/cloudflare";
+import { env, assetFiles } from "./runtime";
+import { reset } from "./runtime";
+import {
+  beforeAll,
+  afterAll,
+  beforeEach,
+  afterEach,
+  expect,
+  it,
+} from "bun:test";
+import { setupNetwork } from "./runtime";
 import { http, HttpResponse } from "msw";
 import {
   archiveOutput,
@@ -92,7 +99,7 @@ it("copies a chunked multipart asset byte-for-byte and serves HEAD, conditional 
 });
 
 it.each(["truncated", "oversized", "html", "redirect"])(
-  "does not publish an R2 object after a %s source response",
+  "does not publish a stored object after a %s source response",
   async (kind) => {
     let unsafeRequests = 0;
     network.use(
@@ -125,7 +132,7 @@ it.each(["truncated", "oversized", "html", "redirect"])(
         async () => url,
       ),
     ).rejects.toThrow();
-    expect((await env.GENERATED_ASSETS.list()).objects).toHaveLength(0);
+    expect(assetFiles()).toEqual([]);
     expect(unsafeRequests).toBe(0);
   },
 );

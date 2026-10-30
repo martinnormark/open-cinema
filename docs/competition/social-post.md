@@ -1,5 +1,7 @@
 # Launch post drafts
 
+> Deployment update (2026-10-30): the application now runs entirely in Docker with Bun, SQLite and private file storage. Infrastructure references and earlier verification results below describe the previous implementation. Use [deployment](../deployment.md) and [architecture](../../ARCHITECTURE.md) for current setup.
+
 Drafts for the #OpenSourceHiggsfield post the [entry form](../competition-submission.md) needs a link to. Pick one, edit, and post it with the video uploaded natively (not as a link), then paste the post's URL into the form. Written 2026-10-17 against the state of `main`; re-read the claims below if the app changes before posting.
 
 **Attach:** the demo cut [`docs/media/open-cinema-demo.mp4`](../media/open-cinema-demo.mp4) (1:58, captioned, silent). For a 30-second cut, see [The 30-second viral cut](../competition-submission.md#the-30-second-viral-cut); it is not made yet.

@@ -1,6 +1,6 @@
-import { env } from "cloudflare:workers";
-import { applyD1Migrations } from "cloudflare:test";
-import { beforeAll, expect, it } from "vitest";
+import { env } from "./runtime";
+import { applyMigrations } from "./runtime";
+import { beforeAll, expect, it } from "bun:test";
 import {
   approvedTake,
   readWorldManifest,
@@ -28,7 +28,7 @@ import {
   listRecipes,
 } from "@open-cinema/database/queries";
 
-beforeAll(() => applyD1Migrations(env.DB, env.TEST_MIGRATIONS));
+beforeAll(() => applyMigrations(env.DB, env.TEST_MIGRATIONS));
 
 async function readyImage(
   db: ReturnType<typeof createDatabase>,
@@ -213,7 +213,7 @@ it("carries a project's world to another studio and adapts what does not fit", a
   const copy = await getSequence(db, target, result.sequences[0]!.id);
   expect(copy!.projectId).toBe(result.projectId);
   expect(copy!.shots[0]!.prompt).toBe("@Mara2:wet holds up @Lantern");
-  expect(approvedTake(copy!.shots[0]!, "keyframe")?.asset).toEqual({
+  expect<unknown>(approvedTake(copy!.shots[0]!, "keyframe")?.asset).toEqual({
     type: "media-asset",
     assetId: uploads[raw.sequences![0]!.shots![0]!.takes![0]!.media],
   });

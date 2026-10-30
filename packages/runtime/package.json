@@ -1,0 +1,17 @@
+{
+  "name": "@open-cinema/runtime",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./transport": "./src/transport.ts",
+    "./auth": "./src/auth.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@open-cinema/assets": "workspace:*",
+    "@open-cinema/database": "workspace:*"
+  }
+}

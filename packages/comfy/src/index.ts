@@ -40,7 +40,7 @@ function failureMessage(errorType: string) {
       return "There are not enough Comfy credits for this generation.";
     case "unauthorized":
     case "forbidden":
-      return "Comfy Router rejected these credentials. Check the jobs Worker API key.";
+      return "Comfy Router rejected these credentials. Check the job service API key.";
     case "content_policy_violation":
       return "The model refused this request under its content policy, and nothing was charged. Seedance refuses takes with close, clear faces: for Make it longer, choose LTX 2.3. Otherwise try different words.";
     case "invalid_input":
@@ -85,7 +85,7 @@ export function createComfyClient(options: {
   if (options.provider === "cloud-workflow") return createCloudClient(options);
   if (!options.apiKey.trim()) throw new Error("Comfy credentials are required");
   // SDK 0.5 exposes Router configuration at module scope. Every coordinator uses
-  // the SAME Worker secret, never a caller-supplied key. BYOK requires an isolated client.
+  // the SAME server secret, never a caller-supplied key. BYOK requires an isolated client.
   comfy.config({
     credentials: options.apiKey,
     baseUrl: routerBaseUrl(options.baseUrl),

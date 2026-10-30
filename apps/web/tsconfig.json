@@ -3,7 +3,7 @@
   "compilerOptions": {
     "jsx": "react-jsx",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["vite/client", "node", "@cloudflare/workers-types"],
+    "types": ["vite/client", "node", "bun"],
     "paths": {
       "@/*": ["./src/*"]
     }
@@ -12,6 +12,7 @@
     "src/**/*.ts",
     "src/**/*.tsx",
     "vite.config.ts",
-    "worker-configuration.d.ts"
+    "server.ts",
+    "dev-server.ts"
   ]
 }

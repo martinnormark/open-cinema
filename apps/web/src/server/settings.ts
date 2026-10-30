@@ -21,11 +21,11 @@ export const getStudioSettings = createServerFn({ method: "GET" }).handler(
     const url = new URL(getRequest().url);
     let comfy: ComfyKeyStatus = "unknown";
     try {
-      // Only the jobs Worker holds COMFY_API_KEY, so ask it rather than read it here.
+      // Ask for readiness; never serialize a provider credential.
       const status = await getCoordinator("settings-probe").getProviderStatus();
       comfy = status.comfyConfigured ? "configured" : "missing";
     } catch {
-      /* Jobs Worker unreachable: say we don't know rather than guess. */
+      /* A configuration error makes provider readiness unknown. */
     }
     return {
       auth: getAuthStatus(),

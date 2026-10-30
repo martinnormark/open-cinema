@@ -1,5 +1,7 @@
 # Comfy competition and developer reference
 
+> Deployment update (2026-10-30): the application now runs entirely in Docker with Bun, SQLite and private file storage. Infrastructure references and earlier verification results below describe the previous implementation. Use [deployment](comfy-hosting.md) and [architecture](../ARCHITECTURE.md) for current setup.
+
 Researched on **2026-10-16** from official Comfy sources. These files summarize the source material; they are not verbatim archives. Rules, availability, API behavior, and pricing can change, so follow the linked documentation before submitting or implementing.
 
 ## Competition
@@ -14,7 +16,7 @@ Researched on **2026-10-16** from official Comfy sources. These files summarize 
 | Platform overview      | [Developer overview](developer-overview.md)           | Choose an integration path                          |
 | Workflow execution     | [Workflow APIs and SDKs](workflow-apis-and-sdks.md)   | Run graphs from an application and retrieve results |
 | Hosted model access    | [Comfy Router](comfy-router.md)                       | Invoke partner models through one API               |
-| Hosting and deployment | [Deployment](deployment.md)                           | Cloud, managed endpoints, or self-hosted execution  |
+| Hosting and deployment | [Deployment](comfy-hosting.md)                           | Cloud, managed endpoints, or self-hosted execution  |
 | Backend extensions     | [Custom nodes](custom-nodes.md)                       | Add Python processing and model integrations        |
 | Editor extensions      | [Frontend extensions](frontend-extensions.md)         | Add UI behavior, panels, commands, and widgets      |
 | Distribution           | [Registry and publishing](registry-and-publishing.md) | Version and distribute reusable node packages       |
@@ -56,3 +58,5 @@ Primary entry points: [developer documentation](https://docs.comfy.org/developme
 - [Router model catalog](comfy-router-catalog.md): every Router model and the inputs of those our workflows use.
 - [Comfy capabilities](comfy-capabilities.md): a historical record of the first Router checks for image and short video (2026-10-16).
 - [Scaffold verification](scaffold-verification.md): the checks run on the initial scaffold (2026-10-17).
+
+For the application itself, see [Docker deployment](deployment.md).

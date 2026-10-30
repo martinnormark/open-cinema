@@ -1,5 +1,7 @@
 # Competition submission plan
 
+> Deployment update (2026-10-30): the application now runs entirely in Docker with Bun, SQLite and private file storage. Infrastructure references and earlier verification results below describe the previous implementation. Use [deployment](deployment.md) and [architecture](../ARCHITECTURE.md) for current setup.
+
 Our entry to Comfy's [Open Source Higgsfield](https://comfy.org/open-source-higgsfield) competition. Rules, dates and prize conditions are summarised in [competition.md](competition.md) (verified 2026-10-16); re-check the landing page before submitting. Direction comes from [issue #1](https://github.com/martinnormark/open-cinema/issues/1) and the roadmap in [issue #2](https://github.com/martinnormark/open-cinema/issues/2).
 
 **Deadline: October 30, 2026, 9:00am Pacific (17:00 Copenhagen).** One submission per person, through the [entry form](https://form.typeform.com/to/V1dSQrkS).

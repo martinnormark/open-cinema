@@ -1,6 +1,6 @@
 // Which approved references lead when an Element is mentioned, and how
 // several Elements share one model's image limit.
-import { expect, it } from "vitest";
+import { expect, it } from "bun:test";
 import {
   approvedReferences,
   generationRequestSchema,

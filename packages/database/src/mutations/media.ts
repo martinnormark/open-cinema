@@ -12,7 +12,7 @@ import { toMediaAsset } from "../queries/media";
 import { ensureUser } from "./users";
 
 /**
- * Records an upload before its bytes land in R2. The caller chooses the
+ * Records an upload before its bytes land in private storage. The caller chooses the
  * object key (see packages/assets) and finishes with markMediaAssetReady.
  */
 export async function createPendingMediaAsset(
@@ -48,7 +48,7 @@ export async function createPendingMediaAsset(
   return toMediaAsset(row);
 }
 
-/** Only a pending upload can become ready; stored metadata comes from R2, not the client. */
+/** Only a pending upload can become ready; stored metadata comes from private storage, not the client. */
 export async function markMediaAssetReady(
   db: DatabaseContext,
   scope: OwnerScope,
@@ -78,7 +78,7 @@ export async function markMediaAssetFailed(
 }
 
 /**
- * Removes the record; the caller deletes the R2 bytes. Element references and
+ * Removes the record; the caller deletes the private storage bytes. Element references and
  * revisions hold typed refs, not foreign keys, so they resolve to null after.
  */
 export async function deleteMediaAsset(

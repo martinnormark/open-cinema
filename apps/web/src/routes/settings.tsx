@@ -37,9 +37,9 @@ const comfyDetail: Record<ComfyKeyStatus, string> = {
   configured:
     "Generations run through Comfy Router and are billed to the workspace that owns this key.",
   missing:
-    "Add COMFY_API_KEY to the jobs Worker (apps/jobs/.dev.vars locally, a Worker secret when deployed), then restart.",
+    "Add COMFY_API_KEY to your .env file or mount it as a Docker secret, then recreate the studio container.",
   unknown:
-    "The jobs Worker did not report its key status. Generating an image will tell you whether credentials are missing.",
+    "The server did not report its key status. Generating an image will tell you whether credentials are missing.",
 };
 
 function Settings() {
@@ -66,7 +66,7 @@ function Settings() {
         <div className="mt-10 rounded-xl border bg-surface">
           <SettingsSection
             title="Comfy"
-            description="Generation runs on Comfy Router with the key held by the jobs Worker. The key never reaches the browser."
+            description="Generation runs on Comfy Router and Comfy Cloud with the key held by the server. The key never reaches the browser."
           >
             <Row label="API key">
               <Badge variant={comfy.variant}>{comfy.label}</Badge>
@@ -170,8 +170,8 @@ function Settings() {
             <Row label="Mode">
               <span className="flex items-center gap-2">
                 <span className="text-sm">
-                  {settings.auth.mode === "cloudflare-access"
-                    ? "Cloudflare Access"
+                  {settings.auth.mode === "password"
+                    ? "Studio password"
                     : settings.auth.mode === "local"
                       ? "Local test session"
                       : "Not configured"}
@@ -213,7 +213,7 @@ function Settings() {
                 </code>
                 {settings.environment.secure ? "" : " · not HTTPS"}
               </Fact>
-              <Fact term="Runtime">Cloudflare Workers</Fact>
+              <Fact term="Runtime">Docker · Bun</Fact>
               <Fact term="Router models">
                 <ul className="flex flex-wrap gap-1.5">
                   {models.map((model) => (

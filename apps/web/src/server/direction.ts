@@ -16,7 +16,7 @@ type Stamped =
 
 /**
  * Files a command under its project and records the project look as it is
- * now, read from D1 rather than trusted from the browser. A shot's overrides
+ * now, read from SQLite rather than trusted from the browser. A shot's overrides
  * and directing choices stay in the command; the project itself is unchanged.
  */
 export async function stampDirection(

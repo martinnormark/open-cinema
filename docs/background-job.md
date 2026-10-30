@@ -1,5 +1,7 @@
 # Background replacement job
 
+> Deployment update (2026-10-30): the application now runs entirely in Docker with Bun, SQLite and private file storage. Infrastructure references and earlier verification results below describe the previous implementation. Use [deployment](deployment.md) and [architecture](../ARCHITECTURE.md) for current setup.
+
 The `video.background-replace` job delivers the pipeline Phase 0 recommended ([phase0-background.md](phase0-background.md)): Kling 3.0 Omni edits the take, and a foreground lock puts the source performers back over Kling's background. Both results reach the creator on the source's own frame grid with the source audio, and the creator chooses between them in the comparison viewer.
 
 ## Stages

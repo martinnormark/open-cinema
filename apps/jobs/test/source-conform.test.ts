@@ -1,12 +1,15 @@
-import { env } from "cloudflare:workers";
+import type { Coordinator } from "./runtime";
+import { env } from "./runtime";
+import { applyMigrations, reset, runWake, withCoordinator } from "./runtime";
 import {
-  applyD1Migrations,
-  reset,
-  runDurableObjectAlarm,
-  runInDurableObject,
-} from "cloudflare:test";
-import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from "vitest";
-import { setupNetwork } from "@msw/cloudflare";
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  expect,
+  it,
+} from "bun:test";
+import { setupNetwork } from "./runtime";
 import { http, HttpResponse } from "msw";
 import type { CommandResult } from "@open-cinema/contracts";
 import { createDatabase } from "@open-cinema/database";
@@ -30,7 +33,7 @@ beforeEach(async () => {
     ),
   );
   await reset();
-  await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
+  await applyMigrations(env.DB, env.TEST_MIGRATIONS);
 });
 afterEach(async () => {
   await reset();
@@ -113,8 +116,8 @@ async function submit(ownerId: string, assetId: string) {
   return stub;
 }
 
-async function due(stub: DurableObjectStub) {
-  await runInDurableObject(stub, async (_, state) => {
+async function due(stub: Coordinator) {
+  await withCoordinator(stub, async (_, state) => {
     const record = await readCoordinator(state.storage);
     await mutateCoordinator(
       state.storage,
@@ -125,7 +128,7 @@ async function due(stub: DurableObjectStub) {
       },
     );
   });
-  await runDurableObjectAlarm(stub);
+  await runWake(stub);
 }
 
 const videoUrl = (body: unknown) =>
@@ -174,7 +177,7 @@ it("rebuilds a request whose receipt was lost with the same storage link", async
   expect(bodies).toHaveLength(2);
   expect(bodies[1]).toEqual(bodies[0]);
   expect(stored.size).toBe(1);
-  const record = await runInDurableObject(stub, (_, state) =>
+  const record = await withCoordinator(stub, (_, state) =>
     readCoordinator(state.storage),
   );
   expect(record!.jobs[0]!.providerJobId).toBe("kling-1");

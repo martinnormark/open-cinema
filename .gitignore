@@ -162,3 +162,7 @@ artifacts/
 __pycache__/
 apps/web/public/models/
 .DS_Store
+
+# Docker runtime data and mounted secrets
+.data/
+secrets/

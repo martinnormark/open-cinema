@@ -1,5 +1,5 @@
 import "@tanstack/react-start/server-only";
-import { env } from "cloudflare:workers";
+import { env } from "@open-cinema/runtime";
 import type { OwnerScope } from "@open-cinema/contracts";
 import { createDatabase, type DatabaseContext } from "@open-cinema/database";
 import { requireSameOrigin, requireSession } from "./session";
@@ -30,7 +30,7 @@ export async function mutate(): Promise<OwnerContext> {
 }
 
 /** Driver and query-engine messages describe the database, not the creator's input. */
-const INTERNAL_MESSAGE = /D1_|SQLITE_|prisma/i;
+const INTERNAL_MESSAGE = /SQLITE_|libsql|prisma/i;
 
 /**
  * Owner-scoped errors become messages the creator can act on. Plain `Error`s

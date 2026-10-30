@@ -1,5 +1,7 @@
 # Foundation: contracts, persistence, and workflow dispatch
 
+> Deployment update (2026-10-30): the application now runs entirely in Docker with Bun, SQLite and private file storage. Infrastructure references and earlier verification results below describe the previous implementation. Use [deployment](deployment.md) and [architecture](../ARCHITECTURE.md) for current setup.
+
 How the shared pieces fit together, and where new work goes. Written 2026-10-17. The live model list is in [comfy-router-catalog.md](comfy-router-catalog.md).
 
 ## Contracts (`packages/contracts`)

@@ -1,12 +1,15 @@
-import { env } from "cloudflare:workers";
+import type { Coordinator } from "./runtime";
+import { env } from "./runtime";
+import { applyMigrations, reset, runWake, withCoordinator } from "./runtime";
 import {
-  applyD1Migrations,
-  reset,
-  runDurableObjectAlarm,
-  runInDurableObject,
-} from "cloudflare:test";
-import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from "vitest";
-import { setupNetwork } from "@msw/cloudflare";
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  expect,
+  it,
+} from "bun:test";
+import { setupNetwork } from "./runtime";
 import { http, HttpResponse } from "msw";
 import type { CommandResult } from "@open-cinema/contracts";
 import { createDatabase } from "@open-cinema/database";
@@ -29,7 +32,7 @@ beforeEach(async () => {
     ),
   );
   await reset();
-  await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
+  await applyMigrations(env.DB, env.TEST_MIGRATIONS);
 });
 afterEach(async () => {
   await reset();
@@ -43,16 +46,12 @@ function fixture() {
     stub: env.GENERATION_COORDINATORS.getByName(ownerId),
   };
 }
-function accepted(result: CommandResult & Partial<Disposable>) {
-  try {
-    if (!result.ok) throw new Error(result.error);
-    return structuredClone(result.snapshot.jobs[0]!);
-  } finally {
-    result[Symbol.dispose]?.();
-  }
+function accepted(result: CommandResult) {
+  if (!result.ok) throw new Error(result.error);
+  return structuredClone(result.snapshot.jobs[0]!);
 }
 async function due(stub: ReturnType<typeof fixture>["stub"]) {
-  await runInDurableObject(stub, async (_, state) => {
+  await withCoordinator(stub, async (_, state) => {
     const record = await readCoordinator(state.storage);
     await mutateCoordinator(
       state.storage,
@@ -63,10 +62,10 @@ async function due(stub: ReturnType<typeof fixture>["stub"]) {
       },
     );
   });
-  await runDurableObjectAlarm(stub);
+  await runWake(stub);
 }
 const checkpoint = (stub: ReturnType<typeof fixture>["stub"]) =>
-  runInDurableObject(stub, (_, state) => readCoordinator(state.storage));
+  withCoordinator(stub, (_, state) => readCoordinator(state.storage));
 
 const mp4 = new Uint8Array([0, 0, 0, 24, 102, 116, 121, 112, 105, 115, 111]);
 /** A Router model that accepts one submission and completes it with `result`. */
@@ -239,7 +238,7 @@ it("keeps monitoring while Router reports the job queued, up to the queue-wait c
   );
   await due(stub);
   const nearlyExpired = async (createdAt: string) =>
-    runInDurableObject(stub, (_, state) =>
+    withCoordinator(stub, (_, state) =>
       mutateCoordinator(state.storage, scope, (r) => {
         r.executions[job.id]!.deadline = Date.now() + 1000;
         r.jobs[0]!.createdAt = createdAt;

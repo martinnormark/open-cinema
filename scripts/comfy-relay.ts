@@ -1,17 +1,5 @@
-/**
- * Development-only relay for environments whose egress proxy injects Comfy
- * credentials (for example a Claude Code cloud container). workerd connects
- * directly and bypasses HTTPS_PROXY, so local Workers cannot reach Router with
- * proxy-injected auth. Run this, then set COMFY_BASE_URL in apps/jobs/.dev.vars.
- *
- *   bun scripts/comfy-relay.ts            # listens on 127.0.0.1:8790
- *   COMFY_RELAY_PORT=9000 bun scripts/comfy-relay.ts
- *
- * The relay binds to loopback only, forwards to Comfy through HTTPS_PROXY (Comfy
- * Cloud's `/api/...` paths to https://cloud.comfy.org, everything else to Router
- * at https://api.comfy.org), and drops the caller's Authorization and X-API-Key
- * headers so only the proxy's
- * credential is used. Never run it on a shared or public interface.
+/** Optional local Comfy relay for development environments that need proxy credentials.
+ * The Docker deployment connects directly to Comfy and does not require this script.
  */
 const ROUTER = "https://api.comfy.org";
 const CLOUD = "https://cloud.comfy.org";

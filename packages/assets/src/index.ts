@@ -1,3 +1,9 @@
+import type {
+  AssetStore,
+  StoredObject,
+  MultipartUpload,
+  UploadedPart,
+} from "./store";
 import type { JobOutput } from "@open-cinema/contracts";
 import { IMAGE_HEADER_BYTES, imageSize } from "./image-size";
 
@@ -28,7 +34,7 @@ type StoredMetadata = {
   width?: number;
   height?: number;
 };
-function metadata(object: R2Object): StoredMetadata {
+function metadata(object: StoredObject): StoredMetadata {
   return {
     r2Key: object.key,
     sizeBytes: object.size,
@@ -90,7 +96,7 @@ async function outputKey(ownerId: string, output: JobOutput) {
   return `generated/v1/${encodeURIComponent(ownerId)}/${encodeURIComponent(output.jobId)}/${hash}`;
 }
 async function existingOutput(
-  bucket: R2Bucket,
+  bucket: AssetStore,
   key: string,
   ownerId: string,
   output: JobOutput,
@@ -106,11 +112,11 @@ async function existingOutput(
 }
 
 /**
- * Idempotent save of an output the jobs Worker produced itself (a Comfy Cloud
+ * Idempotent save of an output the job service produced itself (a Comfy Cloud
  * media graph's MP4). `produce` runs only when the object is not already stored.
  */
 export async function storeProducedOutput(
-  bucket: R2Bucket,
+  bucket: AssetStore,
   ownerId: string,
   output: JobOutput,
   produce: () => Promise<{ body: ReadableStream<Uint8Array>; size: number }>,
@@ -123,21 +129,28 @@ export async function storeProducedOutput(
     await body.cancel();
     throw new Error("Invalid produced asset");
   }
-  // R2 needs a known length for a streamed put.
-  const { readable, writable } = new FixedLengthStream(size);
-  const piped = body.pipeTo(writable);
-  const [object] = await Promise.all([
-    bucket.put(key, readable, {
-      httpMetadata: { contentType: output.mediaType },
-      customMetadata: { ownerId, jobId: output.jobId, outputId: output.id },
+  let total = 0;
+  const checked = body.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        total += chunk.byteLength;
+        if (total > size) throw new Error("Invalid produced asset size");
+        controller.enqueue(chunk);
+      },
+      flush() {
+        if (total !== size) throw new Error("Incomplete produced asset");
+      },
     }),
-    piped,
-  ]);
+  );
+  const object = await bucket.put(key, checked, {
+    httpMetadata: { contentType: output.mediaType },
+    customMetadata: { ownerId, jobId: output.jobId, outputId: output.id },
+  });
   return metadata(object);
 }
 
 /** The pixel size of a stored image, read from its first bytes, or null. */
-export async function measureStoredImage(bucket: R2Bucket, key: string) {
+export async function measureStoredImage(bucket: AssetStore, key: string) {
   const object = await bucket.get(key, {
     range: { offset: 0, length: IMAGE_HEADER_BYTES },
   });
@@ -147,7 +160,7 @@ export async function measureStoredImage(bucket: R2Bucket, key: string) {
 
 /** Idempotent copy. Multipart keeps memory bounded even for chunked responses. */
 export async function archiveOutput(
-  bucket: R2Bucket,
+  bucket: AssetStore,
   ownerId: string,
   output: JobOutput,
   resolveUrl: () => Promise<string | null>,
@@ -162,8 +175,10 @@ export async function archiveOutput(
   if (!url) throw new Error("Provider image is no longer available");
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 60_000);
-  let upload: R2MultipartUpload | undefined;
-  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+  let upload: MultipartUpload | undefined;
+  let reader:
+    | Pick<ReadableStreamDefaultReader<Uint8Array>, "read" | "cancel">
+    | undefined;
   try {
     const response = await download(url, controller.signal);
     const contentType =
@@ -199,7 +214,7 @@ export async function archiveOutput(
       customMetadata: { ownerId, jobId: output.jobId, outputId: output.id },
     });
     reader = response.body.getReader();
-    const parts: R2UploadedPart[] = [];
+    const parts: UploadedPart[] = [];
     let part = new Uint8Array(PART_BYTES);
     let filled = 0;
     let total = 0;
@@ -248,7 +263,7 @@ export async function archiveOutput(
 
 /** The caller must authorize the output before invoking this function. */
 export async function serveStoredOutput(
-  bucket: R2Bucket,
+  bucket: AssetStore,
   output: JobOutput,
   request: Request,
 ): Promise<Response> {
@@ -259,7 +274,7 @@ export async function serveStoredOutput(
 
 /** Streams a private object with ETag and byte-range support. Authorize first. */
 export async function serveObject(
-  bucket: R2Bucket,
+  bucket: AssetStore,
   key: string,
   request: Request,
 ): Promise<Response> {
@@ -332,3 +347,5 @@ export async function serveObject(
 
 export * from "./uploads";
 export * from "./inline";
+
+export * from "./store";

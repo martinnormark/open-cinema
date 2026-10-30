@@ -1,3 +1,4 @@
+import { providerCredentials, type RuntimeEnv } from "@open-cinema/runtime";
 import { readObjectBase64, signMediaPath } from "@open-cinema/assets";
 import {
   assetRefKey,
@@ -16,9 +17,9 @@ import { renderCloudMedia } from "./media";
 
 /** Optional deployment settings for provider-fetchable upload links. */
 interface MediaLinkEnv {
-  /** Public https origin of the web Worker, e.g. https://studio.example.com. */
+  /** Public https origin of the web server, e.g. https://studio.example.com. */
   MEDIA_PUBLIC_ORIGIN?: string;
-  /** The web Worker's media signing secret (LOCAL_SESSION_SECRET there). */
+  /** The web server's media signing secret (LOCAL_SESSION_SECRET there). */
   MEDIA_SIGNING_SECRET?: string;
 }
 
@@ -44,7 +45,7 @@ export interface UploadCache {
   set(key: string, url: string): void;
 }
 
-/** Where a ref's bytes are: this job's checkpoint first, then D1. */
+/** Where a ref's bytes are: this job's checkpoint first, then SQLite. */
 export async function storedAsset(
   db: ReturnType<typeof createDatabase>,
   scope: OwnerScope,
@@ -73,10 +74,10 @@ export async function storedAsset(
  * job so a rebuilt request after a lost receipt is byte-identical.
  */
 export function createAssetResolver(
-  env: JobsEnv & MediaLinkEnv,
+  env: RuntimeEnv & MediaLinkEnv,
   scope: OwnerScope,
   linkExpiresAt: number,
-  /** This job's saved outputs, read from the checkpoint before D1 has them. */
+  /** This job's saved outputs, read from the checkpoint before SQLite has them. */
   ownOutputs: readonly JobOutput[] = [],
   uploads?: UploadCache,
 ) {
@@ -138,16 +139,13 @@ export function createAssetResolver(
         } else {
           const object = await env.GENERATED_ASSETS.get(stored.r2Key);
           if (!object) throw new AssetUnavailableError(assetRefKey(ref));
-          // Signed upload URLs need a known length; R2 knows it exactly.
-          const { readable, writable } = new FixedLengthStream(object.size);
-          void object.body.pipeTo(writable);
-          body = readable;
+          body = object.body;
           size = object.size;
         }
         const extension = contentType.split("/")[1]?.split(";")[0];
         const url = await uploadToComfyStorage({
-          apiKey: env.COMFY_API_KEY ?? "",
-          baseUrl: routerBaseUrl(env.COMFY_BASE_URL),
+          apiKey: providerCredentials(env, "router").apiKey,
+          baseUrl: routerBaseUrl(providerCredentials(env, "router").baseUrl),
           fileName: `${crypto.randomUUID()}${extension ? `.${extension}` : ""}`,
           contentType,
           sizeBytes: size,

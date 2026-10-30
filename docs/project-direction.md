@@ -1,5 +1,7 @@
 # Project direction, combined states and recipes
 
+> Deployment update (2026-10-30): the application now runs entirely in Docker with Bun, SQLite and private file storage. Infrastructure references and earlier verification results below describe the previous implementation. Use [deployment](deployment.md) and [architecture](../ARCHITECTURE.md) for current setup.
+
 This covers roadmap issues #8 and #9 (Phase 2 of #2): a persistent look per project with per-shot overrides, richer Element states, and recipes that keep direction worth reusing.
 
 ## Direction

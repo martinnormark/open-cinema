@@ -1,24 +1,11 @@
 import "@tanstack/react-start/server-only";
-import { env } from "cloudflare:workers";
-import {
-  getCookie,
-  getRequest,
-  getRequestHeader,
-  setCookie,
-} from "@tanstack/react-start/server";
+import { env } from "@open-cinema/runtime";
+import { getCookie, getRequest, setCookie } from "@tanstack/react-start/server";
 
-/**
- * Two ways to identify a creator, chosen by AUTH_MODE:
- *
- * - `local` (default): a signed, loopback-only test session for development.
- * - `cloudflare-access`: the deployment sits behind Cloudflare Access, which
- *   authenticates people (email OTP, Google, GitHub, SSO) before any request
- *   reaches the Worker. We verify the Access JWT on every request and derive
- *   the owner from its subject. See docs/auth.md.
- *
- * Any other configuration fails closed.
- */
-export type AuthMode = "local" | "cloudflare-access";
+import { passwordIdentity, passwordChallenge } from "@open-cinema/runtime/auth";
+
+/** Local signed sessions or a password-protected, self-hosted studio. */
+export type AuthMode = "local" | "password";
 
 export interface Session {
   userId: string;
@@ -37,7 +24,7 @@ const LOOPBACK = ["127.0.0.1", "localhost", "[::1]"];
 
 function authMode(): AuthMode | null {
   const mode = (env.AUTH_MODE || "local").trim();
-  return mode === "local" || mode === "cloudflare-access" ? mode : null;
+  return mode === "local" || mode === "password" ? mode : null;
 }
 
 function unauthorized(message: string): never {
@@ -47,14 +34,14 @@ function unauthorized(message: string): never {
 /** Display-safe description of how this deployment authenticates people. */
 export function getAuthStatus(): AuthStatus {
   const mode = authMode();
-  if (mode === "cloudflare-access") {
-    const ready = !!accessConfiguration(false);
+  if (mode === "password") {
+    const ready = Boolean(env.BASIC_AUTH_USER && env.BASIC_AUTH_PASSWORD);
     return {
       mode,
       ready,
       detail: ready
-        ? "Cloudflare Access signs people in before they reach the studio."
-        : "Set CF_ACCESS_TEAM_DOMAIN and CF_ACCESS_AUD to finish configuring Cloudflare Access.",
+        ? "This private studio uses the deployment's username and password."
+        : "Set BASIC_AUTH_PASSWORD to protect this studio.",
     };
   }
   if (mode === "local") {
@@ -70,13 +57,13 @@ export function getAuthStatus(): AuthStatus {
   return {
     mode: "unconfigured",
     ready: false,
-    detail: `AUTH_MODE must be "local" or "cloudflare-access".`,
+    detail: `AUTH_MODE must be "local" or "password".`,
   };
 }
 
 export async function requireSession(): Promise<Session> {
   const mode = authMode();
-  if (mode === "cloudflare-access") return requireAccessSession();
+  if (mode === "password") return requirePasswordSession();
   if (mode === "local") return requireLocalSession();
   return unauthorized("Authentication is not configured for this deployment.");
 }
@@ -91,13 +78,9 @@ export async function optionalSession(): Promise<Session | null> {
   }
 }
 
-/**
- * Explicit POST setup. Locally this mints a signed cookie; behind Cloudflare
- * Access the identity already exists, so it only verifies it. Never accepts a
- * user ID from the browser.
- */
+/** Creates a local identity, or verifies the hosted account. */
 export async function startLocalSession(): Promise<Session> {
-  if (authMode() === "cloudflare-access") return requireAccessSession();
+  if (authMode() === "password") return requirePasswordSession();
   const secret = localConfiguration(true);
   try {
     return await requireLocalSession();
@@ -188,113 +171,8 @@ async function requireLocalSession(): Promise<Session> {
   }
 }
 
-// Cloudflare Access
-
-interface AccessConfiguration {
-  issuer: string;
-  audience: string;
-}
-
-function accessConfiguration(strict: true): AccessConfiguration;
-function accessConfiguration(strict: false): AccessConfiguration | null;
-function accessConfiguration(strict: boolean) {
-  const domain = (env.CF_ACCESS_TEAM_DOMAIN ?? "")
-    .trim()
-    .replace(/^https?:\/\//, "")
-    .replace(/\/+$/, "");
-  const audience = (env.CF_ACCESS_AUD ?? "").trim();
-  if (!/^[a-z0-9-]+\.cloudflareaccess\.com$/i.test(domain) || !audience) {
-    if (!strict) return null;
-    unauthorized("Cloudflare Access is not fully configured.");
-  }
-  return { issuer: `https://${domain}`, audience };
-}
-
-interface Jwk extends JsonWebKey {
-  kid?: string;
-}
-let jwksCache: { issuer: string; keys: Jwk[]; fetchedAt: number } | null = null;
-
-async function accessKeys(issuer: string, refresh = false) {
-  if (
-    !refresh &&
-    jwksCache?.issuer === issuer &&
-    Date.now() - jwksCache.fetchedAt < 60 * 60_000
-  )
-    return jwksCache.keys;
-  const response = await fetch(`${issuer}/cdn-cgi/access/certs`);
-  if (!response.ok) unauthorized("Could not verify your sign-in. Try again.");
-  const { keys } = (await response.json()) as { keys?: Jwk[] };
-  jwksCache = { issuer, keys: keys ?? [], fetchedAt: Date.now() };
-  return jwksCache.keys;
-}
-
-function base64UrlDecode(value: string) {
-  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
-  return Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
-}
-
-async function requireAccessSession(): Promise<Session> {
-  const { issuer, audience } = accessConfiguration(true);
-  const token =
-    getRequestHeader("Cf-Access-Jwt-Assertion") ??
-    getCookie("CF_Authorization");
-  if (!token) return unauthorized("Sign in through Cloudflare Access.");
-  try {
-    const [rawHeader, rawPayload, rawSignature] = token.split(".");
-    if (!rawHeader || !rawPayload || !rawSignature) throw new Error();
-    const decoder = new TextDecoder();
-    const header = JSON.parse(decoder.decode(base64UrlDecode(rawHeader))) as {
-      alg?: string;
-      kid?: string;
-    };
-    if (header.alg !== "RS256" || !header.kid) throw new Error();
-    let jwk = (await accessKeys(issuer)).find((k) => k.kid === header.kid);
-    // Access rotates keys; refetch once before rejecting an unknown kid.
-    jwk ??= (await accessKeys(issuer, true)).find((k) => k.kid === header.kid);
-    if (!jwk) throw new Error();
-    const key = await crypto.subtle.importKey(
-      "jwk",
-      jwk,
-      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-      false,
-      ["verify"],
-    );
-    const valid = await crypto.subtle.verify(
-      "RSASSA-PKCS1-v1_5",
-      key,
-      base64UrlDecode(rawSignature),
-      new TextEncoder().encode(`${rawHeader}.${rawPayload}`),
-    );
-    const claims = JSON.parse(decoder.decode(base64UrlDecode(rawPayload))) as {
-      aud?: string | string[];
-      iss?: string;
-      sub?: string;
-      email?: string;
-      exp?: number;
-      nbf?: number;
-    };
-    const now = Date.now() / 1000;
-    const audiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
-    if (
-      !valid ||
-      claims.iss !== issuer ||
-      !audiences.includes(audience) ||
-      typeof claims.sub !== "string" ||
-      !claims.sub ||
-      typeof claims.exp !== "number" ||
-      claims.exp <= now ||
-      (typeof claims.nbf === "number" && claims.nbf > now + 60)
-    )
-      throw new Error();
-    return {
-      userId: `access-${claims.sub}`,
-      expiresAt: claims.exp * 1000,
-      ...(typeof claims.email === "string" ? { email: claims.email } : {}),
-    };
-  } catch (error) {
-    if (error instanceof Response) throw error;
-    return unauthorized("Your sign-in could not be verified. Sign in again.");
-  }
+async function requirePasswordSession(): Promise<Session> {
+  const userId = passwordIdentity(getRequest());
+  if (!userId) throw passwordChallenge();
+  return { userId, expiresAt: Date.now() + 24 * 60 * 60_000 };
 }

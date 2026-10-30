@@ -110,7 +110,7 @@ function isCloudRequest(
 }
 
 async function download(url: string, signal: AbortSignal) {
-  // A brushed mask travels inline in the request; Workers cannot fetch data: URLs.
+  // A brushed mask travels inline in the request; decode it without a network fetch.
   const inline = /^data:[^;,]+;base64,(.*)$/.exec(url);
   if (inline) {
     const bytes = Uint8Array.from(atob(inline[1]!), (c) => c.charCodeAt(0));
@@ -132,8 +132,7 @@ async function download(url: string, signal: AbortSignal) {
 
 /**
  * `POST /api/v2/assets`, returning the `core/ASSET` reference a loader input
- * takes. The SDK's own asset handles hash with a runtime-compiled WebAssembly
- * module, which Workers forbid; the hash is only a dedup hint, so it is skipped.
+ * takes. The optional provider hash is only a deduplication hint; it is omitted.
  */
 async function uploadAsset(
   baseUrl: string,
@@ -445,12 +444,12 @@ export function createComfyClient(options: {
   const baseUrl = relay ?? COMFY_CLOUD_BASE_URL;
   if (!options.apiKey.trim()) throw new Error("Comfy credentials are required");
   if (relay) return createCompatClient(relay, order, options.apiKey);
-  // The SDK stores fetch as an instance method; Workers requires the global receiver.
+  // Keep the global receiver when the SDK invokes fetch as an instance method.
   const client = new Comfy({
     apiKey: options.apiKey,
     timeoutMs: 15_000,
     clientInfo: "open-cinema",
-    fetch: (input, init) => globalThis.fetch(input, init),
+    fetch: globalThis.fetch.bind(globalThis),
   });
   const prepare = (request: Record<string, unknown>, signal: AbortSignal) =>
     prepareMedia(request, async (media) =>

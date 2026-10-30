@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { env } from "cloudflare:workers";
+import { env } from "@open-cinema/runtime";
 import {
   commandResultSchema,
   workflowCommandSchema,
@@ -25,7 +25,7 @@ export const submitWorkflow = createServerFn({ method: "POST" })
     const stamped = await stampDirection(db, scope, data);
     if (!stamped.ok)
       return commandResultSchema.parse({ ok: false, error: stamped.error });
-    using result = await getCoordinator(session.userId).submit(
+    const result = await getCoordinator(session.userId).submit(
       scope,
       stamped.command,
     );

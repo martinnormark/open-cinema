@@ -1,3 +1,4 @@
+import { providerCredentials, type RuntimeEnv } from "@open-cinema/runtime";
 import {
   CloudMediaRejectedError,
   runCloudMedia,
@@ -8,7 +9,7 @@ import {
 /** Cloud answered with a definite refusal (bad input), not a transport error. */
 export class MediaRejectedError extends Error {}
 
-/** A graph input stored in R2, streamed to Cloud when the graph runs. */
+/** A graph input stored in private storage, streamed to Cloud when the graph runs. */
 export interface StoredMediaPart {
   name: MediaPartName;
   r2Key: string;
@@ -18,10 +19,10 @@ export interface StoredMediaPart {
 /**
  * Runs a job's lock, conform or square-pixel step as a ComfyUI graph on Comfy Cloud (see
  * packages/comfy/src/workflows/media-graphs.ts) and returns its MP4. The parts
- * stream from R2 into Cloud's uploads one at a time; nothing is buffered.
+ * stream from private storage into Cloud's uploads one at a time; nothing is buffered.
  */
 export async function renderCloudMedia(
-  env: JobsEnv,
+  env: RuntimeEnv,
   operation: MediaOperation,
   parts: readonly StoredMediaPart[],
   signal: AbortSignal,
@@ -30,8 +31,7 @@ export async function renderCloudMedia(
 ): Promise<{ body: ReadableStream<Uint8Array>; size: number }> {
   try {
     return await runCloudMedia({
-      apiKey: env.COMFY_API_KEY ?? "",
-      baseUrl: env.COMFY_BASE_URL,
+      ...providerCredentials(env, "cloud"),
       operation,
       parts: parts.map((part) => ({
         name: part.name,

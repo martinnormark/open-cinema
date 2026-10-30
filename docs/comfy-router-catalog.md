@@ -1,5 +1,7 @@
 # Comfy Router model catalog
 
+> Deployment update (2026-10-30): the application now runs entirely in Docker with Bun, SQLite and private file storage. Infrastructure references and earlier verification results below describe the previous implementation. Use [deployment](deployment.md) and [architecture](../ARCHITECTURE.md) for current setup.
+
 Listed **2026-10-16** with `comfy.models.list()` from `@comfyorg/sdk` 0.5.0 against `https://api.comfy.org` (249 models across 35 providers). The catalog entries carry only `id`, `provider`, `model`, and `billing`; inputs differ per model, so read each model's schema at `GET /v2/models/{provider}/{model}/openapi.json` (`comfy.models.schema(id)`) before building a request. Prices are not in the listing; see [pricing](https://docs.comfy.org/development/comfy-router/pricing).
 
 Regenerate by iterating `comfy.models.list()` (it walks every page; a bare `GET /v2/models?limit=50` returns only the first page with `has_more: true`).

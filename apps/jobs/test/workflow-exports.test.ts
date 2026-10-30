@@ -1,32 +1,20 @@
-import { expect, it } from "vitest";
+import { expect, it } from "bun:test";
 import {
   workflowExports,
   workflowFileContents,
   workflowManifest,
 } from "@open-cinema/comfy";
 
-// Vite's import.meta.glob; its client types are not in this package.
-declare global {
-  interface ImportMeta {
-    glob<T>(
-      pattern: string,
-      options: { query: string; import: string; eager: true },
-    ): Record<string, T>;
-  }
-}
-
-// The committed workflow files, as text (scripts/export-workflows.ts writes them).
+import { readdirSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { join } from "node:path";
+const root = fileURLToPath(
+  new URL("../../../workflows/cloud/", import.meta.url),
+);
 const committed = Object.fromEntries(
-  Object.entries(
-    import.meta.glob<string>("../../../workflows/cloud/**/*.json", {
-      query: "?raw",
-      import: "default",
-      eager: true,
-    }),
-  ).map(([path, text]) => [
-    path.replace("../../../workflows/cloud/", ""),
-    text,
-  ]),
+  readdirSync(root, { recursive: true, encoding: "utf8" })
+    .filter((path) => path.endsWith(".json"))
+    .map((path) => [path, readFileSync(join(root, path), "utf8")]),
 );
 
 const STALE = "run `bun scripts/export-workflows.ts` and commit the result";

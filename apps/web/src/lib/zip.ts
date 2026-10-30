@@ -4,7 +4,7 @@
  *
  * The writer streams: entries are stored (media is already compressed), and
  * each entry's CRC and size follow its data in a data descriptor, so a large
- * video goes from R2 to the download without being held in memory. Bundles
+ * video goes from private storage to the download without being held in memory. Bundles
  * stay under the classic 4 GB ZIP limits; there is no ZIP64.
  *
  * The reader works on a `Blob` (a chosen `File`) through slices, so a stored
@@ -55,7 +55,7 @@ function dosDateTime(date: Date) {
 
 export interface ZipSource {
   name: string;
-  /** Opened only when the entry is written, so one R2 read is open at a time. */
+  /** Opened only when the entry is written, so one private storage read is open at a time. */
   open: () => Promise<ReadableStream<Uint8Array> | Uint8Array | null>;
 }
 

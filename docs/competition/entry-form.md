@@ -1,5 +1,7 @@
 # Entry form draft
 
+> Deployment update (2026-10-30): the application now runs entirely in Docker with Bun, SQLite and private file storage. Infrastructure references and earlier verification results below describe the previous implementation. Use [deployment](../deployment.md) and [architecture](../../ARCHITECTURE.md) for current setup.
+
 Answers for the [Open Source Higgsfield entry form](https://form.typeform.com/to/V1dSQrkS), in the form's order, ready to paste. The questions were read from the live form on 2026-10-17; re-check them before submitting. Answers describe `main` on 2026-10-17. **Fields marked "Martin" only Martin can fill in.** One submission per person; deadline **October 30, 2026, 9:00am Pacific** (17:00 Copenhagen).
 
 ## Tell us about yourself

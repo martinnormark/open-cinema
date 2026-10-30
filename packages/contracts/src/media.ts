@@ -25,7 +25,7 @@ export function assetRefKey(ref: AssetRef): string {
     : `output:${ref.jobId}:${ref.outputId}`;
 }
 
-/** `pending` covers an upload whose bytes have not been verified in R2 yet. */
+/** `pending` covers an upload whose bytes have not been verified in private storage yet. */
 export const mediaAssetStatusSchema = z.enum(["pending", "ready", "failed"]);
 export type MediaAssetStatus = z.infer<typeof mediaAssetStatusSchema>;
 

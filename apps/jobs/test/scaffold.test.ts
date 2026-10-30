@@ -1,14 +1,9 @@
-import { env, exports } from "cloudflare:workers";
-import { describe, expect, it } from "vitest";
+import { env, subscribe } from "./runtime";
+import { describe, expect, it } from "bun:test";
 import { getOrbState, jobEventSchema } from "@open-cinema/contracts";
 import { createComfyClient, mapProviderState } from "@open-cinema/comfy";
 
-describe("Worker boundaries", () => {
-  it("does not expose a public jobs endpoint", async () => {
-    const response = await exports.default.fetch("https://jobs.test/");
-    expect(response.status).toBe(404);
-  });
-
+describe("Coordinator boundaries", () => {
   it("persists coordinator ownership and rejects another user", async () => {
     const ownerId = crypto.randomUUID();
     const stub = env.GENERATION_COORDINATORS.getByName(ownerId);
@@ -29,34 +24,24 @@ describe("Worker boundaries", () => {
     const stub = env.GENERATION_COORDINATORS.getByName(crypto.randomUUID());
     expect(
       (
-        await stub.fetch("https://jobs.test/stream", {
-          headers: {
-            Upgrade: "websocket",
-            "X-Owner-Id": "owner",
-            "X-Session-Expires-At": String(Date.now() - 1),
-          },
-        })
+        await stub.fetch(
+          new Request("https://jobs.test/stream", {
+            headers: {
+              Upgrade: "websocket",
+              "X-Owner-Id": "owner",
+              "X-Session-Expires-At": String(Date.now() - 1),
+            },
+          }),
+        )
       ).status,
     ).toBe(401);
   });
 
-  it("opens a hibernatable socket and sends a validated snapshot", async () => {
+  it("opens a status socket and sends a validated snapshot", async () => {
     const ownerId = crypto.randomUUID();
     const stub = env.GENERATION_COORDINATORS.getByName(ownerId);
-    const response = await stub.fetch("https://jobs.test/stream", {
-      headers: {
-        Upgrade: "websocket",
-        "X-Owner-Id": ownerId,
-        "X-Session-Expires-At": String(Date.now() + 60_000),
-      },
-    });
-    expect(response.status).toBe(101);
-    const socket = response.webSocket;
-    if (!socket) throw new Error("Missing WebSocket");
-    socket.accept();
-    const message = await new Promise<MessageEvent>((resolve) =>
-      socket.addEventListener("message", resolve, { once: true }),
-    );
+    const { socket, first } = await subscribe(stub, ownerId);
+    const message = await first;
     expect(
       jobEventSchema.parse(JSON.parse(String(message.data))),
     ).toMatchObject({ type: "snapshot", jobs: [] });
@@ -89,7 +74,7 @@ describe("shared contracts", () => {
 });
 
 describe("Comfy runtime compatibility", () => {
-  it("constructs the official SDK in workerd without network I/O", () => {
+  it("constructs the official SDK in Bun without network I/O", () => {
     expect(createComfyClient({ apiKey: "local-test-only" }).submit).toBeTypeOf(
       "function",
     );

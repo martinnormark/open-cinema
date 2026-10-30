@@ -1,5 +1,5 @@
 import "@tanstack/react-start/server-only";
-import { env } from "cloudflare:workers";
+import { env } from "@open-cinema/runtime";
 import { createDatabase, type DatabaseContext } from "@open-cinema/database";
 import { listJobs, listMediaAssets } from "@open-cinema/database/queries";
 import { recordImageSize, recordPoster } from "@open-cinema/database/mutations";
@@ -91,7 +91,7 @@ const BACKFILL_PER_LISTING = 24;
 
 /**
  * Images saved before their size was read on copy: read each one's header
- * from R2 and record it, so the next listing already knows.
+ * from private storage and record it, so the next listing already knows.
  */
 async function backfillImageSizes(
   db: DatabaseContext,
@@ -139,7 +139,7 @@ export async function listForOwner(ownerId: string) {
 
 export interface PosterTarget {
   ref: AssetRef;
-  /** Where the poster is stored in R2. */
+  /** Where the poster is stored in private storage. */
   key: string;
   /** Record the size and length the browser measured while drawing it. */
   measured?: boolean;

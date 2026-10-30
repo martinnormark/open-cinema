@@ -75,7 +75,7 @@ export function shouldShowEstimate(
   );
 }
 
-/** Formats a credit amount or range in the creator's preferred unit. */
+/** Stable English formatting keeps server and browser hydration identical. */
 export function formatCost(
   credits: number | { min: number; max: number },
   unit: CostUnit,
@@ -84,8 +84,8 @@ export function formatCost(
     typeof credits === "number" ? { min: credits, max: credits } : credits;
   const one = (value: number) =>
     unit === "credits"
-      ? `${Math.round(value).toLocaleString()} credits`
-      : (value / CREDITS_PER_USD).toLocaleString(undefined, {
+      ? `${Math.round(value).toLocaleString("en-US")} credits`
+      : (value / CREDITS_PER_USD).toLocaleString("en-US", {
           style: "currency",
           currency: "USD",
           minimumFractionDigits: 2,
@@ -93,6 +93,6 @@ export function formatCost(
         });
   if (Math.abs(range.max - range.min) < 0.5) return one(range.min);
   return unit === "credits"
-    ? `${Math.round(range.min).toLocaleString()}–${Math.round(range.max).toLocaleString()} credits`
+    ? `${Math.round(range.min).toLocaleString("en-US")}–${Math.round(range.max).toLocaleString("en-US")} credits`
     : `${one(range.min)}–${one(range.max)}`;
 }

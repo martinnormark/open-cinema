@@ -221,7 +221,7 @@ export type AddTakeInput = z.input<typeof addTakeInputSchema>;
 export const setTakeStatusInputSchema = z.object({
   id: z.string().min(1),
   status: takeStatusSchema,
-  /** The job's output, recorded when a take is decided before D1 caught up. */
+  /** The job's output, recorded when a take is decided before SQLite caught up. */
   asset: assetRefSchema.optional(),
 });
 export type SetTakeStatusInput = z.input<typeof setTakeStatusInputSchema>;

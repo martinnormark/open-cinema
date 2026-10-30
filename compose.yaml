@@ -1,0 +1,20 @@
+services:
+  studio:
+    build: .
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${PORT:-3000}:3000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PORT: "3000"
+      DATA_DIR: /data
+      HOST: 0.0.0.0
+    volumes:
+      - studio-data:/data
+    restart: unless-stopped
+    stop_grace_period: 45s
+    init: true
+
+volumes:
+  studio-data:

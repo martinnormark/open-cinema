@@ -1,50 +1,30 @@
-# Sign-in and public deployment
+# Authentication
 
-Open Cinema identifies each creator so their jobs, media and Elements stay separate. The web Worker chooses how with the `AUTH_MODE` variable in [`apps/web/wrangler.jsonc`](../apps/web/wrangler.jsonc). The implementation is [`apps/web/src/server/session.ts`](../apps/web/src/server/session.ts). Any unrecognised or incomplete configuration fails closed with `401`.
+Docker deployments use `AUTH_MODE=local` or `AUTH_MODE=password`. Unknown or incomplete configurations fail closed. The implementation is in `apps/web/src/server/session.ts` and `packages/runtime/src/auth.ts`.
 
-| `AUTH_MODE`         | Who it is for                   | Identity                                    |
-| ------------------- | ------------------------------- | ------------------------------------------- |
-| `local` (default)   | Development on your own machine | Random `local-…` owner in a signed cookie   |
-| `cloudflare-access` | Any deployment on a public URL  | `access-<sub>` from a verified Access token |
+## Local sessions
 
-The Settings page shows the active mode and whether it is ready.
+Local mode accepts only loopback URLs (`localhost`, `127.0.0.1`, `[::1]`) and requires `LOCAL_MVP_ENABLED=true`. The default Compose port binding is loopback-only. The studio's session action creates a signed, HTTP-only, SameSite=Strict cookie lasting 24 hours. The signing secret is generated once in the persistent volume unless `LOCAL_SESSION_SECRET` or its `_FILE` setting is supplied.
 
-## Local test sessions
+This mode is for local use. Do not expose it publicly with a proxy that rewrites the host to a loopback address. Use password mode for hosted access.
 
-Used by `bun run dev` and `bun run preview`. Requires all of:
+## Hosted studio
 
-- `LOCAL_MVP_ENABLED=true` and a `LOCAL_SESSION_SECRET` of at least 32 characters in `apps/web/.dev.vars`;
-- a loopback request host (`127.0.0.1`, `localhost` or `[::1]`).
+Set:
 
-**Start local session** in Studio sets an HttpOnly, SameSite=Strict cookie for 24 hours. The browser never chooses its owner ID. Public hosts are always refused, even if the flag is set by mistake.
+```dotenv
+AUTH_MODE=password
+BASIC_AUTH_USER=studio
+BASIC_AUTH_PASSWORD=replace-with-a-strong-password
+APP_ORIGIN=https://cinema.example.com
+```
 
-## Deploying behind Cloudflare Access
+Use HTTPS through a reverse proxy. The browser's standard HTTP authentication dialog asks for the username and password. All users of those credentials share one studio account. The owner ID derives from the username, so password rotation preserves work; changing the username selects a different account. This deployment does not provide individual accounts, SSO or an account-management UI.
 
-[Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/applications/configure-apps/self-hosted-public-app/) puts a sign-in page (one-time email PIN, Google, GitHub or your SSO) in front of the Worker. Only people your policy allows can reach the studio, so you control who spends your Comfy credits. Access is free for up to 50 users.
+Passwords can be mounted through `BASIC_AUTH_PASSWORD_FILE`. Missing credentials produce 401 with a login challenge; an empty configured password or unsupported mode produces 503 at the HTTP boundary. Password comparison uses fixed-length hashes and a timing-safe comparison. The application does not trust proxy-supplied identity headers.
 
-1. In the Cloudflare dashboard open **Zero Trust → Access → Applications → Add an application → Self-hosted**.
-2. Add the web Worker's hostname (a custom domain, or its `*.workers.dev` address). Protect the whole hostname.
-3. Add an **Allow** policy, for example `Emails` → your address, or `Emails ending in` → your domain. Choose login methods under **Settings → Authentication** (One-time PIN works with no extra setup).
-4. Copy the application's **Audience (AUD) tag** from its overview, and your team domain (`<team>.cloudflareaccess.com`) from **Settings → Custom Pages**.
-5. Configure the web Worker for the environment you deploy:
+Database queries still enforce owner scope. Writes and WebSocket upgrades also require the same Origin as the request, resolved from `APP_ORIGIN` when configured. Status sockets are read-only and close when their session expires.
 
-   ```jsonc
-   "vars": {
-     "AUTH_MODE": "cloudflare-access",
-     "CF_ACCESS_TEAM_DOMAIN": "<team>.cloudflareaccess.com",
-     "CF_ACCESS_AUD": "<audience tag>"
-   }
-   ```
+The health endpoint is public. Signed media GET/HEAD requests bypass the password challenge only to reach the media route's signature verification. Invalid or expired signatures cannot read objects. Other media and all generation commands require authentication.
 
-   Set `LOCAL_MVP_ENABLED` to `false` for that environment. Wrangler still lists `LOCAL_SESSION_SECRET` as a required secret; give it any random value, it is unused in this mode.
-
-6. Deploy (see the README). Visiting the URL now shows the Access sign-in first.
-
-On every request the Worker verifies the `Cf-Access-Jwt-Assertion` header (or the `CF_Authorization` cookie): RS256 signature against your team's published keys (cached for an hour and refetched once for an unknown key ID), issuer, audience, expiry and not-before. The owner is derived from the token's subject, so the same person keeps the same work across devices. Server functions still require a same-origin `Origin` header for state changes.
-
-Why Access instead of in-app accounts: the studio is open source and meant to be self-hosted by one creator or a small team. Access gives real authentication, MFA and revocation without the app storing passwords, and it rejects unauthenticated traffic before it reaches the Worker. In-app accounts (for a multi-tenant hosted service) remain future work; they would add a third mode here without changing how the rest of the app reads the session.
-
-## Not covered yet
-
-- Per-creator spending limits. Everyone allowed by the Access policy shares the deployment's Comfy key and credits.
-- Migrating work from a `local-…` identity to an Access identity.
+See [Docker deployment](deployment.md) for complete configuration and secret mounting.

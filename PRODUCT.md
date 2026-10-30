@@ -10,9 +10,9 @@ web
 
 ## Stack
 
-The agreed target is a strict TypeScript monorepo using Bun workspaces, TanStack Start with React and TanStack Router, Tailwind CSS, and shadcn/ui. Cloudflare Workers host the application; Durable Objects coordinate generation and stream job updates over WebSockets. Cloudflare D1 and Prisma provide application persistence through a dedicated database package. The official Comfy TypeScript SDK connects to external GPU workflow execution. Bun is the development toolchain, not the production runtime.
+The application is a strict TypeScript monorepo using Bun workspaces, TanStack Start with React and TanStack Router, Tailwind CSS, and shadcn/ui. One Docker container runs the Bun server and persistent generation coordinators. SQLite and Prisma hold application records, a separate SQLite store holds job checkpoints and wake times, and private files hold media on the data volume. WebSockets deliver live updates. The official Comfy TypeScript SDK connects to external GPU execution through Router and Comfy Cloud.
 
-These workspace boundaries are implemented, with live Comfy execution through Router and Comfy Cloud and sign-in through Cloudflare Access ([docs/auth.md](docs/auth.md)). Remaining production readiness gates are in ARCHITECTURE.md and README.md.
+Sign-in uses local signed sessions or a password-protected hosted studio. See [docs/auth.md](docs/auth.md) and [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Users
 
@@ -55,9 +55,9 @@ Generation is asynchronous and must continue across navigation, closed tabs, and
 
 ### Open decisions and implementation gates
 
-- Authentication and session implementation, provider-wide capacity, and the selected Comfy hosting target need resolution.
-- Application-owned long-term media storage, retention, and delivery policy remain undecided; database records hold metadata, not media bytes.
-- Validate the selected TanStack server-component/Vite/Cloudflare and Prisma/D1 combinations and Comfy SDK execution in the Workers runtime before treating scaffolding as complete.
+- Individual hosted accounts and provider-wide capacity remain future work; password hosting currently provides one shared studio account.
+- Media lives on the persistent Docker volume; operators own backup and retention policy. Database records hold metadata, not media bytes.
+- Validate the Docker image, persistence across restarts, and provider integrations before each release.
 - Generation continuity, performance reuse, shot extension, and selective replacement require representative workflow demonstrations before being exposed as reliable capabilities.
 
 ## Brand Commitments

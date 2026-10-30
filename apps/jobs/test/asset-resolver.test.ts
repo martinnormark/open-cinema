@@ -1,7 +1,14 @@
-import { env } from "cloudflare:workers";
-import { applyD1Migrations, reset } from "cloudflare:test";
-import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from "vitest";
-import { setupNetwork } from "@msw/cloudflare";
+import { env } from "./runtime";
+import { applyMigrations, reset } from "./runtime";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  expect,
+  it,
+} from "bun:test";
+import { setupNetwork } from "./runtime";
 import { http, HttpResponse } from "msw";
 import { createDatabase } from "@open-cinema/database";
 import {
@@ -16,7 +23,7 @@ beforeAll(() => network.enable());
 afterAll(() => network.disable());
 beforeEach(async () => {
   await reset();
-  await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
+  await applyMigrations(env.DB, env.TEST_MIGRATIONS);
 });
 afterEach(() => network.resetHandlers());
 
@@ -73,7 +80,7 @@ it("uploads URL-only media to Comfy storage once when there is no public origin"
   expect(slots).toEqual([
     { file_name: expect.stringMatching(/\.mp4$/), content_type: "video/mp4" },
   ]);
-  expect(received).toEqual(bytes);
+  expect<unknown>(received).toEqual(bytes);
 });
 
 it("signs media links that outlive the longest wait in Router's queue", async () => {

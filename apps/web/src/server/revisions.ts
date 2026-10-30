@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { env } from "cloudflare:workers";
+import { env } from "@open-cinema/runtime";
 import { z } from "zod";
 import { createDatabase } from "@open-cinema/database";
 import {
@@ -39,7 +39,7 @@ import { optionalSession, requireSameOrigin, requireSession } from "./session";
 
 const db = () => createDatabase(env.DB);
 
-/** Decisions sit beside the D1 row so history can explain how a result was made. */
+/** Decisions sit beside the SQLite row so history can explain how a result was made. */
 const decisionsKey = (ownerId: string, revisionId: string) =>
   `revisions/${ownerId}/${revisionId}/decisions.json`;
 
@@ -113,7 +113,7 @@ export const saveRevisionChecks = createServerFn({ method: "POST" })
     return true;
   });
 
-/** Written at submission so a revision page works before D1 catches up. */
+/** Written at submission so a revision page works before SQLite catches up. */
 const pendingRevisionSchema = z.object({
   revision: revisionSchema,
   decisions: revisionDecisionsSchema,
@@ -194,7 +194,7 @@ export const getRevisionView = createServerFn({ method: "GET" })
     const session = await optionalSession();
     if (!session) return { signedIn: false as const };
     const scope = { ownerId: session.userId };
-    // The coordinator projects a revision to D1 with its job; until then the
+    // The coordinator projects a revision to SQLite with its job; until then the
     // record written at submission stands in, marked pending.
     const revision =
       (await getRevision(db(), scope, data.revisionId)) ??
@@ -279,7 +279,7 @@ export const submitRevision = createServerFn({ method: "POST" })
     );
     if (!stamped.ok) return { ok: false, error: stamped.error };
     const command = stamped.command;
-    using submitted = await getCoordinator(session.userId).submit(
+    const submitted = await getCoordinator(session.userId).submit(
       scope,
       command,
     );

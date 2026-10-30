@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { renderServerComponent } from "@tanstack/react-start/rsc";
 
-// Exercises the RSC path in the Workers build without requiring a database or login.
+// Exercises the RSC path in the server build without requiring a database or login.
 export const getStudioIntroduction = createServerFn({ method: "GET" }).handler(
   async () => {
     return renderServerComponent(

@@ -10,7 +10,7 @@ Open Cinema is an early preview and our entry to Comfy's [Open Source Higgsfield
 
 - **Generate images and video** from a written idea: FLUX 3 images, LTX 2.5 text-to-video and FLUX 3 image-to-video through Comfy Router, and LTX-2 camera moves on Comfy Cloud. Live progress survives reloads, closed tabs and dropped connections.
 - **Build Elements**: Characters, Locations and Things, each made one step at a time from an anchor view (a close portrait, an establishing view, a hero view) into a reference sheet, with Character sheets, Thing turnarounds, and states such as `@Cal:wet` that a prompt can mention.
-- **Keep a media library** of uploads and results, all copied into your own R2 storage before a job is marked ready.
+- **Keep a media library** of uploads and results, all copied into your private media storage before a job is marked ready.
 - **Revise a take** in the revision studio: replace its background, recast a person as a Character (experimental and outside the MVP; see [known limitations](docs/known-limitations.md)), swap an object (Object Swap), restyle it, or re-stage the camera, then compare original and result before keeping it.
 - **Copy the moves** from any clip, a dance, a stunt or a gesture, onto one of your Characters, in the clip's place or one of your Locations, with Wan 3.0 on Comfy Router or the open-weights Wan Animate 2 on Comfy Cloud. Click people or things on a frame to say who becomes whom; SAM 3.1 tracks each of them through the clip in a Comfy Cloud graph that runs Wan 3.0 ([docs/copy-the-moves.md](docs/copy-the-moves.md)).
 - **See which model made what.** Every mode names its model, maker, open or hosted weights and where it runs before you generate, and every result and Activity entry says "Made with" the same.
@@ -50,124 +50,67 @@ Every result below is a real Comfy generation from this repository's workflows, 
 
 **Performance transfer, first attempt.** A FLUX 3 keyframe of a new character driven by the source's pose, with LTX 2.3 Union Control on Comfy Cloud. Faces drifted, so it was replaced by [Copy the moves](docs/copy-the-moves.md) on Wan 3.0 and Wan Animate 2. See [docs/performance-transfer.md](docs/performance-transfer.md).
 
-## Run it locally
-
-You need:
-
-- [Bun](https://bun.sh) **1.4.2** and [Node.js](https://nodejs.org) **24+** (Node runs the dev tooling; production runs on Cloudflare Workers).
-- A **Comfy API key** from [platform.comfy.org](https://platform.comfy.org) with Router credits and Comfy Cloud access. Router bills per request in credits (211 credits = $1). The LTX graphs (Alpha Gen background replacement, camera moves, Object Swap, Restyle, Re-stage) and media steps run on Comfy Cloud, so those need Cloud access too.
-- No Cloudflare account. D1, R2 and Durable Objects are emulated locally.
+## Run with Docker
 
 ```sh
-git clone https://github.com/martinnormark/open-cinema.git
-cd open-cinema
+cp .env.example .env
+# Add your Comfy API key to .env to enable generation.
+docker compose up --build -d
+```
+
+Open http://localhost:3000. One container runs the web app and background jobs; a persistent Docker volume holds SQLite databases and private media. No external database, queue, storage, or identity service is needed. Comfy Router and Comfy Cloud remain the external generation providers.
+
+`COMFY_API_KEY` supplies both providers, or set `COMFY_ROUTER_API_KEY` and `COMFY_CLOUD_API_KEY` separately. Every setting also accepts a `_FILE` path for mounted secrets. Keys are runtime-only and never included in the image or browser bundle. The app starts without provider keys.
+
+For public hosting, use `AUTH_MODE=password`, set `BASIC_AUTH_PASSWORD`, and configure a TLS reverse proxy and `APP_ORIGIN`. This is a shared private studio account. See [deployment](docs/deployment.md) and [authentication](docs/auth.md).
+
+The root `Dockerfile` also works with plain `docker build` and `docker run`. Compose requires no additional service images. Run only one instance per data volume. Rebuilds and restarts preserve work; deleting the volume does not.
+
+## Local development
+
+Install Bun **1.4.2** and Node.js **24+** (used by Prisma tooling). Then:
+
+```sh
 bun install --frozen-lockfile
-```
-
-Create the two local secret files from their examples. Both are gitignored.
-
-```sh
-cp apps/jobs/.dev.vars.example apps/jobs/.dev.vars
-cp apps/web/.dev.vars.example apps/web/.dev.vars
-```
-
-1. In `apps/jobs/.dev.vars`, set `COMFY_API_KEY="…"` (keep the quotes). Only the private jobs Worker ever sees this key.
-2. In `apps/web/.dev.vars`, set `LOCAL_SESSION_SECRET` to a random value of at least 32 characters, for example the output of `openssl rand -base64 48`. Leave `LOCAL_MVP_ENABLED=true`.
-
-Then prepare the local database and start both Workers:
-
-```sh
+cp .env.example .env
 bun run setup
 bun run dev
 ```
 
-Open the URL Vite prints (normally <http://127.0.0.1:5173>). The front page lists what you can do: bring a take to revise, or start from your Elements. With an empty studio, **Bring in the Tide Mill** adds a starter world (a Character, a Location, a Thing, a project look and a four-shot scene), and **Try it on the kitchen table take** gives every take goal a clip to work on. To make a first image, open **Studio**, choose **Start local session**, write a prompt or pick **Surprise me**, and select **Generate image**. **Settings** shows whether your Comfy key and sign-in are configured.
+Vite runs on http://localhost:5173. Development uses the same SQLite, file storage and coordinators as Docker, stored in `.data/`. Run the production build with `bun run build && bun run start` on port 3000.
 
-If something is off:
-
-| Symptom                                       | Fix                                                                                            |
-| --------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| "Local testing is not configured"             | Check `apps/web/.dev.vars`, and open the app on `127.0.0.1` or `localhost`, not a LAN address. |
-| "Comfy Router credentials are not configured" | Set `COMFY_API_KEY` in `apps/jobs/.dev.vars` and restart `bun run dev`.                        |
-| A job fails with a billing or access error    | Add credits to the workspace that owns the key on platform.comfy.org.                          |
-| Database errors after pulling new code        | Run `bun run setup` again to apply new migrations.                                             |
-
-## Deploy to Cloudflare
-
-Open Cinema runs as two Workers: `open-cinema-web` (UI, server functions, sign-in) and the private `open-cinema-jobs` (Comfy calls, Durable Object coordinators, R2 archival).
-
-1. **Create resources** for each environment:
-
-   ```sh
-   bunx wrangler d1 create open-cinema
-   bunx wrangler r2 bucket create open-cinema-generated-assets
-   ```
-
-   Put the D1 `database_id` into **both** `apps/web/wrangler.jsonc` and `apps/jobs/wrangler.jsonc` (the all-zero IDs are local placeholders). Keep the bucket private and do not enable object expiry.
-
-2. **Set up sign-in.** Public deployments refuse every request until real authentication is configured. Put the web Worker behind Cloudflare Access and set `AUTH_MODE`, `CF_ACCESS_TEAM_DOMAIN` and `CF_ACCESS_AUD` as described in [docs/auth.md](docs/auth.md).
-
-3. **Add secrets**:
-
-   ```sh
-   bunx wrangler secret put COMFY_API_KEY --name open-cinema-jobs
-   bunx wrangler secret put LOCAL_MVP_ENABLED --name open-cinema-web      # enter: false
-   bunx wrangler secret put LOCAL_SESSION_SECRET --name open-cinema-web   # any random value; unused with Access
-   ```
-
-   Optional, on the jobs Worker: set the `MEDIA_PUBLIC_ORIGIN` variable to the studio's https origin and `MEDIA_SIGNING_SECRET` (a secret equal to the web Worker's `LOCAL_SESSION_SECRET`) so providers can fetch uploads through signed links ([docs/foundation.md](docs/foundation.md)). Set the `MAX_ACTIVE_JOBS` variable (1 to 4, default 1) to let one creator run more jobs at once.
-
-4. **Apply migrations and build**:
-
-   ```sh
-   bunx wrangler d1 migrations apply open-cinema --remote --config apps/jobs/wrangler.jsonc
-   bun run build
-   ```
-
-   `bun run dev` and `bun run build` first run `bun run models`, which downloads the on-device face and pose models the revision studio's checks use, so they need network access. A failed download only disables those checks.
-
-5. **Deploy jobs first, then web**, using the configs Vite generates so the RSC environment and client assets are included:
-
-   ```sh
-   bunx wrangler deploy --config apps/web/dist/open_cinema_jobs/wrangler.json
-   bunx wrangler deploy --config apps/web/dist/server/wrangler.json
-   ```
-
-Use separate D1 databases, buckets and secrets for preview and production. Nothing in this repository deploys automatically.
+The build prepares the on-device face/pose models used by revision checks. It downloads the pinned pose model when unavailable locally; if the download fails, those optional checks report unavailable.
 
 ## Commands
 
-| Command                    | Effect                                                      |
-| -------------------------- | ----------------------------------------------------------- |
-| `bun run setup`            | Generate Prisma and Worker types, apply local D1 migrations |
-| `bun run dev`              | Run both Workers with Vite and hot reload                   |
-| `bun run typecheck`        | Regenerate types and check all workspaces                   |
-| `bun run test`             | Jobs integration tests in `workerd`, plus web unit tests    |
-| `bun run build`            | Build client, SSR/RSC and jobs Worker artifacts             |
-| `bun run preview`          | Serve the production build locally                          |
-| `bun run check`            | Type-check, test and build                                  |
-| `bun run db:migrate:local` | Apply committed migrations to local D1                      |
-| `bun run format`           | Format code and configuration                               |
-
-The build emits upstream RSC source-map warnings; they do not affect the output.
+| Command                        | Effect                                                  |
+| ------------------------------ | ------------------------------------------------------- |
+| `docker compose up --build -d` | Build and start the complete persistent studio          |
+| `bun run setup`                | Generate Prisma and apply local SQLite migrations       |
+| `bun run dev`                  | Vite with hot reload and persistent background jobs     |
+| `bun run typecheck`            | Regenerate Prisma and check all workspaces              |
+| `bun run test`                 | SQLite/file-store job integration tests and web tests   |
+| `bun run build`                | Build the client, SSR and RSC artifacts                 |
+| `bun run start`                | Run the production Bun server; migrate and recover jobs |
+| `bun run check`                | Type-check, test and build                              |
+| `bun run db:migrate:local`     | Apply ordered SQLite migrations                         |
+| `bun run format`               | Format code and configuration                           |
 
 ## How it is built
 
 | Workspace            | Purpose                                                                  |
 | -------------------- | ------------------------------------------------------------------------ |
-| `apps/web`           | TanStack Start, React, Tailwind, shadcn/ui, server functions, sign-in    |
-| `apps/jobs`          | Private Worker with a per-creator `GenerationCoordinator` Durable Object |
+| `apps/web`           | TanStack Start, React, Tailwind, shadcn/ui, server functions and sign-in |
+| `apps/jobs`          | Persistent per-creator coordinators and job scheduling                   |
 | `packages/contracts` | Browser-safe schemas for jobs, workflows, Elements and media             |
-| `packages/database`  | Prisma schema, D1 migrations, queries and mutations                      |
-| `packages/assets`    | Server-only R2 archival and authenticated streaming                      |
-| `packages/comfy`     | Server-only adapter for the official Comfy TypeScript SDK                |
+| `packages/database`  | Prisma/SQLite catalog, migrations and execution checkpoints              |
+| `packages/assets`    | Private file storage and authenticated streaming                         |
+| `packages/runtime`   | Runtime settings, mounted secrets and HTTP/WebSocket adapters            |
+| `packages/comfy`     | Official Comfy SDK and workflow graph integration                        |
 
-- The web Worker validates input and owns sessions; it never imports the Comfy adapter or sees the API key.
-- A Durable Object per creator accepts idempotent commands, persists checkpoints and alarms, polls Comfy, and pushes authoritative snapshots over hibernatable WebSockets.
-- All database access goes through `packages/database`. To change the schema, edit `packages/database/prisma/schema.prisma`, generate the next ordered SQL migration with the pinned Prisma tooling, then run `bun run db:generate`, `bun run db:migrate:local` and `bun run test`. Do not use `prisma migrate deploy` with D1.
-- R2 holds generated bytes; D1 holds metadata only.
+Jobs survive closed tabs and server restarts. Checkpoints and recovery times commit atomically; output files are archived before a job is marked ready. Browser updates travel over authenticated WebSockets. All database access stays in `packages/database`, and all application data stays on the data volume.
 
-Read [ARCHITECTURE.md](ARCHITECTURE.md) before extending the app, and [AGENTS.md](AGENTS.md) for repository rules (60 fps UI, no direct `useEffect`, design skills).
+Read [ARCHITECTURE.md](ARCHITECTURE.md) before extending the app, and [AGENTS.md](AGENTS.md) for repository rules.
 
 ## Documentation
 

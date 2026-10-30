@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { env } from "cloudflare:workers";
+import { env } from "@open-cinema/runtime";
 import { z } from "zod";
 import {
   addShotInputSchema,
@@ -90,7 +90,7 @@ export const planMySequence = createServerFn({ method: "POST" })
   .validator(planSequenceInputSchema)
   .handler(async ({ data }) => {
     const scope = await mutationScope();
-    using plan = await getCoordinator(scope.ownerId).planSequence(scope, data);
+    const plan = await getCoordinator(scope.ownerId).planSequence(scope, data);
     return sequencePlanSchema.parse(plan);
   });
 

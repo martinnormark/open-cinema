@@ -1,7 +1,7 @@
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
-  runtime  = "cloudflare"
+  runtime  = "bun"
 }
 
 datasource db {
@@ -133,7 +133,7 @@ model ElementState {
 }
 
 /// Asset refs are stored as typed columns, not foreign keys: job outputs are
-/// projected to D1 asynchronously, so ownership is checked in mutations.
+/// projected to SQLite asynchronously, so ownership is checked in mutations.
 model ElementReference {
   id           String        @id
   elementId    String

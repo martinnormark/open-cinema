@@ -172,7 +172,7 @@ export function getOrbState(
   return jobs.some((job) => isActiveJob(job.state)) ? "thinking" : "idle";
 }
 
-/** Transport contract; no dependency on the Worker implementation. */
+/** Transport contract; no dependency on the server implementation. */
 export interface GenerationCoordinatorApi {
   getSnapshot(scope: OwnerScope): Promise<JobSnapshot | null>;
   /** A bare prompt is shorthand for an `image.flux` workflow command. */
@@ -182,7 +182,7 @@ export interface GenerationCoordinatorApi {
   ): Promise<CommandResult>;
   cancel(scope: OwnerScope, jobId: string): Promise<CommandResult>;
   reconcile(scope: OwnerScope, jobId: string): Promise<CommandResult>;
-  /** Display-safe: whether the jobs Worker holds Comfy credentials. Never the key. */
+  /** Display-safe: whether the job service holds Comfy credentials. Never the key. */
   getProviderStatus(): Promise<{ comfyConfigured: boolean }>;
   /** Proposes shots for an idea; falls back to a sentence split, never throws. */
   planSequence(

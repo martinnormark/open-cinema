@@ -62,8 +62,7 @@ async function uploadThroughRelay(
   relay: string,
   options: Parameters<typeof uploadToComfyStorage>[0],
 ): Promise<string> {
-  // Buffered: workerd cannot pipe one transform stream into another, and
-  // this path only runs in development.
+  // The development relay accepts a multipart form.
   const form = new FormData();
   form.append("type", "input");
   form.append("overwrite", "true");

@@ -1,5 +1,7 @@
 # Media library and uploads
 
+> Deployment update (2026-10-30): the application now runs entirely in Docker with Bun, SQLite and private file storage. Infrastructure references and earlier verification results below describe the previous implementation. Use [deployment](deployment.md) and [architecture](../ARCHITECTURE.md) for current setup.
+
 Uploaded images and short videos feed Elements (as references) and video replacement (as sources). The Library page shows them next to saved generated outputs. Implemented 2026-10-17.
 
 ## Using it from another feature

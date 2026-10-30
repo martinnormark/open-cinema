@@ -1,13 +1,23 @@
-import { env } from "cloudflare:workers";
+import { subscribe } from "./runtime";
+import { sql } from "./runtime";
+import type { Coordinator } from "./runtime";
+import { env } from "./runtime";
 import {
-  applyD1Migrations,
-  abortAllDurableObjects,
-  runDurableObjectAlarm,
-  runInDurableObject,
+  applyMigrations,
+  restartJobs,
+  runWake,
+  withCoordinator,
   reset,
-} from "cloudflare:test";
-import { beforeEach, afterEach, beforeAll, afterAll, expect, it } from "vitest";
-import { setupNetwork } from "@msw/cloudflare";
+} from "./runtime";
+import {
+  beforeEach,
+  afterEach,
+  beforeAll,
+  afterAll,
+  expect,
+  it,
+} from "bun:test";
+import { setupNetwork } from "./runtime";
 import { http, HttpResponse } from "msw";
 import { createDatabase } from "@open-cinema/database";
 import { getJob, getJobOutput } from "@open-cinema/database/queries";
@@ -42,7 +52,7 @@ beforeEach(async () => {
     ),
   );
   await reset();
-  await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
+  await applyMigrations(env.DB, env.TEST_MIGRATIONS);
 });
 afterEach(async () => {
   await reset();
@@ -59,13 +69,9 @@ function fixture() {
     stub: env.GENERATION_COORDINATORS.getByName(ownerId),
   };
 }
-function accepted(result: CommandResult & Partial<Disposable>) {
-  try {
-    if (!result.ok) throw new Error(result.error);
-    return structuredClone(result.snapshot.jobs[0]!);
-  } finally {
-    result[Symbol.dispose]?.();
-  }
+function accepted(result: CommandResult) {
+  if (!result.ok) throw new Error(result.error);
+  return structuredClone(result.snapshot.jobs[0]!);
 }
 const providerId = "provider-1";
 const base = "https://api.comfy.org/v2/models/bfl/flux-3-image/requests";
@@ -110,13 +116,13 @@ async function due(
   stub: ReturnType<typeof fixture>["stub"],
   scope: ReturnType<typeof fixture>["scope"],
 ) {
-  await runInDurableObject(stub, async (_, state) => {
+  await withCoordinator(stub, async (_, state) => {
     await mutateCoordinator(state.storage, scope, (record) => {
       for (const entry of Object.values(record.executions))
         entry.nextAttemptAt = 0;
     });
   });
-  await runDurableObjectAlarm(stub);
+  await runWake(stub);
 }
 
 it("deduplicates concurrent commands, rejects changed input and foreign owners, and cancels queued work without submitting", async () => {
@@ -145,7 +151,7 @@ it("deduplicates concurrent commands, rejects changed input and foreign owners, 
   ).toBeNull();
 });
 
-it("rehydrates a Router receipt after restart and delivers an owned image through WebSocket and D1", async () => {
+it("rehydrates a Router receipt after restart and delivers an owned image through WebSocket and SQLite", async () => {
   let { scope, stub } = fixture();
   let submissions = 0;
   network.use(
@@ -166,22 +172,14 @@ it("rehydrates a Router receipt after restart and delivers an owned image throug
   );
   const job = accepted(await stub.submit(scope, command()));
   await due(stub, scope);
-  const old = await runInDurableObject(stub, (_, state) =>
+  const old = await withCoordinator(stub, (_, state) =>
     readCoordinator(state.storage),
   );
   expect(old?.jobs[0]?.providerJobId).toBe(providerId);
   expect(old?.jobs[0]?.seed).toBeNull();
-  await abortAllDurableObjects();
+  await restartJobs();
   stub = env.GENERATION_COORDINATORS.getByName(scope.ownerId);
-  const response = await stub.fetch("https://jobs.test/stream", {
-    headers: {
-      Upgrade: "websocket",
-      "X-Owner-Id": scope.ownerId,
-      "X-Session-Expires-At": String(Date.now() + 60000),
-    },
-  });
-  const socket = response.webSocket!;
-  socket.accept();
+  const { socket } = await subscribe(stub, scope.ownerId);
   const success = new Promise<void>((resolve) =>
     socket.addEventListener("message", (event) => {
       const data = jobEventSchema.parse(JSON.parse(String(event.data)));
@@ -205,7 +203,7 @@ it("rehydrates a Router receipt after restart and delivers an owned image throug
   expect(
     await stub.getStoredOutput(scope, job.id, "unowned-output"),
   ).toBeNull();
-  using reference = await stub.getStoredOutput(scope, job.id, outputId);
+  const reference = await stub.getStoredOutput(scope, job.id, outputId);
   const output = jobOutputSchema.parse(reference);
   expect(output.r2Key).toBeTruthy();
   expect(output.sizeBytes).toBe(assetBytes.length);
@@ -266,7 +264,7 @@ it("recovers a lost acceptance after restart with identical input and idempotenc
   const job = accepted(await stub.submit(scope, command()));
   await due(stub, scope);
   expect((await stub.getSnapshot(scope))?.jobs[0]?.state).toBe("submitting");
-  await abortAllDurableObjects();
+  await restartJobs();
   stub = env.GENERATION_COORDINATORS.getByName(scope.ownerId);
   accepted(await stub.cancel(scope, job.id));
   await due(stub, scope);
@@ -322,7 +320,7 @@ it("bounds ambiguous submission recovery and pauses admission without minting an
 it("keeps a legacy interrupted Cloud submission suspended when upgrading v2 checkpoints", async () => {
   let { scope, stub } = fixture();
   accepted(await stub.submit(scope, command()));
-  await runInDurableObject(stub, async (_, state) => {
+  await withCoordinator(stub, async (_, state) => {
     const record = await readCoordinator(state.storage);
     const old = JSON.parse(JSON.stringify(record));
     old.schemaVersion = 2;
@@ -330,7 +328,7 @@ it("keeps a legacy interrupted Cloud submission suspended when upgrading v2 chec
     delete old.executions[old.jobs[0].id].provider;
     await state.storage.put("coordinator", old);
   });
-  await abortAllDurableObjects();
+  await restartJobs();
   stub = env.GENERATION_COORDINATORS.getByName(scope.ownerId);
   let submissions = 0;
   network.use(
@@ -345,11 +343,8 @@ it("keeps a legacy interrupted Cloud submission suspended when upgrading v2 chec
   );
   expect(submissions).toBe(0);
   expect(
-    (
-      await runInDurableObject(stub, (_, state) =>
-        readCoordinator(state.storage),
-      )
-    )?.schemaVersion,
+    (await withCoordinator(stub, (_, state) => readCoordinator(state.storage)))
+      ?.schemaVersion,
   ).toBe(COORDINATOR_SCHEMA_VERSION);
 });
 
@@ -378,28 +373,22 @@ it("retries a failed history projection after restart without losing accepted wo
   let { scope, stub } = fixture();
   const job = accepted(await stub.submit(scope, command()));
   accepted(await stub.cancel(scope, job.id));
-  await env.DB.exec('ALTER TABLE "GenerationJob" RENAME TO "UnavailableJob"');
+  sql('ALTER TABLE "GenerationJob" RENAME TO "UnavailableJob"');
   await due(stub, scope);
-  await abortAllDurableObjects();
+  await restartJobs();
   stub = env.GENERATION_COORDINATORS.getByName(scope.ownerId);
   expect(
-    (
-      await runInDurableObject(stub, (_, state) =>
-        readCoordinator(state.storage),
-      )
-    )?.executions[job.id]?.pendingProjection,
+    (await withCoordinator(stub, (_, state) => readCoordinator(state.storage)))
+      ?.executions[job.id]?.pendingProjection,
   ).toBe(true);
-  await env.DB.exec('ALTER TABLE "UnavailableJob" RENAME TO "GenerationJob"');
+  sql('ALTER TABLE "UnavailableJob" RENAME TO "GenerationJob"');
   await due(stub, scope);
   expect((await getJob(createDatabase(env.DB), scope, job.id))?.state).toBe(
     "cancelled",
   );
   expect(
-    (
-      await runInDurableObject(stub, (_, state) =>
-        readCoordinator(state.storage),
-      )
-    )?.executions[job.id]?.pendingProjection,
+    (await withCoordinator(stub, (_, state) => readCoordinator(state.storage)))
+      ?.executions[job.id]?.pendingProjection,
   ).toBe(false);
 });
 
@@ -470,18 +459,18 @@ it("does not mistake a credential rejection during receipt recovery for proof th
   expect(calls).toBe(2);
 });
 
-it("recovers a completed R2 upload after a lost checkpoint without contacting the expired provider", async () => {
+it("recovers a completed private storage upload after a lost checkpoint without contacting the expired provider", async () => {
   let { scope, stub } = fixture();
   network.use(http.post(base, receipt));
   const job = accepted(await stub.submit(scope, command()));
   await due(stub, scope);
   finish();
   await due(stub, scope);
-  const record = await runInDurableObject(stub, (_, state) =>
+  const record = await withCoordinator(stub, (_, state) =>
     readCoordinator(state.storage),
   );
   const pending = record!.jobs[0]!;
-  // Stop at the real storage boundary: R2 committed, DO acknowledgement not yet written.
+  // Stop at the real storage boundary: private storage committed, DO acknowledgement not yet written.
   await archiveOutput(
     env.GENERATED_ASSETS,
     scope.ownerId,
@@ -498,7 +487,7 @@ it("recovers a completed R2 upload after a lost checkpoint without contacting th
       () => new HttpResponse(null, { status: 410 }),
     ),
   );
-  await abortAllDurableObjects();
+  await restartJobs();
   stub = env.GENERATION_COORDINATORS.getByName(scope.ownerId);
   await due(stub, scope);
   const recovered = await getJob(createDatabase(env.DB), scope, job.id);
@@ -539,7 +528,7 @@ it("suspends failed asset downloads and retries storage without resubmitting a g
     state: "needs_attention",
     outputs: [{ r2Key: null }],
   });
-  await abortAllDurableObjects();
+  await restartJobs();
   stub = env.GENERATION_COORDINATORS.getByName(scope.ownerId);
   finish();
   expect(accepted(await stub.reconcile(scope, job.id)).state).toBe(
@@ -557,7 +546,7 @@ it("archives existing v3 completed outputs on coordinator activation", async () 
   await due(stub, scope);
   finish();
   await due(stub, scope);
-  await runInDurableObject(stub, async (_, state) => {
+  await withCoordinator(stub, async (_, state) => {
     const record = JSON.parse(
       JSON.stringify(await readCoordinator(state.storage)),
     );
@@ -567,10 +556,10 @@ it("archives existing v3 completed outputs on coordinator activation", async () 
     await state.storage.put("coordinator", record);
     await state.storage.deleteAlarm();
   });
-  await abortAllDurableObjects();
+  await restartJobs();
   stub = env.GENERATION_COORDINATORS.getByName(scope.ownerId);
   expect((await stub.getSnapshot(scope))?.jobs[0]?.state).toBe("persisting");
-  expect(await runDurableObjectAlarm(stub)).toBe(true);
+  expect(await runWake(stub)).toBe(true);
   expect((await stub.getSnapshot(scope))?.jobs[0]?.state).toBe("succeeded");
 });
 
@@ -585,7 +574,7 @@ it("starts the monitoring window when a queued job is submitted, not while it wa
   );
   accepted(await stub.submit(scope, command()));
   // As if it waited behind a long Router job past the window set at acceptance.
-  await runInDurableObject(stub, (_, state) =>
+  await withCoordinator(stub, (_, state) =>
     mutateCoordinator(state.storage, scope, (record) => {
       for (const entry of Object.values(record.executions))
         entry.deadline = Date.now() - 1;
@@ -606,7 +595,7 @@ it("wakes for the earliest due job when several are active", async () => {
   accepted(await stub.submit(scope, command()));
   accepted(await stub.submit(scope, command()));
   const soon = Date.now() + 10_000;
-  const alarm = await runInDurableObject(stub, async (_, state) => {
+  const alarm = await withCoordinator(stub, async (_, state) => {
     await mutateCoordinator(state.storage, scope, (record) => {
       record.jobs.forEach((job, i) => {
         job.state = "running";

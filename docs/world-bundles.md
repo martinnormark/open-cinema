@@ -1,5 +1,7 @@
 # World bundles
 
+> Deployment update (2026-10-30): the application now runs entirely in Docker with Bun, SQLite and private file storage. Infrastructure references and earlier verification results below describe the previous implementation. Use [deployment](deployment.md) and [architecture](../ARCHITECTURE.md) for current setup.
+
 A world bundle moves a creator's reusable work between projects and between
 Open Cinema installations: Elements with their states and reference sheets,
 recipes, a project's look, and sequences with their approved takes. It is a

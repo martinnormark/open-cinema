@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { env } from "cloudflare:workers";
+import { env } from "@open-cinema/runtime";
 import {
   serveObject,
   uploadObjectKey,
@@ -17,7 +17,7 @@ async function owner(request: Request, id: string) {
   // Signed links cover the original only; posters stay session-scoped.
   if (query.get("variant")) return null;
   const valid = await verifyMediaPath(
-    env.LOCAL_SESSION_SECRET,
+    env.MEDIA_SIGNING_SECRET,
     `${signed}/${id}/original`,
     query.get("expires"),
     query.get("signature"),

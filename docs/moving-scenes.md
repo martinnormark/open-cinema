@@ -1,5 +1,7 @@
 # Recasting and relocating a moving scene
 
+> Deployment update (2026-10-30): the application now runs entirely in Docker with Bun, SQLite and private file storage. Infrastructure references and earlier verification results below describe the previous implementation. Use [deployment](deployment.md) and [architecture](../ARCHITECTURE.md) for current setup.
+
 Tested on **2026-10-18** on Comfy's 8.4 s street-dance clip (720×1280, 24 fps, 201 frames, high-angle camera following a dancer, with a passer-by crossing in front). The ask: change the character, or move the whole scene somewhere else, while the shot keeps moving. Cal (the character-sheet Character) and the Tide Mill Location were the targets. Clips are in the project files under `moving-scene/`. Graphs and requests are under [`evaluation/moving-scene/`](../evaluation/moving-scene/).
 
 ## Verdict

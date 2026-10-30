@@ -1,6 +1,6 @@
-import { env } from "cloudflare:workers";
-import { applyD1Migrations } from "cloudflare:test";
-import { beforeAll, expect, it } from "vitest";
+import { env } from "./runtime";
+import { applyMigrations } from "./runtime";
+import { beforeAll, expect, it } from "bun:test";
 import { approvedReferences, missingViews } from "@open-cinema/contracts";
 import { createDatabase } from "@open-cinema/database";
 import {
@@ -23,7 +23,7 @@ import {
   listRevisions,
 } from "@open-cinema/database/queries";
 
-beforeAll(() => applyD1Migrations(env.DB, env.TEST_MIGRATIONS));
+beforeAll(() => applyMigrations(env.DB, env.TEST_MIGRATIONS));
 
 async function readyUpload(
   db: ReturnType<typeof createDatabase>,

@@ -1,5 +1,7 @@
 # Scaffold verification
 
+> Deployment update (2026-10-30): the application now runs entirely in Docker with Bun, SQLite and private file storage. Infrastructure references and earlier verification results below describe the previous implementation. Use [deployment](deployment.md) and [architecture](../ARCHITECTURE.md) for current setup.
+
 Verified locally on 2026-10-17. These checks establish a runnable foundation, not production readiness or complete creative workflows.
 
 ## Build and runtime

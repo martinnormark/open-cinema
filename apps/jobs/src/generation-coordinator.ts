@@ -1,4 +1,9 @@
-import { DurableObject } from "cloudflare:workers";
+import { providerCredentials, type RuntimeEnv } from "@open-cinema/runtime";
+import {
+  upgradeConnection,
+  type StatusSocket,
+} from "@open-cinema/runtime/transport";
+import type { CheckpointStorage } from "@open-cinema/database/storage";
 import {
   isActiveJob,
   ownerScopeSchema,
@@ -166,13 +171,15 @@ function touch(record: CoordinatorRecord, job: Job) {
   record.executions[job.id]!.pendingProjection = true;
 }
 
-export class GenerationCoordinator
-  extends DurableObject<JobsEnv>
-  implements GenerationCoordinatorApi
-{
+export class GenerationCoordinator implements GenerationCoordinatorApi {
+  private sockets = new Set<StatusSocket>();
+  constructor(
+    readonly storage: CheckpointStorage,
+    private env: RuntimeEnv,
+  ) {}
   async getSnapshot(scope: OwnerScope): Promise<JobSnapshot | null> {
     const record = await initializeCoordinator(
-      this.ctx.storage,
+      this.storage,
       ownerScopeSchema.parse(scope),
     );
     return record ? snapshot(record) : null;
@@ -210,7 +217,12 @@ export class GenerationCoordinator
     ) as WorkflowDefinition | null;
     if (!definition)
       return failure("That kind of generation is not available yet.");
-    if (!this.env.COMFY_API_KEY?.trim())
+    if (
+      !providerCredentials(
+        this.env,
+        definition.provider?.(command.request.inputs as never) ?? "router",
+      ).apiKey?.trim()
+    )
       return failure("Comfy Router credentials are not configured.");
     const model = definition.model(command.request.inputs as never);
     // Prompt-only commands keep their pre-v5 hash so retries across a deploy still match.
@@ -224,7 +236,7 @@ export class GenerationCoordinator
       assets.length > 0 ||
       requestMentions(command.request).length > 0 ||
       parseMentionHandles(requestPrompt(command.request)).length > 0;
-    // Plain prompts never touch D1, so a D1 outage cannot block them.
+    // Plain prompts never touch SQLite, so a SQLite outage cannot block them.
     if (needsLookup)
       try {
         const db = createDatabase(this.env.DB);
@@ -242,93 +254,88 @@ export class GenerationCoordinator
       }
     let error: string | null = null;
     let jobId: string | null = null;
-    const record = await mutateCoordinator(
-      this.ctx.storage,
-      scope,
-      (record) => {
-        error = null;
-        jobId = null;
-        const existing = Object.values(record.executions).find(
-          (e) => e.command.idempotencyKey === command.idempotencyKey,
-        );
-        if (existing) {
-          jobId =
-            Object.entries(record.executions).find(
-              ([, e]) => e === existing,
-            )?.[0] ?? null;
-          if (existing.requestHash !== requestHash)
-            error =
-              "This request key was already used for a different request.";
-          return;
-        }
-        if (record.jobs.some((j) => j.state === "needs_attention")) {
-          error =
-            "Resolve the uncertain job in Activity before starting another generation.";
-          return;
-        }
-        if (record.jobs.filter((j) => isActiveJob(j.state)).length >= 4) {
-          error =
-            "Your queue is full. Wait for a job to finish or cancel a queued job.";
-          return;
-        }
-        if (record.jobs.length >= 100) {
-          error = "This MVP session has reached its 100-job limit.";
-          return;
-        }
-        const now = new Date().toISOString();
-        const job: Job = {
-          id: crypto.randomUUID(),
-          ownerId: scope.ownerId,
-          state: "queued",
-          version: 1,
-          providerJobId: null,
-          createdAt: now,
-          updatedAt: now,
-          // A revision reads as the creator's stated change; its prompt is
-          // only the extra direction (a recast's may be a wardrobe note).
-          prompt:
-            command.revision?.intent || requestPrompt(command.request) || "",
-          model:
-            typeof definition.displayModel === "function"
-              ? definition.displayModel(command.request.inputs as never)
-              : definition.displayModel,
-          workflowKind: command.request.workflowKind,
-          projectId: command.projectId ?? null,
-          seed: null,
+    const record = await mutateCoordinator(this.storage, scope, (record) => {
+      error = null;
+      jobId = null;
+      const existing = Object.values(record.executions).find(
+        (e) => e.command.idempotencyKey === command.idempotencyKey,
+      );
+      if (existing) {
+        jobId =
+          Object.entries(record.executions).find(
+            ([, e]) => e === existing,
+          )?.[0] ?? null;
+        if (existing.requestHash !== requestHash)
+          error = "This request key was already used for a different request.";
+        return;
+      }
+      if (record.jobs.some((j) => j.state === "needs_attention")) {
+        error =
+          "Resolve the uncertain job in Activity before starting another generation.";
+        return;
+      }
+      if (record.jobs.filter((j) => isActiveJob(j.state)).length >= 4) {
+        error =
+          "Your queue is full. Wait for a job to finish or cancel a queued job.";
+        return;
+      }
+      if (record.jobs.length >= 100) {
+        error = "This MVP session has reached its 100-job limit.";
+        return;
+      }
+      const now = new Date().toISOString();
+      const job: Job = {
+        id: crypto.randomUUID(),
+        ownerId: scope.ownerId,
+        state: "queued",
+        version: 1,
+        providerJobId: null,
+        createdAt: now,
+        updatedAt: now,
+        // A revision reads as the creator's stated change; its prompt is
+        // only the extra direction (a recast's may be a wardrobe note).
+        prompt:
+          command.revision?.intent || requestPrompt(command.request) || "",
+        model:
+          typeof definition.displayModel === "function"
+            ? definition.displayModel(command.request.inputs as never)
+            : definition.displayModel,
+        workflowKind: command.request.workflowKind,
+        projectId: command.projectId ?? null,
+        seed: null,
 
-          progress: null,
-          stage: workflowStages(
-            command.request.workflowKind,
-            command.request.inputs,
-          ).length
-            ? (definition.label ?? null)
-            : null,
-          error: null,
-          outputs: [],
-        };
-        record.jobs.unshift(job);
-        jobId = job.id;
-        record.executions[job.id] = {
-          command,
-          requestHash,
-          provider:
-            definition.provider?.(command.request.inputs as never) ?? "router",
-          workflowKind: command.request.workflowKind,
-          mentions,
-          assetsPending: false,
-          workflow: { model },
-          submissionKey: crypto.randomUUID(),
-          uploads: {},
-          stage: 0,
-          nextAttemptAt: Date.now(),
-          deadline: Date.now() + definition.deadlineMs,
-          attempts: 0,
-          pendingProjection: true,
-          cancelRequested: false,
-        };
-        record.sequence++;
-      },
-    );
+        progress: null,
+        stage: workflowStages(
+          command.request.workflowKind,
+          command.request.inputs,
+        ).length
+          ? (definition.label ?? null)
+          : null,
+        error: null,
+        outputs: [],
+      };
+      record.jobs.unshift(job);
+      jobId = job.id;
+      record.executions[job.id] = {
+        command,
+        requestHash,
+        provider:
+          definition.provider?.(command.request.inputs as never) ?? "router",
+        workflowKind: command.request.workflowKind,
+        mentions,
+        assetsPending: false,
+        workflow: { model },
+        submissionKey: crypto.randomUUID(),
+        uploads: {},
+        stage: 0,
+        nextAttemptAt: Date.now(),
+        deadline: Date.now() + definition.deadlineMs,
+        attempts: 0,
+        pendingProjection: true,
+        cancelRequested: false,
+      };
+      record.sequence++;
+    });
     if (!record) return failure("Forbidden");
     if (error) return failure(error);
     this.broadcast(record);
@@ -343,7 +350,7 @@ export class GenerationCoordinator
     type Stop = { providerJobId: string; execution: Execution };
     let stop: Stop | null = null;
     const record = await mutateCoordinator(
-      this.ctx.storage,
+      this.storage,
       ownerScopeSchema.parse(scope),
       (record) => {
         stop = null;
@@ -398,7 +405,7 @@ export class GenerationCoordinator
 
   async reconcile(scope: OwnerScope, jobId: string): Promise<CommandResult> {
     const initial = await initializeCoordinator(
-      this.ctx.storage,
+      this.storage,
       ownerScopeSchema.parse(scope),
     );
     const job = initial?.jobs.find((j) => j.id === jobId);
@@ -406,35 +413,36 @@ export class GenerationCoordinator
       return failure(
         "No provider job ID was received. Check your Comfy Cloud history; automatic resubmission is disabled.",
       );
-    const record = await mutateCoordinator(
-      this.ctx.storage,
-      scope,
-      (record) => {
-        const current = record.jobs.find((j) => j.id === jobId)!;
-        if (current.state !== "needs_attention") return;
-        current.state = record.executions[jobId]!.assetsPending
-          ? "persisting"
-          : record.executions[jobId]!.cancelRequested
-            ? "cancelling"
-            : "running";
-        // A media stage has no provider job to reconcile; it simply retries.
-        current.error = null;
-        Object.assign(record.executions[jobId]!, {
-          nextAttemptAt: Date.now(),
-          deadline: Date.now() + deadlineFor(record.executions[jobId]!),
-          attempts: 0,
-        });
-        touch(record, current);
-      },
-    );
+    const record = await mutateCoordinator(this.storage, scope, (record) => {
+      const current = record.jobs.find((j) => j.id === jobId)!;
+      if (current.state !== "needs_attention") return;
+      current.state = record.executions[jobId]!.assetsPending
+        ? "persisting"
+        : record.executions[jobId]!.cancelRequested
+          ? "cancelling"
+          : "running";
+      // A media stage has no provider job to reconcile; it simply retries.
+      current.error = null;
+      Object.assign(record.executions[jobId]!, {
+        nextAttemptAt: Date.now(),
+        deadline: Date.now() + deadlineFor(record.executions[jobId]!),
+        attempts: 0,
+      });
+      touch(record, current);
+    });
     if (!record) return failure("Forbidden");
     this.broadcast(record);
     return { ok: true, snapshot: snapshot(record) };
   }
 
   async getProviderStatus(): Promise<{ comfyConfigured: boolean }> {
-    // Reads no storage, so probing a throwaway DO name creates no coordinator.
-    return { comfyConfigured: Boolean(this.env.COMFY_API_KEY?.trim()) };
+    // Reads no storage, so probing a readiness probe creates no coordinator.
+    return {
+      comfyConfigured: Boolean(
+        providerCredentials(this.env, "router").apiKey?.trim() ||
+        providerCredentials(this.env, "cloud").apiKey?.trim(),
+      ),
+    };
   }
 
   /**
@@ -447,8 +455,7 @@ export class GenerationCoordinator
   ): Promise<SequencePlan> {
     ownerScopeSchema.parse(scope);
     return planSequence(input, {
-      apiKey: this.env.COMFY_API_KEY ?? "",
-      baseUrl: (this.env as { COMFY_BASE_URL?: string }).COMFY_BASE_URL,
+      ...providerCredentials(this.env, "router"),
     });
   }
 
@@ -458,7 +465,7 @@ export class GenerationCoordinator
     outputId: string,
   ): Promise<JobOutput | null> {
     const record = await initializeCoordinator(
-      this.ctx.storage,
+      this.storage,
       ownerScopeSchema.parse(scope),
     );
     return (
@@ -469,8 +476,7 @@ export class GenerationCoordinator
   }
   private client(execution: Execution) {
     return createComfyClient({
-      apiKey: this.env.COMFY_API_KEY ?? "",
-      baseUrl: (this.env as { COMFY_BASE_URL?: string }).COMFY_BASE_URL,
+      ...providerCredentials(this.env, execution.provider),
       provider: execution.provider,
       workflow: execution.workflow,
       ...(execution.provider === "router"
@@ -519,7 +525,7 @@ export class GenerationCoordinator
         : await definition.build(request.inputs as never, context);
     // Saved before submitting, so a restart mid-submit rebuilds the same request.
     if (created.size)
-      await mutateCoordinator(this.ctx.storage, { ownerId }, (record) => {
+      await mutateCoordinator(this.storage, { ownerId }, (record) => {
         const current = record.executions[job.id];
         if (!current) return;
         for (const [key, url] of created)
@@ -572,7 +578,7 @@ export class GenerationCoordinator
     update: (job: Job, record: CoordinatorRecord) => void,
   ) {
     const record = await mutateCoordinator(
-      this.ctx.storage,
+      this.storage,
       { ownerId },
       (record) => {
         const job = record.jobs.find((j) => j.id === id);
@@ -799,8 +805,8 @@ export class GenerationCoordinator
 
   async alarm(): Promise<void> {
     // Schedule a watchdog BEFORE external I/O. Crashes never lose the recovery wake.
-    await scheduleCoordinatorWake(this.ctx.storage, Date.now() + 30_000);
-    let record = await readCoordinator(this.ctx.storage);
+    await scheduleCoordinatorWake(this.storage, Date.now() + 30_000);
+    let record = await readCoordinator(this.storage);
     if (!record) return;
     const now = Date.now();
     // Up to MAX_ACTIVE_JOBS provider executions per owner (one by default);
@@ -854,7 +860,7 @@ export class GenerationCoordinator
         });
       } else if (!job.providerJobId) {
         const claimed = await mutateCoordinator(
-          this.ctx.storage,
+          this.storage,
           { ownerId: record.ownerId },
           (r) => {
             const current = r.jobs.find((j) => j.id === job.id)!;
@@ -994,7 +1000,7 @@ export class GenerationCoordinator
         }
       }
     }
-    record = (await readCoordinator(this.ctx.storage))!;
+    record = (await readCoordinator(this.storage))!;
     for (const job of record.jobs
       .filter((j) => record!.executions[j.id]?.pendingProjection)
       .slice(0, 8)) {
@@ -1005,7 +1011,7 @@ export class GenerationCoordinator
           record.executions[job.id]!,
         );
         await mutateCoordinator(
-          this.ctx.storage,
+          this.storage,
           { ownerId: record.ownerId },
           (r) => {
             if (r.jobs.find((j) => j.id === job.id)?.version === job.version)
@@ -1018,9 +1024,9 @@ export class GenerationCoordinator
         );
       }
     }
-    record = (await readCoordinator(this.ctx.storage))!;
+    record = (await readCoordinator(this.storage))!;
     let next = Infinity;
-    for (const socket of this.ctx.getWebSockets()) {
+    for (const socket of this.sockets) {
       const expiry = this.socketExpiry(socket);
       if (expiry <= Date.now()) socket.close(1008, "Session expired");
       else next = Math.min(next, expiry);
@@ -1032,22 +1038,16 @@ export class GenerationCoordinator
   private async reschedule(next: number) {
     // Keep storage access inside the database package, including alarm cancellation.
     await replaceCoordinatorWake(
-      this.ctx.storage,
+      this.storage,
       Number.isFinite(next) ? Math.max(Date.now() + 100, next) : null,
     );
   }
-  private socketExpiry(socket: WebSocket): number {
-    const value: unknown = socket.deserializeAttachment();
-    return typeof value === "object" &&
-      value !== null &&
-      "expiresAt" in value &&
-      typeof value.expiresAt === "number"
-      ? value.expiresAt
-      : 0;
+  private socketExpiry(socket: StatusSocket): number {
+    return socket.expiresAt;
   }
   private broadcast(record: CoordinatorRecord) {
     const data = JSON.stringify(snapshot(record));
-    for (const socket of this.ctx.getWebSockets()) {
+    for (const socket of this.sockets) {
       try {
         if (this.socketExpiry(socket) <= Date.now())
           socket.close(1008, "Session expired");
@@ -1074,24 +1074,35 @@ export class GenerationCoordinator
       return new Response("Unauthorized", { status: 401 });
     const initial = await this.getSnapshot(scope.data);
     if (!initial) return new Response("Forbidden", { status: 403 });
-    await scheduleCoordinatorWake(this.ctx.storage, expiresAt);
+    await scheduleCoordinatorWake(this.storage, expiresAt);
     // Refresh AFTER awaiting the alarm; no await between final snapshot and socket registration.
-    const latest = await readCoordinator(this.ctx.storage);
-    if (this.ctx.getWebSockets().length >= 10)
+    if (this.sockets.size >= 10)
       return new Response("Too many connections", { status: 429 });
-    const pair = new WebSocketPair();
-    this.ctx.acceptWebSocket(pair[1]);
-    pair[1].serializeAttachment({ expiresAt });
-    pair[1].send(JSON.stringify(snapshot(latest!)));
-    return new Response(null, { status: 101, webSocket: pair[0] });
+    return upgradeConnection(
+      {
+        open: async (socket) => {
+          if (this.sockets.size >= 10) {
+            socket.close(1013, "Too many connections");
+            return;
+          }
+          this.sockets.add(socket);
+          try {
+            const current = await readCoordinator(this.storage);
+            if (current) this.broadcast(current);
+          } catch {
+            this.sockets.delete(socket);
+            socket.close(1011, "Reconnect to synchronize");
+          }
+        },
+        close: (socket) => {
+          this.sockets.delete(socket);
+        },
+      },
+      expiresAt,
+    );
   }
-  webSocketMessage(socket: WebSocket) {
-    socket.close(1008, "Read-only status stream");
-  }
-  webSocketClose(socket: WebSocket) {
-    socket.close(1000, "Connection closed");
-  }
-  webSocketError(socket: WebSocket) {
-    socket.close(1011, "Connection error");
+  close() {
+    for (const socket of this.sockets) socket.close(1001, "Server restarting");
+    this.sockets.clear();
   }
 }

@@ -1,5 +1,7 @@
 # Generation MVP
 
+> Deployment update (2026-10-30): the application now runs entirely in Docker with Bun, SQLite and private file storage. Infrastructure references and earlier verification results below describe the previous implementation. Use [deployment](deployment.md) and [architecture](../ARCHITECTURE.md) for current setup.
+
 Implemented on 2026-10-17. Studio can submit an image prompt, choose from five sample prompts, cancel work, and show generated images. Activity and the floating Orb share one WebSocket subscription across routes.
 
 ## Run locally

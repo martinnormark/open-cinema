@@ -1,3 +1,4 @@
+import type { AssetStore } from "./store";
 /** Router rejects base64 payloads above 20 MB; leave headroom for encoding. */
 export const MAX_INLINE_BYTES = 14 * 1024 * 1024;
 
@@ -5,7 +6,7 @@ export class InlineMediaError extends Error {}
 
 /** Reads one stored object as base64 for a provider request body. */
 export async function readObjectBase64(
-  bucket: R2Bucket,
+  bucket: AssetStore,
   key: string,
   maxBytes = MAX_INLINE_BYTES,
 ): Promise<{ base64: string; mediaType: string }> {

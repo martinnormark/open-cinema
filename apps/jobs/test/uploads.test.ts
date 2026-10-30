@@ -1,6 +1,6 @@
-import { env } from "cloudflare:workers";
-import { reset } from "cloudflare:test";
-import { beforeEach, expect, it } from "vitest";
+import { env, assetFiles } from "./runtime";
+import { reset } from "./runtime";
+import { beforeEach, expect, it } from "bun:test";
 import {
   serveObject,
   signMediaPath,
@@ -47,7 +47,12 @@ it("streams a multipart video upload byte-for-byte and serves byte ranges", asyn
   });
   const object = await env.GENERATED_ASSETS.get(stored.r2Key);
   const digest = (data: ArrayBuffer | Uint8Array) =>
-    crypto.subtle.digest("SHA-256", data).then((d) => new Uint8Array(d));
+    crypto.subtle
+      .digest(
+        "SHA-256",
+        data instanceof Uint8Array ? new Uint8Array(data) : data,
+      )
+      .then((d) => new Uint8Array(d));
   expect(await digest(await object!.arrayBuffer())).toEqual(
     await digest(bytes),
   );
@@ -94,8 +99,7 @@ it("rejects mislabelled, oversized, and truncated uploads without storing anythi
       128,
     ),
   ).rejects.toMatchObject({ status: 422 });
-  const listed = await env.GENERATED_ASSETS.list({ prefix: "uploads/" });
-  expect(listed.objects).toEqual([]);
+  expect(assetFiles()).toEqual([]);
 });
 
 it("accepts signed media paths only for the signed path and before expiry", async () => {

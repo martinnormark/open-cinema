@@ -1,6 +1,6 @@
 // Copy the moves on Wan 3.0 (Router) and Wan Animate 2 (Comfy Cloud). The runs
 // behind these shapes are in docs/copy-the-moves.md.
-import { expect, it } from "vitest";
+import { expect, it } from "bun:test";
 import {
   MOTION_ENGINES,
   modelCredit,

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { env } from "cloudflare:workers";
+import { env } from "@open-cinema/runtime";
 import { createDatabase } from "@open-cinema/database";
 import { getJobOutput } from "@open-cinema/database/queries";
 import {
@@ -51,8 +51,8 @@ async function outputResponse(request: Request) {
       return await poster(request, projected);
     if (projected?.r2Key)
       return await serveStoredOutput(env.GENERATED_ASSETS, projected, request);
-    // The checkpoint covers a delayed D1 projection and starts legacy asset migration.
-    using live = await getCoordinator(session.userId).getStoredOutput(
+    // The checkpoint covers a delayed SQLite projection and starts legacy asset migration.
+    const live = await getCoordinator(session.userId).getStoredOutput(
       scope,
       jobId,
       outputId,

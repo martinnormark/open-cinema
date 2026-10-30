@@ -1,3 +1,4 @@
+import type { CheckpointStorage } from "../storage";
 import type { OwnerScope } from "@open-cinema/contracts";
 import {
   COORDINATOR_SCHEMA_VERSION,
@@ -6,7 +7,7 @@ import {
 } from "../durable/schema";
 
 export async function initializeCoordinator(
-  storage: DurableObjectStorage,
+  storage: CheckpointStorage,
   scope: OwnerScope,
 ): Promise<CoordinatorRecord | null> {
   const result = await storage.transaction(async (transaction) => {
@@ -38,7 +39,7 @@ export async function initializeCoordinator(
 }
 
 export async function scheduleCoordinatorWake(
-  storage: DurableObjectStorage,
+  storage: CheckpointStorage,
   timestamp: number,
 ): Promise<void> {
   await storage.transaction(async (transaction) => {
@@ -50,7 +51,7 @@ export async function scheduleCoordinatorWake(
 
 /** Short local transaction: checkpoint and recovery alarm commit together. No external I/O in update. */
 export async function mutateCoordinator(
-  storage: DurableObjectStorage,
+  storage: CheckpointStorage,
   scope: OwnerScope,
   update: (record: CoordinatorRecord) => void,
   wakeAt = Date.now() + 100,
@@ -71,7 +72,7 @@ export async function mutateCoordinator(
 
 /** Recompute under the same transaction as the alarm write so concurrent commands cannot lose a wake. */
 export async function replaceCoordinatorWake(
-  storage: DurableObjectStorage,
+  storage: CheckpointStorage,
   socketExpiry: number | null,
 ) {
   await storage.transaction(async (transaction) => {

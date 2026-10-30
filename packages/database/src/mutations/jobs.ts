@@ -2,7 +2,7 @@ import { resultOutputs, type Job } from "@open-cinema/contracts";
 import { getClient, type DatabaseContext } from "../client";
 import type { ExecutionRecord } from "../durable/schema";
 
-/** Idempotent D1 projection. Only strictly newer versions can replace a job row. */
+/** Idempotent SQLite projection. Only strictly newer versions can replace a job row. */
 export async function applyJobSnapshot(
   db: DatabaseContext,
   job: Job,

@@ -43,20 +43,37 @@ function multipart(
       `Content-Type: ${part.contentType}\r\n\r\n`,
   );
   const tail = encoder.encode(`\r\n--${boundary}--\r\n`);
-  const { readable, writable } = new FixedLengthStream(
-    head.byteLength + part.size + tail.byteLength,
-  );
-  void (async () => {
-    const writer = writable.getWriter();
-    await writer.write(head);
-    writer.releaseLock();
-    await part.body.pipeTo(writable, { preventClose: true });
-    const end = writable.getWriter();
-    await end.write(tail);
-    await end.close();
-  })().catch((error: unknown) => writable.abort(error).catch(() => undefined));
+  const size = head.byteLength + part.size + tail.byteLength;
+  const reader = part.body.getReader();
+  let started = false;
+  let total = 0;
+  const body = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      if (!started) {
+        started = true;
+        controller.enqueue(head);
+        return;
+      }
+      const chunk = await reader.read();
+      if (chunk.done) {
+        if (total !== part.size) throw new Error("Incomplete Cloud upload");
+        controller.enqueue(tail);
+        controller.close();
+        reader.releaseLock();
+      } else {
+        total += chunk.value.byteLength;
+        if (total > part.size) {
+          await reader.cancel();
+          throw new Error("Cloud upload exceeds declared size");
+        }
+        controller.enqueue(chunk.value);
+      }
+    },
+    cancel: (reason) => reader.cancel(reason),
+  });
   return {
-    body: readable,
+    body,
+    size,
     contentType: `multipart/form-data; boundary=${boundary}`,
   };
 }
@@ -158,7 +175,11 @@ export async function runCloudMedia(options: {
     const uploaded = await json(
       await fetch(`${base}/api/upload/image`, {
         method: "POST",
-        headers: { ...headers, "Content-Type": upload.contentType },
+        headers: {
+          ...headers,
+          "Content-Type": upload.contentType,
+          "Content-Length": String(upload.size),
+        },
         body: upload.body,
         signal,
       }),

@@ -1,12 +1,15 @@
-import { env } from "cloudflare:workers";
+import type { Coordinator } from "./runtime";
+import { env } from "./runtime";
+import { applyMigrations, reset, runWake, withCoordinator } from "./runtime";
 import {
-  applyD1Migrations,
-  reset,
-  runDurableObjectAlarm,
-  runInDurableObject,
-} from "cloudflare:test";
-import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from "vitest";
-import { setupNetwork } from "@msw/cloudflare";
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  expect,
+  it,
+} from "bun:test";
+import { setupNetwork } from "./runtime";
 import { http, HttpResponse } from "msw";
 import { resultOutputs, type CommandResult } from "@open-cinema/contracts";
 import { createDatabase } from "@open-cinema/database";
@@ -32,7 +35,7 @@ beforeEach(async () => {
     ),
   );
   await reset();
-  await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
+  await applyMigrations(env.DB, env.TEST_MIGRATIONS);
 });
 afterEach(async () => {
   await reset();
@@ -79,8 +82,8 @@ function asset(url: string, body: Uint8Array, contentType: string) {
     ),
   );
 }
-async function due(stub: DurableObjectStub) {
-  await runInDurableObject(stub, async (_, state) => {
+async function due(stub: Coordinator) {
+  await withCoordinator(stub, async (_, state) => {
     const record = await readCoordinator(state.storage);
     await mutateCoordinator(
       state.storage,
@@ -91,10 +94,10 @@ async function due(stub: DurableObjectStub) {
       },
     );
   });
-  await runDurableObjectAlarm(stub);
+  await runWake(stub);
 }
-const checkpoint = (stub: DurableObjectStub) =>
-  runInDurableObject(stub, (_, state) => readCoordinator(state.storage));
+const checkpoint = (stub: Coordinator) =>
+  withCoordinator(stub, (_, state) => readCoordinator(state.storage));
 async function stored(r2Key: string | null) {
   const object = await env.GENERATED_ASSETS.get(r2Key!);
   return new Uint8Array(await object!.arrayBuffer());

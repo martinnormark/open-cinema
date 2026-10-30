@@ -1,3 +1,9 @@
+import type {
+  AssetStore,
+  StoredObject,
+  MultipartUpload,
+  UploadedPart,
+} from "./store";
 import {
   MAX_UPLOAD_BYTES,
   mediaKindFor,
@@ -9,10 +15,7 @@ const PART_BYTES = 5 * 1024 * 1024;
 
 export type UploadKind = MediaKind;
 
-/**
- * Contract limits, further capped for direct uploads: Workers reject request
- * bodies over 100 MB on most plans.
- */
+/** Keep the existing upload limits consistent across browser and server. */
 export const UPLOAD_LIMITS = {
   image: MAX_UPLOAD_BYTES.image,
   video: Math.min(MAX_UPLOAD_BYTES.video, 95 * 1024 * 1024),
@@ -93,7 +96,7 @@ export function posterObjectKey(ownerId: string, ref: AssetRef, r2Key: string) {
     : `${r2Key}/poster`;
 }
 
-function metadata(object: R2Object, kind: UploadKind): StoredUpload {
+function metadata(object: StoredObject, kind: UploadKind): StoredUpload {
   return {
     r2Key: object.key,
     sizeBytes: object.size,
@@ -104,12 +107,12 @@ function metadata(object: R2Object, kind: UploadKind): StoredUpload {
 }
 
 /**
- * Streams an upload into private R2 storage with bounded memory. Validates the
+ * Streams an upload into private private storage storage with bounded memory. Validates the
  * declared media type, file signature, and size while bytes arrive; partial
  * uploads are aborted so nothing is stored on failure.
  */
 export async function storeUpload(
-  bucket: R2Bucket,
+  bucket: AssetStore,
   ownerId: string,
   uploadId: string,
   body: ReadableStream<Uint8Array>,
@@ -131,9 +134,9 @@ export async function storeUpload(
     );
   const key = uploadObjectKey(ownerId, uploadId, "original");
   const reader = body.getReader();
-  let upload: R2MultipartUpload | undefined;
+  let upload: MultipartUpload | undefined;
   try {
-    const parts: R2UploadedPart[] = [];
+    const parts: UploadedPart[] = [];
     let part = new Uint8Array(PART_BYTES);
     let filled = 0;
     let total = 0;
@@ -193,7 +196,7 @@ export async function storeUpload(
  * saved under `key` (see `uploadObjectKey` and `posterObjectKey`).
  */
 export async function storePoster(
-  bucket: R2Bucket,
+  bucket: AssetStore,
   key: string,
   ownerId: string,
   body: ArrayBuffer,
@@ -214,7 +217,7 @@ export async function storePoster(
 }
 
 export async function deleteUploadObjects(
-  bucket: R2Bucket,
+  bucket: AssetStore,
   ownerId: string,
   uploadId: string,
 ) {

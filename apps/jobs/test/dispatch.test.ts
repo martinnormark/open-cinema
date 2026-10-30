@@ -1,13 +1,21 @@
-import { env } from "cloudflare:workers";
+import type { Coordinator } from "./runtime";
+import { env } from "./runtime";
 import {
-  abortAllDurableObjects,
-  applyD1Migrations,
+  restartJobs,
+  applyMigrations,
   reset,
-  runDurableObjectAlarm,
-  runInDurableObject,
-} from "cloudflare:test";
-import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from "vitest";
-import { setupNetwork } from "@msw/cloudflare";
+  runWake,
+  withCoordinator,
+} from "./runtime";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  expect,
+  it,
+} from "bun:test";
+import { setupNetwork } from "./runtime";
 import { http, HttpResponse } from "msw";
 import type { CommandResult, Job } from "@open-cinema/contracts";
 import { createDatabase } from "@open-cinema/database";
@@ -37,7 +45,7 @@ beforeEach(async () => {
     ),
   );
   await reset();
-  await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
+  await applyMigrations(env.DB, env.TEST_MIGRATIONS);
 });
 afterEach(async () => {
   await reset();
@@ -52,16 +60,12 @@ function fixture() {
     stub: env.GENERATION_COORDINATORS.getByName(ownerId),
   };
 }
-function accepted(result: CommandResult & Partial<Disposable>) {
-  try {
-    if (!result.ok) throw new Error(result.error);
-    return structuredClone(result.snapshot.jobs[0]!);
-  } finally {
-    result[Symbol.dispose]?.();
-  }
+function accepted(result: CommandResult) {
+  if (!result.ok) throw new Error(result.error);
+  return structuredClone(result.snapshot.jobs[0]!);
 }
 async function due(stub: ReturnType<typeof fixture>["stub"]) {
-  await runInDurableObject(stub, async (_, state) => {
+  await withCoordinator(stub, async (_, state) => {
     const record = await readCoordinator(state.storage);
     await mutateCoordinator(
       state.storage,
@@ -72,7 +76,7 @@ async function due(stub: ReturnType<typeof fixture>["stub"]) {
       },
     );
   });
-  await runDurableObjectAlarm(stub);
+  await runWake(stub);
 }
 function captureSubmissions() {
   const bodies: unknown[] = [];
@@ -114,7 +118,7 @@ it("dispatches a typed image.flux command, snapshotting mentioned Elements witho
     model: "FLUX 3 Image",
     state: "queued",
   });
-  const stored = await runInDurableObject(stub, (_, state) =>
+  const stored = await withCoordinator(stub, (_, state) =>
     readCoordinator(state.storage),
   );
   const execution = stored!.executions[job.id]!;
@@ -192,7 +196,7 @@ it("sends a mentioned Element's approved references inline for image.flux-refere
     },
   ]);
   // Inline media lives only in the provider request, never in the checkpoint.
-  const stored = await runInDurableObject(stub, (_, state) =>
+  const stored = await withCoordinator(stub, (_, state) =>
     readCoordinator(state.storage),
   );
   expect(JSON.stringify(stored)).not.toContain(
@@ -246,7 +250,7 @@ it("upgrades a v4 Router checkpoint and submits its stored request unchanged", a
     resolution: "1k",
     grounding: false,
   };
-  await runInDurableObject(stub, async (_, state) => {
+  await withCoordinator(stub, async (_, state) => {
     const record = JSON.parse(
       JSON.stringify(await readCoordinator(state.storage)),
     );
@@ -264,9 +268,9 @@ it("upgrades a v4 Router checkpoint and submits its stored request unchanged", a
     delete record.jobs[0].projectId;
     await state.storage.put("coordinator", record);
   });
-  await abortAllDurableObjects();
+  await restartJobs();
   stub = env.GENERATION_COORDINATORS.getByName(scope.ownerId);
-  const upgraded = await runInDurableObject(stub, (_, state) =>
+  const upgraded = await withCoordinator(stub, (_, state) =>
     readCoordinator(state.storage),
   );
   expect(upgraded?.schemaVersion).toBe(COORDINATOR_SCHEMA_VERSION);
@@ -522,7 +526,7 @@ it("runs LTX 2.5 Alpha Gen on Comfy Cloud with uploaded media and lists the comp
     __type: "core/ASSET",
     info: { id: "asset-2" },
   });
-  const record = await runInDurableObject(stub, (_, state) =>
+  const record = await withCoordinator(stub, (_, state) =>
     readCoordinator(state.storage),
   );
   const execution = record!.executions[job.id]!;
@@ -545,7 +549,7 @@ it("runs LTX 2.5 Alpha Gen on Comfy Cloud with uploaded media and lists the comp
     ),
   );
   await due(stub);
-  const done = await runInDurableObject(stub, (_, state) =>
+  const done = await withCoordinator(stub, (_, state) =>
     readCoordinator(state.storage),
   );
   expect(done!.jobs[0]!.outputs.map((o) => o.providerAssetId)).toEqual([
@@ -678,7 +682,7 @@ it("combines one state per kind in a mention and writes the shot's direction int
       },
     }),
   );
-  const stored = await runInDurableObject(stub, (_, state) =>
+  const stored = await withCoordinator(stub, (_, state) =>
     readCoordinator(state.storage),
   );
   expect(stored!.executions[job.id]!.mentions[0]).toMatchObject({

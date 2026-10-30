@@ -11,7 +11,7 @@ import { getCoordinator } from "./jobs";
 export const getJobSnapshot = createServerFn({ method: "GET" }).handler(
   async () => {
     const session = await requireSession();
-    using result = await getCoordinator(session.userId).getSnapshot({
+    const result = await getCoordinator(session.userId).getSnapshot({
       ownerId: session.userId,
     });
     return result === null ? null : snapshotSchema.parse(result);
@@ -31,7 +31,7 @@ export const cancelGeneration = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     requireSameOrigin();
     const session = await requireSession();
-    using result = await getCoordinator(session.userId).cancel(
+    const result = await getCoordinator(session.userId).cancel(
       { ownerId: session.userId },
       data.jobId,
     );
@@ -43,7 +43,7 @@ export const reconcileGeneration = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     requireSameOrigin();
     const session = await requireSession();
-    using result = await getCoordinator(session.userId).reconcile(
+    const result = await getCoordinator(session.userId).reconcile(
       { ownerId: session.userId },
       data.jobId,
     );
