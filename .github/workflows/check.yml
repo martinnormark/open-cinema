@@ -18,6 +18,7 @@ jobs:
         with:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
+      - run: bun audit
       - run: bun run format:check
       - run: bun run check
       - run: docker compose config --quiet

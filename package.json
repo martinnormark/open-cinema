@@ -24,6 +24,11 @@
     "setup": "bun run db:generate && bun run db:migrate:local",
     "start": "bun apps/web/server.ts"
   },
+  "overrides": {
+    "@modelcontextprotocol/server": "2.3.0",
+    "fast-uri": "3.1.9",
+    "seroval": "1.6.11"
+  },
   "devDependencies": {
     "typescript": "7.0.2",
     "@types/node": "24.19.2",
