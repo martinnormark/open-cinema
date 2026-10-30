@@ -140,23 +140,108 @@ const fixed = (n: number) => Number(n.toFixed(4)).toString();
  * to uploaded assets named by WAN3_CAST_MEDIA_INPUTS.
  */
 export function wan3CastGraph(o: Wan3CastOptions): Graph {
-  if (!o.targets.length) throw new Error("Tag someone to replace first");
-  if (o.targets.length > TRACK_COLOURS.length)
-    throw new Error(`Up to ${TRACK_COLOURS.length} people per run`);
-  const frames: Link = ["source_parts", 0];
-  const fps: Link = ["source_parts", 2];
-  const work: Link = ["work", 0];
-  const width: Link = ["work_size", 0];
-  const height: Link = ["work_size", 1];
-  const count: Link = ["work_size", 2];
-  const sam: Link = ["sam", 0];
-
   const graph: Graph = {
     source: { class_type: "LoadVideo", inputs: { file: "" } },
     source_parts: {
       class_type: "GetVideoComponents",
       inputs: { video: ["source", 0] },
     },
+  };
+  castTrackNodes(graph, {
+    frames: ["source_parts", 0],
+    fps: ["source_parts", 2],
+    targets: o.targets,
+    tracks: o.tracks,
+  });
+  if (!o.wan) return graph;
+
+  for (let i = 0; i < o.wan.images; i++)
+    graph[`reference_${i}`] = {
+      class_type: "LoadImage",
+      inputs: { image: "" },
+    };
+  graph.wan = {
+    class_type: "Wan3ReferenceToVideoApi",
+    inputs: {
+      model: "wan3.0-video",
+      "model.prompt": o.wan.prompt,
+      "model.resolution": o.wan.resolution,
+      "model.ratio": "adaptive",
+      "model.duration": o.wan.duration,
+      // The clip's own sound goes under the result below.
+      "model.audio": false,
+      // The words are ours on purpose; Wan's rewriting drifted from the clip.
+      "model.prompt_extend": false,
+      ...Object.fromEntries(
+        Array.from({ length: o.wan.images }, (_, i) => [
+          `model.reference_images.image${i + 1}`,
+          [`reference_${i}`, 0],
+        ]),
+      ),
+      "model.reference_videos.video1": ["source", 0],
+      "model.reference_videos.video2": ["tracks_video", 0],
+      seed: o.wan.seed,
+      watermark: false,
+    },
+  };
+  let result: Link = ["wan", 0];
+  if (o.wan.sound) {
+    graph.result_parts = {
+      class_type: "GetVideoComponents",
+      inputs: { video: result },
+    };
+    graph.result_video = {
+      class_type: "CreateVideo",
+      inputs: {
+        images: ["result_parts", 0],
+        fps: ["result_parts", 2],
+        audio: ["source_parts", 1],
+      },
+    };
+    result = ["result_video", 0];
+  }
+  graph.save_result = {
+    class_type: "SaveVideo",
+    inputs: {
+      video: result,
+      filename_prefix: "open_cinema/cast",
+      format: "mp4",
+      "format.codec": "h264",
+      "format.codec.encoding": "re-encode",
+      "format.codec.encoding.crf": 16,
+    },
+  };
+  return graph;
+}
+
+export interface CastTrackOptions {
+  /** The clip's frames and frame rate, as the graph has loaded them. */
+  frames: Link;
+  fps: Link;
+  targets: readonly CastTarget[];
+  /** The stretch the tracks video covers; null for the whole clip. */
+  tracks: { start: number; seconds: number } | null;
+}
+
+/**
+ * Adds SAM 3.1's tracking to a graph that has loaded the clip: each target is
+ * segmented from its click, tracked forwards and backwards from that frame,
+ * and filled in its own colour over the clip. Writes `tracks_video` (a VIDEO)
+ * and saves it as `save_tracks`; `tracks_frames` holds its frames. Returns
+ * each target's mask over the whole clip, at the tracking size.
+ */
+export function castTrackNodes(graph: Graph, o: CastTrackOptions): Link[] {
+  if (!o.targets.length) throw new Error("Tag someone to replace first");
+  if (o.targets.length > TRACK_COLOURS.length)
+    throw new Error(`Up to ${TRACK_COLOURS.length} people per run`);
+  const { frames, fps } = o;
+  const work: Link = ["work", 0];
+  const width: Link = ["work_size", 0];
+  const height: Link = ["work_size", 1];
+  const count: Link = ["work_size", 2];
+  const sam: Link = ["sam", 0];
+
+  Object.assign(graph, {
     // SAM 3 reads every frame at 1008 px square; smaller frames keep a 10 s
     // clip and its reversed copies well inside memory.
     work: {
@@ -173,7 +258,7 @@ export function wan3CastGraph(o: Wan3CastOptions): Graph {
       class_type: "CheckpointLoaderSimple",
       inputs: { ckpt_name: SAM3_MODEL },
     },
-  };
+  } satisfies Graph);
 
   // People tagged on the same frame share one tracking pass each way.
   const groups = new Map<number, number[]>();
@@ -350,18 +435,29 @@ export function wan3CastGraph(o: Wan3CastOptions): Graph {
     };
     guide = [`fill_${i}`, 0];
   });
-  graph.tracks_start = math(`round(${fixed(o.tracks.start)} * a)`, { a: fps });
-  graph.tracks_length = math(`max(1, round(${fixed(o.tracks.seconds)} * a))`, {
-    a: fps,
-  });
-  graph.tracks_frames = {
-    class_type: "ImageFromBatch",
-    inputs: {
-      image: guide,
-      batch_index: int("tracks_start"),
-      length: int("tracks_length"),
-    },
-  };
+  if (o.tracks) {
+    graph.tracks_start = math(`round(${fixed(o.tracks.start)} * a)`, {
+      a: fps,
+    });
+    graph.tracks_length = math(
+      `max(1, round(${fixed(o.tracks.seconds)} * a))`,
+      { a: fps },
+    );
+    graph.tracks_frames = {
+      class_type: "ImageFromBatch",
+      inputs: {
+        image: guide,
+        batch_index: int("tracks_start"),
+        length: int("tracks_length"),
+      },
+    };
+  } else {
+    // The whole clip: the batch passes through unchanged.
+    graph.tracks_frames = {
+      class_type: "ImageFromBatch",
+      inputs: { image: guide, batch_index: 0, length: count },
+    };
+  }
   graph.tracks_video = {
     class_type: "CreateVideo",
     inputs: { images: ["tracks_frames", 0], fps },
@@ -377,63 +473,5 @@ export function wan3CastGraph(o: Wan3CastOptions): Graph {
       "format.codec.encoding.crf": 20,
     },
   };
-  if (!o.wan) return graph;
-
-  for (let i = 0; i < o.wan.images; i++)
-    graph[`reference_${i}`] = {
-      class_type: "LoadImage",
-      inputs: { image: "" },
-    };
-  graph.wan = {
-    class_type: "Wan3ReferenceToVideoApi",
-    inputs: {
-      model: "wan3.0-video",
-      "model.prompt": o.wan.prompt,
-      "model.resolution": o.wan.resolution,
-      "model.ratio": "adaptive",
-      "model.duration": o.wan.duration,
-      // The clip's own sound goes under the result below.
-      "model.audio": false,
-      // The words are ours on purpose; Wan's rewriting drifted from the clip.
-      "model.prompt_extend": false,
-      ...Object.fromEntries(
-        Array.from({ length: o.wan.images }, (_, i) => [
-          `model.reference_images.image${i + 1}`,
-          [`reference_${i}`, 0],
-        ]),
-      ),
-      "model.reference_videos.video1": ["source", 0],
-      "model.reference_videos.video2": ["tracks_video", 0],
-      seed: o.wan.seed,
-      watermark: false,
-    },
-  };
-  let result: Link = ["wan", 0];
-  if (o.wan.sound) {
-    graph.result_parts = {
-      class_type: "GetVideoComponents",
-      inputs: { video: result },
-    };
-    graph.result_video = {
-      class_type: "CreateVideo",
-      inputs: {
-        images: ["result_parts", 0],
-        fps: ["result_parts", 2],
-        audio: ["source_parts", 1],
-      },
-    };
-    result = ["result_video", 0];
-  }
-  graph.save_result = {
-    class_type: "SaveVideo",
-    inputs: {
-      video: result,
-      filename_prefix: "open_cinema/cast",
-      format: "mp4",
-      "format.codec": "h264",
-      "format.codec.encoding": "re-encode",
-      "format.codec.encoding.crf": 16,
-    },
-  };
-  return graph;
+  return tracks;
 }

@@ -61,6 +61,10 @@ In the project's shared files under `recast-minimax-h3/`:
 - `U1-t3.0-four-way.jpg` and `U2-t4.6-four-way.jpg`: stills from those grids. The U2 still shows the late drift.
 - `minimax-h3-ref-768p/` and `minimax-h3-ref-2k/`: each run's `result.mp4`, `request.json` (data URIs redacted), `identity.json` and `summary.json`.
 
+## In the app (2026-10-30)
+
+The studio now offers H3 beside Kling for a recast (**How → Regenerate the shot**). It runs on H3's **open weights** on Comfy Cloud (`MiniMaxH3ReferenceToVideo` with `minimax_h3_ref2va_pruned_int8_convrot`), not the partner API measured above, so the results above are a guide, not a measurement of this path. One test run (a 6.1 s portrait football take) recast the clicked player correctly in about 23 minutes; see [workflows/character-replace](../workflows/character-replace/README.md#minimax-h3-alternative). SAM 3.1 tracks the clicked person and H3 reads that track as a second reference video, which addresses neither the redrawn background nor the late drift; the target-matte composite recommended above is still the next step. Details and the differences from Comfy's template are in [workflows/character-replace](../workflows/character-replace/README.md#minimax-h3-alternative).
+
 ## Running it
 
 ```sh

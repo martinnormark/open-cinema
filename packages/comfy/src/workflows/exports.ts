@@ -49,6 +49,21 @@ import {
   ltxRecastPrompts,
 } from "./ltx-recast";
 import {
+  MINIMAX_H3_RECAST_MEDIA_INPUTS,
+  MINIMAX_H3_RECAST_MODEL_ID,
+  MINIMAX_H3_RECAST_OUTPUT_NODES,
+  minimaxH3RecastGraph,
+  minimaxH3RecastPrompt,
+} from "./minimax-h3-recast";
+import {
+  scailFrameCount,
+  WAN_SCAIL_RECAST_MEDIA_INPUTS,
+  WAN_SCAIL_RECAST_MODEL_ID,
+  WAN_SCAIL_RECAST_OUTPUT_NODES,
+  wanScailRecastGraph,
+  wanScailRecastPrompts,
+} from "./wan-scail-recast";
+import {
   LTX_RESTAGE_MEDIA_INPUTS,
   LTX_RESTAGE_MODEL_ID,
   LTX_RESTAGE_OUTPUT_NODES,
@@ -486,6 +501,81 @@ const EXAMPLE_CHARACTER = {
   motion: [],
 } satisfies ResolvedMention;
 
+/**
+ * Recast on MiniMax H3: the woman clicked on the right of a two-person take
+ * becomes Cal from his close portrait and sheet (docs/recast-minimax-h3.md).
+ */
+function minimaxRecast(): WorkflowExport {
+  const views = ["face-closeup", "sheet"] as const;
+  const graph = minimaxH3RecastGraph({
+    prompt: minimaxH3RecastPrompt({
+      target: "the woman on the right (on the right of the frame)",
+      character: EXAMPLE_CHARACTER,
+      keepSourceWardrobe: false,
+      views,
+    }),
+    target: {
+      x: 0.72,
+      y: 0.38,
+      seconds: 1.5,
+      box: { x: 0.58, y: 0.12, w: 0.3, h: 0.86 },
+    },
+    references: views.length,
+    sound: true,
+    seed: SEED,
+  });
+  return {
+    file: "recast/minimax-h3.api.json",
+    title:
+      "Recast on MiniMax H3: SAM 3.1 tracks the clicked person, H3 ref2va recasts the shot with the take's sound",
+    usedBy: `video.character-replace (${MINIMAX_H3_RECAST_MODEL_ID})`,
+    ...withFiles(graph, [
+      [MINIMAX_H3_RECAST_MEDIA_INPUTS.source, "source.mp4"],
+      [MINIMAX_H3_RECAST_MEDIA_INPUTS.reference(0), "reference-0.png"],
+      [MINIMAX_H3_RECAST_MEDIA_INPUTS.reference(1), "reference-1.png"],
+    ]),
+    outputs: MINIMAX_H3_RECAST_OUTPUT_NODES,
+  };
+}
+
+/**
+ * Recast on Wan SCAIL-2: the same click and Character as the H3 example, on
+ * a 6 s take (two segments).
+ */
+function wanRecast(): WorkflowExport {
+  const views = ["face-closeup", "sheet"] as const;
+  const graph = wanScailRecastGraph({
+    ...wanScailRecastPrompts({
+      target: "the woman on the right (on the right of the frame)",
+      character: EXAMPLE_CHARACTER,
+      keepSourceWardrobe: false,
+      views,
+    }),
+    target: {
+      x: 0.72,
+      y: 0.38,
+      seconds: 1.5,
+      box: { x: 0.58, y: 0.12, w: 0.3, h: 0.86 },
+    },
+    frames: scailFrameCount(6),
+    references: views.length,
+    sound: true,
+    seed: SEED,
+  });
+  return {
+    file: "recast/wan-scail2.api.json",
+    title:
+      "Recast on Wan SCAIL-2: SAM 3.1 tracks the clicked person, FLUX 3 Klein keyframes the Character, SCAIL-2 replaces them (6 s)",
+    usedBy: `video.character-replace (${WAN_SCAIL_RECAST_MODEL_ID})`,
+    ...withFiles(graph, [
+      [WAN_SCAIL_RECAST_MEDIA_INPUTS.source, "source.mp4"],
+      [WAN_SCAIL_RECAST_MEDIA_INPUTS.reference(0), "reference-0.png"],
+      [WAN_SCAIL_RECAST_MEDIA_INPUTS.reference(1), "reference-1.png"],
+    ]),
+    outputs: WAN_SCAIL_RECAST_OUTPUT_NODES,
+  };
+}
+
 function recast(): WorkflowExport {
   const references = 2;
   const prompts = ltxRecastPrompts({
@@ -604,6 +694,8 @@ export function workflowExports(): WorkflowExport[] {
     performance("edges-detailed"),
     moves(),
     trackedCast(),
+    minimaxRecast(),
+    wanRecast(),
     recast(),
   ];
 }

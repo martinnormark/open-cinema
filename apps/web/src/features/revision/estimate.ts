@@ -4,6 +4,7 @@ import type {
   GenerationEstimate,
   MotionEngine,
   MotionResolution,
+  RecastPipelineChoice,
 } from "@open-cinema/contracts";
 import {
   cloudEstimate,
@@ -38,6 +39,7 @@ export function estimateReplacement(
     /** Tagged people: Wan 3.0 also reads SAM 3.1's tracks. */
     tagged?: boolean;
   } = { engine: "wan-3", seconds: sourceSeconds, resolution: "720p" },
+  recastPipeline: RecastPipelineChoice = "kling",
 ): GenerationEstimate {
   if (kind === "moves")
     return movesEstimate(
@@ -77,6 +79,8 @@ export function estimateReplacement(
         }
       : estimate;
   }
+  if (recastPipeline === "minimax-h3") return cloudEstimate("recast");
+  if (recastPipeline === "wan-scail2") return cloudEstimate("recast-wan");
   // The live recast took about 12 minutes.
   return {
     ...sourceEditEstimate("video.character-replace", sourceSeconds),

@@ -48,6 +48,7 @@ import {
   modelCard,
   type AssetRef,
   type BackgroundPipelineChoice,
+  type RecastPipelineChoice,
   type ExtendPipeline,
   type GenerationRequestInput,
   type MotionEngine,
@@ -105,6 +106,7 @@ import {
 import {
   LTX_REVISION_SECONDS,
   checkKlingSource,
+  checkCloudRecastSource,
   defaultElement,
   kindElementTypes,
   formatEstimate,
@@ -352,6 +354,9 @@ export function ReplacementStudio({
   const [pipeline, setPipeline] = useState<BackgroundPipelineChoice>(
     draft?.draft?.pipeline ?? "kling",
   );
+  const [recastPipeline, setRecastPipeline] = useState<RecastPipelineChoice>(
+    draft?.draft?.recastPipeline ?? "kling",
+  );
   const [plateKey, setPlateKey] = useState<string | null>(
     draft?.draft?.plate ?? null,
   );
@@ -483,6 +488,8 @@ export function ReplacementStudio({
       ? null
       : Math.min(clipSeconds, MOTION_LIMITS.maxSeconds);
   const alpha = kind === "background" && pipeline === "ltx-alpha";
+  /** The Cloud recasts, where SAM 3.1 tracks the clicked person. */
+  const tracked = kind === "character" && recastPipeline !== "kling";
   // A composite never relights the matted people.
   const locked: readonly PreservedAspect[] = alpha
     ? [...LOCKED.background, "lighting"]
@@ -494,15 +501,17 @@ export function ReplacementStudio({
     (a) => !unavailable.includes(a),
   );
   const sourceCheck =
-    source && !alpha && kling
-      ? checkKlingSource({
-          seconds: clipSeconds,
-          width: source.width ?? measured?.width ?? null,
-          height: source.height ?? measured?.height ?? null,
-          fps: source.fps,
-          pixelAspect: source.pixelAspect,
-        })
-      : { problems: [], notes: [] };
+    source && kind === "character" && recastPipeline !== "kling"
+      ? checkCloudRecastSource(recastPipeline, clipSeconds)
+      : source && !alpha && kling
+        ? checkKlingSource({
+            seconds: clipSeconds,
+            width: source.width ?? measured?.width ?? null,
+            height: source.height ?? measured?.height ?? null,
+            fps: source.fps,
+            pixelAspect: source.pixelAspect,
+          })
+        : { problems: [], notes: [] };
 
   // Recast pre-flight: where the marked person is, which way they face and how
   // large their face gets (docs/phase0-recast.md, supported envelope).
@@ -527,11 +536,13 @@ export function ReplacementStudio({
       pipeline,
       { extendPipeline, extendSeconds, areaAdds },
       { engine, seconds: movesSeconds, resolution, tagged },
+      recastPipeline,
     ),
     preferences.unit,
   );
   const model = studioModel(kind, {
     pipeline,
+    recastPipeline,
     extendPipeline,
     areaAdds,
     engine,
@@ -578,8 +589,17 @@ export function ReplacementStudio({
     wardrobeNote.trim().length < 3
   )
     problems.push("Describe the wardrobe, or choose another option.");
-  if (kind === "character" && clipSeconds !== null && clipSeconds < 4)
+  if (
+    kind === "character" &&
+    !tracked &&
+    clipSeconds !== null &&
+    clipSeconds < 4
+  )
     problems.push("Recasting needs a clip of at least 4 seconds.");
+  if (tracked && !target)
+    problems.push(
+      "Click the person to recast on the frame; SAM 3.1 follows them from there.",
+    );
   if (kind === "character" && target && scanState.status === "scanning")
     problems.push("Checking the shot…");
   if (shotCheck?.verdict === "refuse")
@@ -1192,10 +1212,27 @@ export function ReplacementStudio({
                                 },
                               }
                             : {}),
+                          // SAM 3.1 takes the whole person from their box.
+                          ...(tracked && target && shotCheck?.box
+                            ? {
+                                box: (({ x, y, w, h }) => ({
+                                  x,
+                                  y,
+                                  width: w,
+                                  height: h,
+                                  timeMs: target.timeMs,
+                                }))(clampBox(shotCheck.box)),
+                              }
+                            : {}),
                           ...(targetNote.trim()
                             ? { description: targetNote.trim() }
                             : {}),
                         },
+                        pipeline: recastPipeline,
+                        // Wan plans its segments from the take's length.
+                        ...(tracked && clipSeconds
+                          ? { seconds: clipSeconds }
+                          : {}),
                         ...(recastPrompt.length >= 3
                           ? { prompt: recastPrompt }
                           : {}),
@@ -1295,6 +1332,7 @@ export function ReplacementStudio({
           stateId: state?.id ?? null,
           targetNote: targetNote.trim().slice(0, 300),
           pipeline,
+          recastPipeline: kind === "character" ? recastPipeline : null,
           plate: alpha ? plateKey : null,
           angle: kind === "camera" ? angle : null,
           original: kind === "object" ? original.trim().slice(0, 200) : null,
@@ -1743,6 +1781,16 @@ export function ReplacementStudio({
             }}
             locationName={element?.name ?? null}
             clipSeconds={clipSeconds}
+          />
+        )}
+
+        {kind === "character" && (
+          <RecastMethod
+            pipeline={recastPipeline}
+            onPipeline={(next) => {
+              setRecastPipeline(next);
+              setPendingKey(null);
+            }}
           />
         )}
 
@@ -2738,6 +2786,59 @@ function ClipStrip({
         onSelect={onSelect}
       />
     </div>
+  );
+}
+
+function RecastMethod({
+  pipeline,
+  onPipeline,
+}: {
+  pipeline: RecastPipelineChoice;
+  onPipeline: (pipeline: RecastPipelineChoice) => void;
+}) {
+  const methods = {
+    kling: {
+      label: "Edit the take",
+      detail:
+        "Kling 3.0 Omni swaps the person and keeps everyone else close to the take. Clips of 4 to 10 seconds, at 1080p.",
+    },
+    "minimax-h3": {
+      label: "Regenerate the shot",
+      detail:
+        "SAM 3.1 follows the person you click and MiniMax H3 redraws the whole shot with them recast, for the take’s full length up to 15 seconds, keeping the take’s sound. Everyone else and the background are redrawn too.",
+    },
+    "wan-scail2": {
+      label: "Replace the performer",
+      detail:
+        "SAM 3.1 follows the person you click, FLUX 3 Klein places the Character in their spot, and Wan SCAIL-2 replaces them for the take’s full length up to 10 seconds, keeping the take’s sound. Open weights; the rest of the shot is regenerated around them.",
+    },
+  } as const;
+  return (
+    <fieldset className="min-w-0">
+      <legend className="text-sm font-medium">How</legend>
+      <div className="mt-2 flex flex-col gap-1">
+        {(Object.keys(methods) as RecastPipelineChoice[]).map((option) => (
+          <label
+            key={option}
+            className="flex cursor-pointer gap-3 rounded-lg px-2 py-2 hover:bg-surface has-focus-visible:ring-2 has-focus-visible:ring-ring"
+          >
+            <input
+              type="radio"
+              name="recast-pipeline"
+              checked={pipeline === option}
+              onChange={() => onPipeline(option)}
+              className="mt-1 accent-(--tungsten)"
+            />
+            <span>
+              <span className="block text-sm">{methods[option].label}</span>
+              <span className="block text-xs leading-5 text-muted-foreground">
+                {methods[option].detail}
+              </span>
+            </span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
   );
 }
 

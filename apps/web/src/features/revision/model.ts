@@ -10,6 +10,7 @@ import {
   motionEngineSchema,
   motionResolutionSchema,
   reframeAspectSchema,
+  recastPipelineSchema,
   restageAngleSchema,
   vfxEffectSchema,
   preservedAspectSchema,
@@ -19,6 +20,7 @@ import {
   type Element,
   type ExtendPipeline,
   type MotionEngine,
+  type RecastPipelineChoice,
   type ElementType,
   type GenerationEstimate,
   type GenerationRequest,
@@ -267,6 +269,8 @@ export const revisionDecisionsSchema = z.object({
       stateId: z.string().nullable(),
       targetNote: z.string().max(300),
       pipeline: backgroundPipelineSchema,
+      /** Recast: Kling's edit or MiniMax H3 with SAM 3.1's tracks. */
+      recastPipeline: recastPipelineSchema.nullable().optional(),
       /** `assetRefKey` of the chosen plate, for the alpha composite. */
       plate: z.string().max(400).nullable(),
       /** Re-staging: the new angle. */
@@ -469,6 +473,33 @@ export interface SourceFacts {
 }
 
 /**
+ * The Comfy Cloud recasts and the clip lengths they take: MiniMax H3 reads
+ * each reference video for 2 to 15 seconds; Wan SCAIL-2 is held to 10.
+ */
+export const CLOUD_RECAST_SECONDS = {
+  "minimax-h3": { model: "MiniMax H3", min: 2, max: 15 },
+  "wan-scail2": { model: "Wan SCAIL-2", min: 1, max: 10 },
+} as const;
+
+/** What stops a clip from going to a Cloud recast; both take any size and frame rate. */
+export function checkCloudRecastSource(
+  pipeline: keyof typeof CLOUD_RECAST_SECONDS,
+  seconds: number | null,
+) {
+  const { model, min, max } = CLOUD_RECAST_SECONDS[pipeline];
+  const problems: string[] = [];
+  if (seconds !== null && seconds < min - 0.05)
+    problems.push(
+      `${model} needs a clip of at least ${min} second${min === 1 ? "" : "s"}; this one is ${seconds.toFixed(1)} s.`,
+    );
+  if (seconds !== null && seconds > max + 0.05)
+    problems.push(
+      `${model} recasts up to ${max} seconds; this clip is ${seconds.toFixed(1)} s. Trim it and upload it again.`,
+    );
+  return { problems, notes: [] as string[] };
+}
+
+/**
  * What stops a clip from going to Kling (`problems`), and what the job changes
  * on the way without asking (`notes`). Unknown facts are not held against it.
  */
@@ -515,6 +546,7 @@ export function studioModel(
   kind: ReplacementKind,
   choices: {
     pipeline: BackgroundPipelineChoice;
+    recastPipeline?: RecastPipelineChoice;
     extendPipeline: ExtendPipeline;
     areaAdds: boolean;
     engine: MotionEngine;
@@ -528,7 +560,11 @@ export function studioModel(
           ? "Seedance 2.5"
           : "Kling 3.0 Omni";
     case "character":
-      return "Kling 3.0 Omni";
+      return choices.recastPipeline === "minimax-h3"
+        ? "SAM 3.1 + MiniMax H3"
+        : choices.recastPipeline === "wan-scail2"
+          ? "SAM 3.1 + Wan SCAIL-2"
+          : "Kling 3.0 Omni";
     case "object":
     case "restyle":
       return "FLUX 3 Klein + LTX 2.3";

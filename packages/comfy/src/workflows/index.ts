@@ -79,6 +79,7 @@ export {
   wan3TrackedCastPrompt,
 } from "./moves";
 export {
+  castTrackNodes,
   SAM3_MODEL,
   TRACK_COLOURS,
   trackWindow,
@@ -101,6 +102,31 @@ export {
   characterReplaceRequest,
   describeTarget,
 } from "./character-replace";
+export {
+  castTarget,
+  MINIMAX_H3_MODELS,
+  MINIMAX_H3_RECAST_JOB_MODEL,
+  MINIMAX_H3_RECAST_LIMITS,
+  MINIMAX_H3_RECAST_MEDIA_INPUTS,
+  MINIMAX_H3_RECAST_MODEL_ID,
+  MINIMAX_H3_RECAST_OUTPUT_NODES,
+  minimaxH3RecastGraph,
+  minimaxH3RecastPrompt,
+  minimaxH3RecastRequest,
+} from "./minimax-h3-recast";
+export {
+  scailFrameCount,
+  scailSegments,
+  WAN_SCAIL_MODELS,
+  WAN_SCAIL_RECAST_JOB_MODEL,
+  WAN_SCAIL_RECAST_LIMITS,
+  WAN_SCAIL_RECAST_MEDIA_INPUTS,
+  WAN_SCAIL_RECAST_MODEL_ID,
+  WAN_SCAIL_RECAST_OUTPUT_NODES,
+  wanScailRecastGraph,
+  wanScailRecastPrompts,
+  wanScailRecastRequest,
+} from "./wan-scail-recast";
 export {
   planReferences,
   REFERENCE_RULE,

@@ -99,6 +99,20 @@ export const CLOUD_GRAPH_ESTIMATES = {
     seconds: [30, 900],
     note: "Runs LTX 2.3 on Comfy Cloud, billed by GPU time. Adds about 3 seconds after the take.",
   },
+  // Observed 2026-10-30: 6.1 s at 768 × 1344 with SAM 3.1's tracks took 23
+  // minutes on Cloud (20 steps); the template made 5 s at 864 × 480 in 150 s.
+  recast: {
+    seconds: [600, 3000],
+    basis: "observed",
+    note: "Runs SAM 3.1 and MiniMax H3 on Comfy Cloud, billed by GPU time. Regenerates the whole shot at about 768p for the take's full length, up to 15 seconds.",
+  },
+  // Observed 2026-10-30: 6.1 s (two 81-frame segments at 512 × 896) with the
+  // Klein keyframe and SAM 3.1's tracks in 137 s on Cloud.
+  "recast-wan": {
+    seconds: [120, 1500],
+    basis: "observed",
+    note: "Runs SAM 3.1, FLUX 3 Klein and Wan SCAIL-2 on Comfy Cloud, billed by GPU time. Replaces the clicked person for the take's full length, up to 10 seconds.",
+  },
   restage: {
     seconds: [60, 1200],
     note: "Re-projects the take with MoGe-2 and fills the gaps with LTX 2.3 on Comfy Cloud, billed by GPU time. Uses the first 4 seconds of the take.",
@@ -346,6 +360,10 @@ export function estimateGeneration(
         note: `About ${sourceEditRate(request.workflowKind)} credits per second of source video (Kling 3.0 Omni at 720p, plus the matte for the foreground lock).`,
       };
     case "video.character-replace":
+      if (request.inputs.pipeline === "minimax-h3")
+        return cloudEstimate("recast");
+      if (request.inputs.pipeline === "wan-scail2")
+        return cloudEstimate("recast-wan");
       return {
         ...sourceEditEstimate(request.workflowKind, null),
         note: `About ${sourceEditRate(request.workflowKind)} credits per second of source video (Kling 3.0 Omni, 1080p).`,

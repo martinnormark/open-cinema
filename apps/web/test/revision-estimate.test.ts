@@ -98,3 +98,16 @@ test("Copy the moves quotes Wan 3.0 on the seconds it reads and makes", () => {
   expect(open.credits).toBeNull();
   expect(open.basis).toBe("observed");
 });
+
+test("a MiniMax H3 recast is billed by Cloud GPU time, not per Router second", () => {
+  const estimate = estimateReplacement(
+    "character",
+    12,
+    "kling",
+    undefined,
+    undefined,
+    "minimax-h3",
+  );
+  expect(estimate.credits).toBeNull();
+  expect(estimate.note).toContain("MiniMax H3");
+});

@@ -4,7 +4,12 @@ import {
   resultOutputs,
   type ResolvedMention,
 } from "@open-cinema/contracts";
-import { getWorkflowDefinition, type BuildContext } from "@open-cinema/comfy";
+import {
+  getWorkflowDefinition,
+  scailFrameCount,
+  scailSegments,
+  type BuildContext,
+} from "@open-cinema/comfy";
 
 const mara: ResolvedMention = {
   elementId: "char-mara",
@@ -212,4 +217,162 @@ it("refuses a recast with no way to identify the person", async () => {
       context(),
     ),
   ).rejects.toThrow("Describe or point at the person to recast");
+});
+
+it("recasts on MiniMax H3 as a Cloud graph that tracks the clicked person with SAM 3.1", async () => {
+  const definition = getWorkflowDefinition("video.character-replace")!;
+  const inputs = characterReplaceInputsSchema.parse({
+    ...base,
+    pipeline: "minimax-h3",
+    target: {
+      ...base.target,
+      point: { x: 0.7, y: 0.4, timeMs: 1500 },
+      box: { x: 0.55, y: 0.1, width: 0.3, height: 0.85, timeMs: 1500 },
+    },
+    preservation: { preserve: ["performance", "audio"] },
+  });
+  expect(definition.provider?.(inputs)).toBe("cloud-workflow");
+  expect(
+    typeof definition.displayModel === "function" &&
+      definition.displayModel(inputs),
+  ).toBe("SAM 3.1 + MiniMax H3");
+  const request = await definition.build(inputs, context());
+  expect(request.model).toBe("comfy-cloud/minimax-h3-recast");
+  const { graph, media } = request.input as {
+    graph: Record<
+      string,
+      { class_type: string; inputs: Record<string, unknown> }
+    >;
+    media: { node: string; field: string; url: string }[];
+  };
+  expect(media.map((m) => [m.node, m.field, m.url])).toEqual([
+    ["source", "video", "https://comfy-storage.test/take"],
+    ["reference_0", "image", "https://comfy-storage.test/mara-face"],
+    ["reference_1", "image", "https://comfy-storage.test/mara-full"],
+    ["reference_2", "image", "https://comfy-storage.test/mara-back"],
+  ]);
+  // The take is read on H3's 24 fps grid; SAM 3.1 starts from the click and box.
+  expect(graph.source!.inputs).toMatchObject({ force_rate: 24 });
+  const detect = Object.values(graph).find(
+    (n) => n.class_type === "SAM3_Detect",
+  )!;
+  expect(detect.inputs.positive_coords).toBeDefined();
+  expect(detect.inputs.bboxes).toBeDefined();
+  const condition = graph.condition!.inputs;
+  expect(condition["ref_videos.ref_video_0"]).toEqual(["source", 0]);
+  expect(condition["ref_videos.ref_video_1"]).toEqual(["tracks_frames", 0]);
+  expect(condition["ref_video_audios.ref_video_audio_0"]).toEqual([
+    "source",
+    2,
+  ]);
+  expect(condition["ref_images.ref_image_2"]).toEqual(["reference_2", 0]);
+  const prompt = String(condition.prompt);
+  expect(prompt).toContain(
+    "Replace the woman with long red hair (on the right of the frame), the person filled in red in <Video 2>, in <Video 1> with Mara, the person shown in <Picture 1>, <Picture 2>, <Picture 3>",
+  );
+  // The take's length, not the template's fixed five seconds, with its sound.
+  expect(graph.result_frames!.inputs.length).toEqual(["source_size", 2]);
+  expect(graph.result_video!.inputs.audio).toEqual(["source", 2]);
+});
+
+it("leaves the sound out of an H3 recast of a take whose audio is not kept", async () => {
+  const definition = getWorkflowDefinition("video.character-replace")!;
+  const request = await definition.build(
+    characterReplaceInputsSchema.parse({ ...base, pipeline: "minimax-h3" }),
+    context(),
+  );
+  const graph = (
+    request.input as {
+      graph: Record<string, { inputs: Record<string, unknown> }>;
+    }
+  ).graph;
+  expect(graph.condition!.inputs).not.toHaveProperty(
+    "ref_video_audios.ref_video_audio_0",
+  );
+  expect(graph.result_video!.inputs).not.toHaveProperty("audio");
+});
+
+it("refuses an H3 recast without a click on the person", async () => {
+  const definition = getWorkflowDefinition("video.character-replace")!;
+  await expect(
+    definition.build(
+      characterReplaceInputsSchema.parse({
+        ...base,
+        pipeline: "minimax-h3",
+        target: { type: "person", description: "the woman on the right" },
+      }),
+      context(),
+    ),
+  ).rejects.toThrow("Click the person to recast on the frame");
+});
+
+it("plans SCAIL-2's segments from the take's length, five frames of overlap each", () => {
+  expect(scailSegments(scailFrameCount(6.1))).toEqual([
+    { start: 0, length: 81 },
+    { start: 76, length: 69 },
+  ]);
+  // Short takes are one 4n + 1 segment; long ones are capped at 10 s.
+  expect(scailSegments(40)).toEqual([{ start: 0, length: 37 }]);
+  expect(scailFrameCount(30)).toBe(239);
+});
+
+it("recasts on Wan SCAIL-2 as a Cloud graph from a click and a Klein keyframe", async () => {
+  const definition = getWorkflowDefinition("video.character-replace")!;
+  const inputs = characterReplaceInputsSchema.parse({
+    ...base,
+    pipeline: "wan-scail2",
+    seconds: 6.1,
+    target: { ...base.target, point: { x: 0.7, y: 0.4, timeMs: 1500 } },
+    preservation: { preserve: ["performance", "audio"] },
+  });
+  expect(definition.provider?.(inputs)).toBe("cloud-workflow");
+  const request = await definition.build(inputs, context());
+  expect(request.model).toBe("comfy-cloud/wan-scail2-recast");
+  const { graph, media } = request.input as {
+    graph: Record<
+      string,
+      { class_type: string; inputs: Record<string, unknown> }
+    >;
+    media: { node: string; field: string }[];
+  };
+  // Klein reads the frame plus up to three Character views.
+  expect(media.map((m) => m.node)).toEqual([
+    "source",
+    "reference_0",
+    "reference_1",
+    "reference_2",
+  ]);
+  expect(graph.source!.inputs).toMatchObject({
+    force_rate: 24,
+    frame_load_cap: 145,
+  });
+  // Only the clicked person is replaced, seeded from their own track.
+  expect(graph.drive_track!.inputs).toMatchObject({
+    initial_mask: ["seed_mask", 0],
+    max_objects: 1,
+  });
+  expect(graph.colour_masks!.inputs.replacement_mode).toBe(true);
+  // The second segment continues from the first.
+  expect(graph.segment_1_condition!.inputs).toMatchObject({
+    previous_frames: ["segment_0_decode", 0],
+    length: 69,
+  });
+  expect(graph.result_video!.inputs.audio).toEqual(["source", 2]);
+  // Every math node names its first value `a`; Cloud skips the branch otherwise.
+  for (const node of Object.values(graph))
+    if (
+      node.class_type === "ComfyMathExpression" &&
+      Object.keys(node.inputs).some((k) => k.startsWith("values."))
+    )
+      expect(node.inputs).toHaveProperty(["values.a"]);
+});
+
+it("refuses a Wan recast without the take's length", async () => {
+  const definition = getWorkflowDefinition("video.character-replace")!;
+  await expect(
+    definition.build(
+      characterReplaceInputsSchema.parse({ ...base, pipeline: "wan-scail2" }),
+      context(),
+    ),
+  ).rejects.toThrow("The take's length is needed");
 });

@@ -1,6 +1,9 @@
 // The studio refuses clips Kling cannot edit before any credits are spent.
 import { expect, test } from "bun:test";
-import { checkKlingSource } from "../src/features/revision/model";
+import {
+  checkKlingSource,
+  checkCloudRecastSource,
+} from "../src/features/revision/model";
 
 const take = { seconds: 6, width: 1280, height: 720, fps: 25, pixelAspect: 1 };
 
@@ -35,4 +38,17 @@ test("does not hold unknown facts against a clip", () => {
       pixelAspect: null,
     }).problems,
   ).toEqual([]);
+});
+
+test("the Cloud recasts take clips of any size, up to their own lengths", () => {
+  expect(checkCloudRecastSource("minimax-h3", 12).problems).toEqual([]);
+  expect(checkCloudRecastSource("minimax-h3", 1.5).problems[0]).toContain(
+    "at least 2 seconds",
+  );
+  expect(checkCloudRecastSource("minimax-h3", 16).problems[0]).toContain(
+    "up to 15 seconds",
+  );
+  expect(checkCloudRecastSource("wan-scail2", 12).problems[0]).toBe(
+    "Wan SCAIL-2 recasts up to 10 seconds; this clip is 12.0 s. Trim it and upload it again.",
+  );
 });

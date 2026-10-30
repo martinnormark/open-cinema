@@ -69,6 +69,18 @@ import {
   characterReplaceRequest,
 } from "./character-replace";
 import {
+  MINIMAX_H3_RECAST_JOB_MODEL,
+  MINIMAX_H3_RECAST_MODEL_ID,
+  MINIMAX_H3_RECAST_OUTPUT_NODES,
+  minimaxH3RecastRequest,
+} from "./minimax-h3-recast";
+import {
+  WAN_SCAIL_RECAST_JOB_MODEL,
+  WAN_SCAIL_RECAST_MODEL_ID,
+  WAN_SCAIL_RECAST_OUTPUT_NODES,
+  wanScailRecastRequest,
+} from "./wan-scail-recast";
+import {
   LTX_CAMERA_MODEL_ID,
   LTX_CAMERA_OUTPUT_NODES,
   ltxCameraRequest,
@@ -524,13 +536,43 @@ export const performanceTransferWorkflow: WorkflowDefinition<"video.performance-
         : [],
   };
 
+/**
+ * Recast: Kling 3.0 Omni's edit on Router, or a Comfy Cloud graph where SAM
+ * 3.1 tracks the clicked person for MiniMax H3 (./minimax-h3-recast.ts) or
+ * Wan SCAIL-2 (./wan-scail-recast.ts). All come back at 24 fps, so all are
+ * conformed onto the take's frame grid with its sound.
+ */
 export const characterReplaceWorkflow: WorkflowDefinition<"video.character-replace"> =
   {
     kind: "video.character-replace",
-    displayModel: "Kling 3.0 Omni",
+    displayModel: (inputs) =>
+      inputs.pipeline === "minimax-h3"
+        ? MINIMAX_H3_RECAST_JOB_MODEL
+        : inputs.pipeline === "wan-scail2"
+          ? WAN_SCAIL_RECAST_JOB_MODEL
+          : "Kling 3.0 Omni",
     deadlineMs: 60 * 60_000,
-    model: () => CHARACTER_REPLACE_MODEL,
-    build: characterReplaceRequest,
+    model: (inputs) =>
+      inputs.pipeline === "minimax-h3"
+        ? MINIMAX_H3_RECAST_MODEL_ID
+        : inputs.pipeline === "wan-scail2"
+          ? WAN_SCAIL_RECAST_MODEL_ID
+          : CHARACTER_REPLACE_MODEL,
+    provider: (inputs) =>
+      inputs.pipeline === "kling" ? "router" : "cloud-workflow",
+    // Both graphs save the result first, as "save_result".
+    cloudOutputNodes: [
+      ...new Set([
+        ...MINIMAX_H3_RECAST_OUTPUT_NODES,
+        ...WAN_SCAIL_RECAST_OUTPUT_NODES,
+      ]),
+    ],
+    build: (inputs, context) =>
+      inputs.pipeline === "minimax-h3"
+        ? minimaxH3RecastRequest(inputs, context)
+        : inputs.pipeline === "wan-scail2"
+          ? wanScailRecastRequest(inputs, context)
+          : characterReplaceRequest(inputs, context),
     // Same Kling edit result document as background replacement.
     outputs: backgroundReplaceOutputs,
     label: "Recasting the character",

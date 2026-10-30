@@ -1,0 +1,1313 @@
+{
+  "source": {
+    "class_type": "VHS_LoadVideoFFmpeg",
+    "inputs": {
+      "video": "source.mp4",
+      "force_rate": 24,
+      "custom_width": 0,
+      "custom_height": 0,
+      "frame_load_cap": 143,
+      "start_time": 0,
+      "format": "None"
+    }
+  },
+  "source_fps": {
+    "class_type": "PrimitiveFloat",
+    "inputs": {
+      "value": 24
+    }
+  },
+  "source_size": {
+    "class_type": "GetImageSize",
+    "inputs": {
+      "image": [
+        "source",
+        0
+      ]
+    }
+  },
+  "work": {
+    "class_type": "ImageScaleToTotalPixels",
+    "inputs": {
+      "image": [
+        "source",
+        0
+      ],
+      "upscale_method": "bilinear",
+      "megapixels": 0.4,
+      "resolution_steps": 2
+    }
+  },
+  "work_size": {
+    "class_type": "GetImageSize",
+    "inputs": {
+      "image": [
+        "work",
+        0
+      ]
+    }
+  },
+  "sam": {
+    "class_type": "CheckpointLoaderSimple",
+    "inputs": {
+      "ckpt_name": "sam3.1_multiplex_fp16.safetensors"
+    }
+  },
+  "g150_index": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(1, min(a - 2, round(1.5 * b)))",
+      "values.a": [
+        "work_size",
+        2
+      ],
+      "values.b": [
+        "source_fps",
+        0
+      ]
+    }
+  },
+  "g150_frame": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "work",
+        0
+      ],
+      "batch_index": [
+        "g150_index",
+        1
+      ],
+      "length": 1
+    }
+  },
+  "p0_x": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "round(0.72 * a)",
+      "values.a": [
+        "work_size",
+        0
+      ]
+    }
+  },
+  "p0_y": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "round(0.38 * a)",
+      "values.a": [
+        "work_size",
+        1
+      ]
+    }
+  },
+  "p0_point": {
+    "class_type": "StringFormat",
+    "inputs": {
+      "values.a": [
+        "p0_x",
+        1
+      ],
+      "values.b": [
+        "p0_y",
+        1
+      ],
+      "f_string": "[{{\"x\": {a}, \"y\": {b}}}]"
+    }
+  },
+  "p0_detect": {
+    "class_type": "SAM3_Detect",
+    "inputs": {
+      "model": [
+        "sam",
+        0
+      ],
+      "image": [
+        "g150_frame",
+        0
+      ],
+      "threshold": 0.5,
+      "refine_iterations": 2,
+      "individual_masks": false,
+      "positive_coords": [
+        "p0_point",
+        0
+      ],
+      "bboxes": [
+        "p0_box",
+        0
+      ]
+    }
+  },
+  "p0_box_x": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(0, round(0.58 * a))",
+      "values.a": [
+        "work_size",
+        0
+      ]
+    }
+  },
+  "p0_box_y": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(0, round(0.12 * a))",
+      "values.a": [
+        "work_size",
+        1
+      ]
+    }
+  },
+  "p0_box_w": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(1, round(0.3 * a))",
+      "values.a": [
+        "work_size",
+        0
+      ]
+    }
+  },
+  "p0_box_h": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(1, round(0.86 * a))",
+      "values.a": [
+        "work_size",
+        1
+      ]
+    }
+  },
+  "p0_box": {
+    "class_type": "PrimitiveBoundingBox",
+    "inputs": {
+      "x": [
+        "p0_box_x",
+        1
+      ],
+      "y": [
+        "p0_box_y",
+        1
+      ],
+      "width": [
+        "p0_box_w",
+        1
+      ],
+      "height": [
+        "p0_box_h",
+        1
+      ]
+    }
+  },
+  "g150_masks": {
+    "class_type": "BatchMasksNode",
+    "inputs": {
+      "masks.mask0": [
+        "p0_detect",
+        0
+      ]
+    }
+  },
+  "g150_ahead": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "work",
+        0
+      ],
+      "batch_index": [
+        "g150_index",
+        1
+      ],
+      "length": 4096
+    }
+  },
+  "g150_forward": {
+    "class_type": "SAM3_VideoTrack",
+    "inputs": {
+      "images": [
+        "g150_ahead",
+        0
+      ],
+      "model": [
+        "sam",
+        0
+      ],
+      "initial_mask": [
+        "g150_masks",
+        0
+      ],
+      "detection_threshold": 0.5,
+      "max_objects": 1,
+      "detect_interval": 1
+    }
+  },
+  "g150_before_length": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "a + 1",
+      "values.a": [
+        "g150_index",
+        1
+      ]
+    }
+  },
+  "g150_before": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "work",
+        0
+      ],
+      "batch_index": 0,
+      "length": [
+        "g150_before_length",
+        1
+      ]
+    }
+  },
+  "g150_behind": {
+    "class_type": "ReverseImageBatch",
+    "inputs": {
+      "images": [
+        "g150_before",
+        0
+      ]
+    }
+  },
+  "g150_backward": {
+    "class_type": "SAM3_VideoTrack",
+    "inputs": {
+      "images": [
+        "g150_behind",
+        0
+      ],
+      "model": [
+        "sam",
+        0
+      ],
+      "initial_mask": [
+        "g150_masks",
+        0
+      ],
+      "detection_threshold": 0.5,
+      "max_objects": 1,
+      "detect_interval": 1
+    }
+  },
+  "p0_forward": {
+    "class_type": "SAM3_TrackToMask",
+    "inputs": {
+      "track_data": [
+        "g150_forward",
+        0
+      ],
+      "object_indices": "0"
+    }
+  },
+  "p0_backward": {
+    "class_type": "SAM3_TrackToMask",
+    "inputs": {
+      "track_data": [
+        "g150_backward",
+        0
+      ],
+      "object_indices": "0"
+    }
+  },
+  "p0_forward_image": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "p0_forward",
+        0
+      ]
+    }
+  },
+  "p0_backward_image": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "p0_backward",
+        0
+      ]
+    }
+  },
+  "p0_backward_ordered": {
+    "class_type": "ReverseImageBatch",
+    "inputs": {
+      "images": [
+        "p0_backward_image",
+        0
+      ]
+    }
+  },
+  "p0_earlier": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "p0_backward_ordered",
+        0
+      ],
+      "batch_index": 0,
+      "length": [
+        "g150_index",
+        1
+      ]
+    }
+  },
+  "p0_whole": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "p0_earlier",
+        0
+      ],
+      "image2": [
+        "p0_forward_image",
+        0
+      ]
+    }
+  },
+  "p0_track": {
+    "class_type": "ImageToMask",
+    "inputs": {
+      "image": [
+        "p0_whole",
+        0
+      ],
+      "channel": "red"
+    }
+  },
+  "colour_0": {
+    "class_type": "EmptyImage",
+    "inputs": {
+      "width": [
+        "work_size",
+        0
+      ],
+      "height": [
+        "work_size",
+        1
+      ],
+      "batch_size": 1,
+      "color": 16718362
+    }
+  },
+  "fill_0": {
+    "class_type": "ImageCompositeMasked",
+    "inputs": {
+      "destination": [
+        "work",
+        0
+      ],
+      "source": [
+        "colour_0",
+        0
+      ],
+      "x": 0,
+      "y": 0,
+      "resize_source": false,
+      "mask": [
+        "p0_track",
+        0
+      ]
+    }
+  },
+  "tracks_frames": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "fill_0",
+        0
+      ],
+      "batch_index": 0,
+      "length": [
+        "work_size",
+        2
+      ]
+    }
+  },
+  "tracks_video": {
+    "class_type": "CreateVideo",
+    "inputs": {
+      "images": [
+        "tracks_frames",
+        0
+      ],
+      "fps": [
+        "source_fps",
+        0
+      ]
+    }
+  },
+  "save_tracks": {
+    "class_type": "SaveVideo",
+    "inputs": {
+      "video": [
+        "tracks_video",
+        0
+      ],
+      "filename_prefix": "open_cinema/cast_tracks",
+      "format": "mp4",
+      "format.codec": "h264",
+      "format.codec.encoding": "re-encode",
+      "format.codec.encoding.crf": 20
+    }
+  },
+  "click_index": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(0, min(a - 1, round(1.5 * 24)))",
+      "values.a": [
+        "source_size",
+        2
+      ]
+    }
+  },
+  "click_frame": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "source",
+        0
+      ],
+      "batch_index": [
+        "click_index",
+        1
+      ],
+      "length": 1
+    }
+  },
+  "keyframe_unet": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "flux3-image-klein-int8-convrot.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "keyframe_clip": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen3vl_4b_int8_convrot.safetensors",
+      "type": "flux3",
+      "device": "default"
+    }
+  },
+  "keyframe_vae": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "flux2-vae.safetensors"
+    }
+  },
+  "keyframe_text": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "In the first image, replace the woman on the right (on the right of the frame) with Cal, the person shown in the second image, the third image: A man in his late sixties with swept-back silver hair, in a charcoal wool overcoat, navy sweater, dark trousers and black shoes. Take the face only from the close portrait in the second image. The third image is a character sheet: body, build, hair from behind and clothing; the heads are left out of the full-body panels on purpose. Dress them in their outfit from the second image, the third image. Keep their exact position, scale, pose, body angle, head direction, gesture, gaze and expression from the first image, lit by the scene's own light. Change nothing else: every other person, every object, the background and the framing stay exactly as they are.",
+      "clip": [
+        "keyframe_clip",
+        0
+      ]
+    }
+  },
+  "keyframe_zero": {
+    "class_type": "ConditioningZeroOut",
+    "inputs": {
+      "conditioning": [
+        "keyframe_text",
+        0
+      ]
+    }
+  },
+  "reference_0": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "reference-0.png"
+    }
+  },
+  "reference_1": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "reference-1.png"
+    }
+  },
+  "keyframe_references": {
+    "class_type": "ReferenceMultiLatent",
+    "inputs": {
+      "positive": [
+        "keyframe_text",
+        0
+      ],
+      "negative": [
+        "keyframe_zero",
+        0
+      ],
+      "vae": [
+        "keyframe_vae",
+        0
+      ],
+      "resolution": "resize",
+      "resolution.megapixels": 1,
+      "images.image0": [
+        "click_frame",
+        0
+      ],
+      "images.image1": [
+        "reference_0",
+        0
+      ],
+      "images.image2": [
+        "reference_1",
+        0
+      ]
+    }
+  },
+  "keyframe_sample": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": [
+        "keyframe_unet",
+        0
+      ],
+      "positive": [
+        "keyframe_references",
+        0
+      ],
+      "negative": [
+        "keyframe_references",
+        1
+      ],
+      "latent_image": [
+        "keyframe_references",
+        2
+      ],
+      "seed": 20261030,
+      "steps": 16,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1
+    }
+  },
+  "keyframe_decode": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "keyframe_sample",
+        0
+      ],
+      "vae": [
+        "keyframe_vae",
+        0
+      ]
+    }
+  },
+  "keyframe_size": {
+    "class_type": "GetImageSize",
+    "inputs": {
+      "image": [
+        "keyframe_decode",
+        0
+      ]
+    }
+  },
+  "key_x": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(0, round(0.72 * a))",
+      "values.a": [
+        "keyframe_size",
+        0
+      ]
+    }
+  },
+  "key_y": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(0, round(0.38 * a))",
+      "values.a": [
+        "keyframe_size",
+        1
+      ]
+    }
+  },
+  "key_point": {
+    "class_type": "StringFormat",
+    "inputs": {
+      "values.a": [
+        "key_x",
+        1
+      ],
+      "values.b": [
+        "key_y",
+        1
+      ],
+      "f_string": "[{{\"x\": {a}, \"y\": {b}}}]"
+    }
+  },
+  "key_detect": {
+    "class_type": "SAM3_Detect",
+    "inputs": {
+      "model": [
+        "sam",
+        0
+      ],
+      "image": [
+        "keyframe_decode",
+        0
+      ],
+      "threshold": 0.5,
+      "refine_iterations": 2,
+      "individual_masks": false,
+      "positive_coords": [
+        "key_point",
+        0
+      ],
+      "bboxes": [
+        "key_box",
+        0
+      ]
+    }
+  },
+  "key_box_x": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(0, round(0.58 * a))",
+      "values.a": [
+        "keyframe_size",
+        0
+      ]
+    }
+  },
+  "key_box_y": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(0, round(0.12 * a))",
+      "values.a": [
+        "keyframe_size",
+        1
+      ]
+    }
+  },
+  "key_box_w": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(1, round(0.3 * a))",
+      "values.a": [
+        "keyframe_size",
+        0
+      ]
+    }
+  },
+  "key_box_h": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(1, round(0.86 * a))",
+      "values.a": [
+        "keyframe_size",
+        1
+      ]
+    }
+  },
+  "key_box": {
+    "class_type": "PrimitiveBoundingBox",
+    "inputs": {
+      "x": [
+        "key_box_x",
+        1
+      ],
+      "y": [
+        "key_box_y",
+        1
+      ],
+      "width": [
+        "key_box_w",
+        1
+      ],
+      "height": [
+        "key_box_h",
+        1
+      ]
+    }
+  },
+  "gen_width": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(32, round(a * 896 / max(a, b) / 32) * 32)",
+      "values.a": [
+        "source_size",
+        0
+      ],
+      "values.b": [
+        "source_size",
+        1
+      ]
+    }
+  },
+  "gen_height": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(32, round(b * 896 / max(a, b) / 32) * 32)",
+      "values.a": [
+        "source_size",
+        0
+      ],
+      "values.b": [
+        "source_size",
+        1
+      ]
+    }
+  },
+  "pose": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "source",
+        0
+      ],
+      "upscale_method": "bilinear",
+      "width": [
+        "gen_width",
+        1
+      ],
+      "height": [
+        "gen_height",
+        1
+      ],
+      "crop": "disabled"
+    }
+  },
+  "seed_image": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": [
+        "p0_track",
+        0
+      ]
+    }
+  },
+  "seed_first": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "seed_image",
+        0
+      ],
+      "batch_index": 0,
+      "length": 1
+    }
+  },
+  "seed_fit": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "seed_first",
+        0
+      ],
+      "upscale_method": "bilinear",
+      "width": [
+        "gen_width",
+        1
+      ],
+      "height": [
+        "gen_height",
+        1
+      ],
+      "crop": "disabled"
+    }
+  },
+  "seed_mask": {
+    "class_type": "ImageToMask",
+    "inputs": {
+      "image": [
+        "seed_fit",
+        0
+      ],
+      "channel": "red"
+    }
+  },
+  "drive_track": {
+    "class_type": "SAM3_VideoTrack",
+    "inputs": {
+      "images": [
+        "pose",
+        0
+      ],
+      "model": [
+        "sam",
+        0
+      ],
+      "initial_mask": [
+        "seed_mask",
+        0
+      ],
+      "detection_threshold": 0.5,
+      "max_objects": 1,
+      "detect_interval": 1
+    }
+  },
+  "colour_masks": {
+    "class_type": "SCAIL2ColoredMask",
+    "inputs": {
+      "driving_track_data": [
+        "drive_track",
+        0
+      ],
+      "ref_track_data": [
+        "key_detect",
+        0
+      ],
+      "object_indices": "",
+      "sort_by": "left_to_right",
+      "replacement_mode": true
+    }
+  },
+  "unet": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "wan2.1_14B_SCAIL_2_int8_convrot.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "dpo": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "model": [
+        "unet",
+        0
+      ],
+      "lora_name": "wan2.1_SCAIL_2_DPO_lora_bf16.safetensors",
+      "strength_model": 1
+    }
+  },
+  "distill": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "model": [
+        "dpo",
+        0
+      ],
+      "lora_name": "lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
+      "strength_model": 0.8
+    }
+  },
+  "shift": {
+    "class_type": "ModelSamplingSD3",
+    "inputs": {
+      "model": [
+        "distill",
+        0
+      ],
+      "shift": 5
+    }
+  },
+  "text_encoder": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "type": "wan",
+      "device": "default"
+    }
+  },
+  "vae": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "Wan2_1_VAE_bf16.safetensors"
+    }
+  },
+  "clip_vision": {
+    "class_type": "CLIPVisionLoader",
+    "inputs": {
+      "clip_name": "clip_vision_h.safetensors"
+    }
+  },
+  "clip_vision_encode": {
+    "class_type": "CLIPVisionEncode",
+    "inputs": {
+      "clip_vision": [
+        "clip_vision",
+        0
+      ],
+      "image": [
+        "keyframe_decode",
+        0
+      ],
+      "crop": "none"
+    }
+  },
+  "positive": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "Cal, A man in his late sixties with swept-back silver hair, in a charcoal wool overcoat, navy sweater, dark trousers and black shoes, takes the place of the woman on the right (on the right of the frame), with the same movement, gestures, expression and timing. Everyone else, the background, the framing, the lighting and the camera movement stay as in the video. Photorealistic, natural skin, same film look.",
+      "clip": [
+        "text_encoder",
+        0
+      ]
+    }
+  },
+  "negative": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "",
+      "clip": [
+        "text_encoder",
+        0
+      ]
+    }
+  },
+  "sampler": {
+    "class_type": "KSamplerSelect",
+    "inputs": {
+      "sampler_name": "euler"
+    }
+  },
+  "sigmas": {
+    "class_type": "BasicScheduler",
+    "inputs": {
+      "model": [
+        "distill",
+        0
+      ],
+      "scheduler": "simple",
+      "steps": 6,
+      "denoise": 1
+    }
+  },
+  "segment_0_pose": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "pose",
+        0
+      ],
+      "batch_index": 0,
+      "length": 81
+    }
+  },
+  "segment_0_mask": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "colour_masks",
+        0
+      ],
+      "batch_index": 0,
+      "length": 81
+    }
+  },
+  "segment_0_condition": {
+    "class_type": "WanSCAILToVideo",
+    "inputs": {
+      "positive": [
+        "positive",
+        0
+      ],
+      "negative": [
+        "negative",
+        0
+      ],
+      "vae": [
+        "vae",
+        0
+      ],
+      "width": [
+        "gen_width",
+        1
+      ],
+      "height": [
+        "gen_height",
+        1
+      ],
+      "length": 81,
+      "batch_size": 1,
+      "pose_strength": 1,
+      "pose_start": 0,
+      "pose_end": 1,
+      "video_frame_offset": 0,
+      "previous_frame_count": 5,
+      "replacement_mode": true,
+      "pose_video": [
+        "segment_0_pose",
+        0
+      ],
+      "pose_video_mask": [
+        "segment_0_mask",
+        0
+      ],
+      "reference_image": [
+        "keyframe_decode",
+        0
+      ],
+      "reference_image_mask": [
+        "colour_masks",
+        1
+      ],
+      "clip_vision_output": [
+        "clip_vision_encode",
+        0
+      ]
+    }
+  },
+  "segment_0_sample": {
+    "class_type": "SamplerCustom",
+    "inputs": {
+      "model": [
+        "shift",
+        0
+      ],
+      "add_noise": true,
+      "noise_seed": 20261030,
+      "cfg": 1,
+      "positive": [
+        "segment_0_condition",
+        0
+      ],
+      "negative": [
+        "segment_0_condition",
+        1
+      ],
+      "sampler": [
+        "sampler",
+        0
+      ],
+      "sigmas": [
+        "sigmas",
+        0
+      ],
+      "latent_image": [
+        "segment_0_condition",
+        2
+      ]
+    }
+  },
+  "segment_0_decode": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "segment_0_sample",
+        1
+      ],
+      "vae": [
+        "vae",
+        0
+      ]
+    }
+  },
+  "segment_1_pose": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "pose",
+        0
+      ],
+      "batch_index": 76,
+      "length": 65
+    }
+  },
+  "segment_1_mask": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "colour_masks",
+        0
+      ],
+      "batch_index": 76,
+      "length": 65
+    }
+  },
+  "segment_1_condition": {
+    "class_type": "WanSCAILToVideo",
+    "inputs": {
+      "positive": [
+        "positive",
+        0
+      ],
+      "negative": [
+        "negative",
+        0
+      ],
+      "vae": [
+        "vae",
+        0
+      ],
+      "width": [
+        "gen_width",
+        1
+      ],
+      "height": [
+        "gen_height",
+        1
+      ],
+      "length": 65,
+      "batch_size": 1,
+      "pose_strength": 1,
+      "pose_start": 0,
+      "pose_end": 1,
+      "video_frame_offset": 0,
+      "previous_frame_count": 5,
+      "replacement_mode": true,
+      "pose_video": [
+        "segment_1_pose",
+        0
+      ],
+      "pose_video_mask": [
+        "segment_1_mask",
+        0
+      ],
+      "reference_image": [
+        "keyframe_decode",
+        0
+      ],
+      "reference_image_mask": [
+        "colour_masks",
+        1
+      ],
+      "clip_vision_output": [
+        "clip_vision_encode",
+        0
+      ],
+      "previous_frames": [
+        "segment_0_decode",
+        0
+      ]
+    }
+  },
+  "segment_1_sample": {
+    "class_type": "SamplerCustom",
+    "inputs": {
+      "model": [
+        "shift",
+        0
+      ],
+      "add_noise": true,
+      "noise_seed": 20261030,
+      "cfg": 1,
+      "positive": [
+        "segment_1_condition",
+        0
+      ],
+      "negative": [
+        "segment_1_condition",
+        1
+      ],
+      "sampler": [
+        "sampler",
+        0
+      ],
+      "sigmas": [
+        "sigmas",
+        0
+      ],
+      "latent_image": [
+        "segment_1_condition",
+        2
+      ]
+    }
+  },
+  "segment_1_decode": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "segment_1_sample",
+        1
+      ],
+      "vae": [
+        "vae",
+        0
+      ]
+    }
+  },
+  "segment_1_new": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "segment_1_decode",
+        0
+      ],
+      "batch_index": 5,
+      "length": 4096
+    }
+  },
+  "segment_1_anchor": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "segment_0_decode",
+        0
+      ],
+      "batch_index": -1,
+      "length": 1
+    }
+  },
+  "segment_1_matched": {
+    "class_type": "ColorTransfer",
+    "inputs": {
+      "image_target": [
+        "segment_1_new",
+        0
+      ],
+      "image_ref": [
+        "segment_1_anchor",
+        0
+      ],
+      "method": "reinhard_lab",
+      "source_stats": "per_frame",
+      "strength": 1
+    }
+  },
+  "joined_0": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "segment_0_decode",
+        0
+      ],
+      "image2": [
+        "segment_1_matched",
+        0
+      ]
+    }
+  },
+  "result_video": {
+    "class_type": "CreateVideo",
+    "inputs": {
+      "images": [
+        "joined_0",
+        0
+      ],
+      "fps": [
+        "source_fps",
+        0
+      ],
+      "audio": [
+        "source",
+        2
+      ]
+    }
+  },
+  "save_result": {
+    "class_type": "SaveVideo",
+    "inputs": {
+      "video": [
+        "result_video",
+        0
+      ],
+      "filename_prefix": "open_cinema/recast_scail",
+      "format": "mp4",
+      "format.codec": "h264",
+      "format.codec.encoding": "re-encode",
+      "format.codec.encoding.crf": 16
+    }
+  },
+  "save_keyframe": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": [
+        "keyframe_decode",
+        0
+      ],
+      "filename_prefix": "open_cinema/recast_scail_keyframe"
+    }
+  }
+}

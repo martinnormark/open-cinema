@@ -52,6 +52,12 @@ export const MODEL_CARDS: Record<string, ModelCard> = {
     runsOn: "Comfy Cloud",
   },
   "FLUX 3 Klein + Wan Animate 2": cloud("Black Forest Labs and Alibaba"),
+  "SAM 3.1 + MiniMax H3": cloud("Meta and MiniMax"),
+  // SCAIL-2 is zai-org's character model on Alibaba's Wan 2.1 14B; FLUX 3
+  // Klein makes its reference keyframe.
+  "SAM 3.1 + Wan SCAIL-2": cloud(
+    "Meta, zai-org, Alibaba and Black Forest Labs",
+  ),
 };
 
 export function modelCard(model: string): ModelCard | null {

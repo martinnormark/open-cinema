@@ -167,6 +167,13 @@ export type BackgroundReplaceInputs = z.infer<
   typeof backgroundReplaceInputsSchema
 >;
 
+export const recastPipelineSchema = z.enum([
+  "kling",
+  "minimax-h3",
+  "wan-scail2",
+]);
+export type RecastPipelineChoice = z.infer<typeof recastPipelineSchema>;
+
 export const characterReplaceInputsSchema = z.object({
   source: assetRefSchema,
   target: targetSelectionSchema,
@@ -175,6 +182,17 @@ export const characterReplaceInputsSchema = z.object({
   references: z.array(assetRefSchema).max(7).default([]),
   prompt: prompt.optional(),
   preservation: preservationIntentSchema,
+  /**
+   * `kling` edits the take (Kling 3.0 Omni video edit on Router; the person
+   * is named in words). `minimax-h3` regenerates the shot on MiniMax H3's
+   * open weights on Comfy Cloud, with SAM 3.1 tracking the clicked person;
+   * it needs a point or box on the frame. `wan-scail2` replaces the clicked
+   * person with SCAIL-2 (Wan 2.1 14B) on Comfy Cloud, from a FLUX 3 Klein
+   * keyframe of the Character in their place.
+   */
+  pipeline: recastPipelineSchema.default("kling"),
+  /** The take's length in seconds; Wan plans its segments from it. */
+  seconds: z.number().positive().max(600).optional(),
 });
 export type CharacterReplaceInputs = z.infer<
   typeof characterReplaceInputsSchema
@@ -653,7 +671,11 @@ export const WORKFLOW_DESCRIPTORS = {
     kind: "video.character-replace",
     label: "Recast character",
     output: "video",
-    models: ["kling/kling-v3-omni"],
+    models: [
+      "kling/kling-v3-omni",
+      "comfy-cloud/minimax-h3-recast",
+      "comfy-cloud/wan-scail2-recast",
+    ],
   },
   "video.performance-transfer": {
     kind: "video.performance-transfer",

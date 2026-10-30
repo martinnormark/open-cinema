@@ -41,12 +41,15 @@ interface ManifestEntry {
  * exported graph ran with it there that day (jobs f30bd530 and a32a3cf1); so
  * did FLUX 3 Klein and its encoder (job baf43ad0). Cloud renamed the Klein
  * file on 2026-10-22; the new name ran in Wan Animate 2's keyframe that day
- * (prompt 1d581236). Reported as a note, not a failure.
+ * (prompt 1d581236). MiniMax H3's int8 video VAE, which Comfy's ref2va
+ * template loads, ran there on 2026-10-30 (job 91dfbd38). Reported as a
+ * note, not a failure.
  */
 const UNLISTED_ON_CLOUD = new Set([
   "ltx-2.5-22b-ic-lora-alpha-gen-0.9.safetensors",
   "flux3-image-klein-int8-convrot.safetensors",
   "qwen3vl_4b_int8_convrot.safetensors",
+  "minimax_h3_video_vae_int8_convrot.safetensors",
 ]);
 const notes: string[] = [];
 
@@ -162,6 +165,15 @@ function check(
       errors.push(`${id}: unknown node ${node.class_type}`);
       continue;
     }
+    // An expression whose values leave out `a` (a lone `values.b`) passes
+    // validation, then silently blocks every node downstream on Cloud; gaps
+    // after `a` (a, b, c, e) run (checked 2026-10-30).
+    if (
+      node.class_type === "ComfyMathExpression" &&
+      Object.keys(node.inputs).some((k) => k.startsWith("values.")) &&
+      !("values.a" in node.inputs)
+    )
+      errors.push(`${id}: ComfyMathExpression values must include a`);
     for (const name of Object.keys(info.input.required ?? {})) {
       const spec = info.input.required![name]!;
       // Autogrow and dynamic combos are set through their dotted members.
