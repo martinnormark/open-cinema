@@ -8,6 +8,13 @@ import {
 } from "@open-cinema/contracts";
 import { CropMarks } from "@/components/empty-state";
 import { LoopingClip } from "@/components/looping-clip";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -78,7 +85,29 @@ export function StartPage({
         </p>
       </header>
       <div className="mt-8 grid gap-8 lg:grid-cols-[23rem_minmax(0,1fr)] lg:gap-12">
-        <GoalList goal={goal} onGoal={choose} />
+        <div className="lg:hidden">
+          <label
+            htmlFor="start-goal"
+            className="mb-2 block text-label text-muted-foreground"
+          >
+            What would you like to do?
+          </label>
+          <Select value={goal.id} onValueChange={(id) => onGoal(id as GoalId)}>
+            <SelectTrigger id="start-goal" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {goals.map((option) => (
+                <SelectItem key={option.id} value={option.id}>
+                  {option.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="hidden lg:block">
+          <GoalList goal={goal} onGoal={choose} />
+        </div>
         <div
           ref={stage}
           className="min-w-0 scroll-mt-20 lg:sticky lg:top-20 lg:self-start"

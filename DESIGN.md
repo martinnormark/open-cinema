@@ -192,11 +192,11 @@ A sticky 3.5rem top bar on the canvas colour, with page content below in a centr
 
 ### The top bar
 
-[`AppTopBar`](apps/web/src/components/app-top-bar.tsx), left to right: the lockup (it is the way home to Start), the places you make from (Studio, Sequences), a hairline, every way to change a take, then the shelves (Elements, Library) and Settings as an icon. The tasks are what creators came for, so they read a step brighter than the places around them, use one- or two-word labels (`short` in [`goals.ts`](apps/web/src/features/start/goals.ts)), and open the task page directly.
+`AppTopBar` groups the workspace into three stable areas using shadcn dropdown menus: **Create** (Studio, Sequences, Recipes), **Revise** (all take changes), and **World** (Elements, Library, Projects, Move your world). Settings stays a labelled link. Do not add generic More menus or expose individual revision tools as top-level navigation.
 
-- **Priority, not truncation.** From `lg` five tasks sit inline and the rest wait under "More"; from `xl` eight sit inline and "More" holds effects, looks and the camera. Never shrink the type or let the bar scroll to fit more.
-- **One lamp.** The current item carries a 2px tungsten line on the bar's bottom hairline, which glides between items on `transform` only (tabs sliding, `--duration-fast`). A task folded under "More" lights "More".
-- **Below `lg`** the places fold into a sheet from the left (`bg-sidebar`), the bar carries the menu button and the lockup, and the tasks become a strip of chips under the bar that scrolls sideways with faded ends; the current chip is tungsten-edged and centred in view. On phones the Orb moves into the bar's row so it never covers creative controls.
+The current area stays lit with the existing tungsten underline on all its child routes. The selected destination has a filled row and tungsten icon inside its menu. A persistent location row below the header shows area → page, including World → Move your world and Revise → the selected task. This context remains visible on mobile when the main navigation folds into a grouped shadcn Sheet below `md`. The Sheet uses the same destinations and highlights only the actual selected page.
+
+On Start below `lg`, a labelled shadcn Select replaces the long goal list so the selected task and take chooser are visible together. Desktop retains the full explanatory list.
 
 ### Task pages
 

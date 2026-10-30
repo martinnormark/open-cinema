@@ -1,4 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/page-header";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { z } from "zod";
 import { PackageOpen } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
@@ -17,11 +19,20 @@ function World() {
   const search = Route.useSearch();
   if (!home.signedIn)
     return (
-      <section className="mx-auto w-full max-w-6xl px-6 py-10 md:px-12 md:py-14">
-        <h1 id="page-title" className="sr-only">
-          Move your world
-        </h1>
-        <EmptyState icon={PackageOpen} title="Start a session first">
+      <section className="mx-auto w-full max-w-6xl space-y-8 px-6 py-10 md:px-12 md:py-14">
+        <PageHeader
+          title="Move your world"
+          description="Save your creative world, or bring one into this studio."
+        />
+        <EmptyState
+          icon={PackageOpen}
+          title="Start a session first"
+          actions={
+            <Button asChild>
+              <Link to="/studio">Go to Studio</Link>
+            </Button>
+          }
+        >
           <p>
             A world is saved from, and brought into, your session. Start a local
             session in the Studio, then come back.
