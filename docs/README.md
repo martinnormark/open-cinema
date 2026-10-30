@@ -28,7 +28,7 @@ Primary entry points: [developer documentation](https://docs.comfy.org/developme
 
 - [Foundation](foundation.md): contracts, persistence, workflow dispatch, and how to add a workflow kind.
 - [Generation MVP](generation-mvp.md): the first image pipeline, its job lifecycle, consistency rules and local verification.
-- [Sign-in and public deployment](auth.md): the `AUTH_MODE` options and how to put a deployment behind Cloudflare Access.
+- [Sign-in and public deployment](auth.md): the `AUTH_MODE` options, local sessions and the password-protected hosted studio. Docker hosting is in [Deployment](deployment.md).
 - [Design system](../DESIGN.md): the identity, tokens, typography, colour and motion rules for the studio.
 - [Direction, combined states and recipes](direction.md): per-shot looks and direction, state kinds and recipes.
 - [Elements: the default path](elements.md): the anchor-first next step shared by Characters, Locations and Things, the defaults the app decides, Thing turnarounds, and which references a mention sends.
