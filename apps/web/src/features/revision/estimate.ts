@@ -6,6 +6,7 @@ import type {
   MotionResolution,
   RecastPipelineChoice,
 } from "@open-cinema/contracts";
+import { KLING_EDIT_LIMITS } from "@open-cinema/contracts";
 import {
   cloudEstimate,
   movesEstimate,
@@ -86,7 +87,7 @@ export function estimateReplacement(
     ...sourceEditEstimate("video.character-replace", sourceSeconds),
     note:
       sourceSeconds === null
-        ? `About ${sourceEditRate("video.character-replace")} credits per second of source video, at 1080p. Clips need 4 to 10 seconds.`
+        ? `About ${sourceEditRate("video.character-replace")} credits per second of source video, at 1080p. Clips need ${KLING_EDIT_LIMITS.minSeconds} to ${KLING_EDIT_LIMITS.maxSeconds} seconds.`
         : "Kling 3.0 Omni at 1080p. The shared Router queue can add much more time.",
   };
 }

@@ -38,20 +38,20 @@ The default is wired: `video.character-replace` builds the Kling 3.0 Omni reques
 
 State this before generation; refuse or warn outside it.
 
-| Dimension       | Supported                                                                                                        | Evidence                       |
-| --------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| Length          | 3–10 s per take (Kling's input limit). Longer takes must be split.                                               | Provider limit; tested 5 s     |
-| Resolution      | 720 px or more on each side, up to 2160 px. Output is 1080p (`pro` mode).                                        | Provider limit; tested 720p in |
-| Frame rate      | 24–60 fps in; Kling returns 24 fps at the source length within one frame, so 25/30 fps takes need a conform.     | U1, U2 (25), U3 (29.97)        |
-| Target          | One person, selected by a description plus a point; the face seen at medium size or larger for part of the clip. | U1, U2, U3, G1, G2, G3         |
-| Other people    | Up to five in frame, including one in direct contact with the target.                                            | U2 (five), U1, G2, G4          |
-| Performance     | Talking, laughing, leaning, pointing, drinking, walking, dancing with spins, a jump.                             | U1, U2, G2, G1, U3, G5         |
-| Occlusion       | The target fully hidden behind a pillar and a passer-by, then re-emerging.                                       | G3                             |
-| Interactions    | Hand-holding, a cup to the lips, an object handed over.                                                          | U4, G2, G4                     |
-| Camera          | Locked-off, push-in, backward dolly, pan, orbit, handheld.                                                       | U2, G2, G1, G3, G4, G5         |
-| Aspect          | 16:9 and 9:16; framing is kept.                                                                                  | U5 (9:16)                      |
-| Wardrobe intent | **Reference outfit only.** "Keep the original clothing" is not honoured yet.                                     | G4, U5                         |
-| Character       | Up to four approved reference views; full-body first, then face, then three-quarter.                             | Mara (6 views), Theo (5 views) |
+| Dimension       | Supported                                                                                                          | Evidence                       |
+| --------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------ |
+| Length          | 3–10 s per take (Kling's input limit). Longer takes must be split.                                                 | Provider limit; tested 5 s     |
+| Resolution      | 720 px or more on each side, up to 2160 px; the app enlarges a smaller clip to 720 first. Output is 1080p (`pro`). | Provider limit; tested 720p in |
+| Frame rate      | 24–60 fps in; Kling returns 24 fps at the source length within one frame, so 25/30 fps takes need a conform.       | U1, U2 (25), U3 (29.97)        |
+| Target          | One person, selected by a description plus a point; the face seen at medium size or larger for part of the clip.   | U1, U2, U3, G1, G2, G3         |
+| Other people    | Up to five in frame, including one in direct contact with the target.                                              | U2 (five), U1, G2, G4          |
+| Performance     | Talking, laughing, leaning, pointing, drinking, walking, dancing with spins, a jump.                               | U1, U2, G2, G1, U3, G5         |
+| Occlusion       | The target fully hidden behind a pillar and a passer-by, then re-emerging.                                         | G3                             |
+| Interactions    | Hand-holding, a cup to the lips, an object handed over.                                                            | U4, G2, G4                     |
+| Camera          | Locked-off, push-in, backward dolly, pan, orbit, handheld.                                                         | U2, G2, G1, G3, G4, G5         |
+| Aspect          | 16:9 and 9:16; framing is kept.                                                                                    | U5 (9:16)                      |
+| Wardrobe intent | **Reference outfit only.** "Keep the original clothing" is not honoured yet.                                       | G4, U5                         |
+| Character       | Up to four approved reference views; full-body first, then face, then three-quarter.                               | Mara (6 views), Theo (5 views) |
 
 Outside the envelope until measured: back-view-only targets (U4 failed), targets whose face stays small in a wide shot (G5 failed on likeness), keeping the source clothing (G4 and U5 failed), takes longer than 5 s, real dialogue with lip sync to audio (`keep_original_sound` is wired but untested), more than one recast in a take, and crowds.
 

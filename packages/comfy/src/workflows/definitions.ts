@@ -377,9 +377,14 @@ export const backgroundReplaceWorkflow: WorkflowDefinition<"video.background-rep
     async build(inputs, context) {
       if (inputs.pipeline === "ltx-alpha")
         return ltxAlphaBackgroundRequest(inputs, context);
-      // Kling and Seedance fetch the source clip by URL only.
+      // Kling and Seedance fetch the source clip by URL only. Kling refuses a
+      // clip under its minimum size, so that one is enlarged just enough.
       const source = await context.asset(inputs.source);
-      const videoUrl = await source.fetchableUrl();
+      const videoUrl = await source.fetchableUrl(
+        inputs.pipeline === "seedance"
+          ? {}
+          : { minShortSide: KLING_EDIT_LIMITS.minShortSidePx },
+      );
       const location = context.mentions.find(
         (m) => m.elementId === inputs.location?.elementId,
       );

@@ -110,6 +110,25 @@ export function withoutPerson(text: string, person: number) {
 }
 
 /** The pose model's box kept inside the frame, as the request takes it. */
+/** Room around a pose box, which can stop short of the hair and hands. */
+export function padBox(box: Box, share = 0.08): Box {
+  const padX = box.w * share;
+  const padY = box.h * share;
+  return {
+    x: box.x - padX,
+    y: box.y - padY,
+    w: box.w + 2 * padX,
+    h: box.h + 2 * padY,
+  };
+}
+
+export function clampPoint(point: { x: number; y: number }) {
+  return {
+    x: Math.min(1, Math.max(0, point.x)),
+    y: Math.min(1, Math.max(0, point.y)),
+  };
+}
+
 export function clampBox(box: Box): Box {
   const x = Math.min(1, Math.max(0, box.x));
   const y = Math.min(1, Math.max(0, box.y));

@@ -25,11 +25,11 @@ No Router model conforms or composites on a timeline. A live check (2026-10-17, 
 
 The steps run as ComfyUI graphs on Comfy Cloud (`packages/comfy/src/workflows/media-graphs.ts`), built from core nodes plus ComfyUI-VideoHelperSuite's ffmpeg loader, which Cloud ships:
 
-| Step      | Parts               | What the graph does                                                                                                                                                                         |
-| --------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `lock`    | source, edit, matte | Conforms the edit and the matte as below, then `ImageCompositeMasked` puts the source's own pixels over the edit through the matte's alpha.                                                 |
-| `conform` | source, edit        | `VHS_LoadVideoFFmpeg` resamples the edit to the source's rate (ffmpeg's `fps` filter, nearest frame in time), holds its last frame if it ends early, and trims to the source's frame count. |
-| `square`  | source              | Scales a clip with non-square pixels to its display size. Only for clips the browser could not convert at upload ([below](#square-pixels)).                                                 |
+| Step      | Parts               | What the graph does                                                                                                                                                                                                     |
+| --------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lock`    | source, edit, matte | Conforms the edit and the matte as below, then `ImageCompositeMasked` puts the source's own pixels over the edit through the matte's alpha.                                                                             |
+| `conform` | source, edit        | `VHS_LoadVideoFFmpeg` resamples the edit to the source's rate (ffmpeg's `fps` filter, nearest frame in time), holds its last frame if it ends early, and trims to the source's frame count.                             |
+| `square`  | source              | Scales a clip to its display size with square pixels and, when asked, enlarges it to a minimum short side. For clips the browser could not convert at upload, and clips under Kling's 720 px ([below](#square-pixels)). |
 
 Each step saves one H.264 MP4 at the source's frame rate and frame count, with the source's audio (`CreateVideo`, `SaveVideo`). Bria's matte is VP9 with alpha; VHS decodes it with libvpx and reports the alpha as an inverted mask, which `InvertMask` turns back. The composite scales the matte to the frame itself. Phase 0's one-pixel matte blur is gone: Bria's edge is already soft, and every extra image batch is a full float copy of the clip in Cloud's memory.
 
@@ -40,6 +40,8 @@ Every output is at the source's display size with square pixels. The Comfy stora
 ### Square pixels
 
 A source whose pixels are not square (for example a 639:640 sample aspect, which Kling answers with a bare `provider_error`) is converted in the browser at upload with Mediabunny ([library.md](library.md#upload-path)), so the stored original already has square pixels. A clip the browser could not convert keeps its measured `MediaAsset.pixelAspect`; when the job uploads it to Comfy storage, the asset resolver runs the `square` graph on Comfy Cloud and streams that MP4 instead of the original.
+
+Kling refuses video under 720 px on the short side. Its requests ask the resolver for that minimum (`fetchableUrl({ minShortSide: 720 })`), and a clip below it goes through the same `square` graph, enlarged with Lanczos just enough to reach 720 px, keeping its shape. Clips that already pass, and clips whose size was not measured, are sent as uploaded. The enlarged copy is cached apart from the original, and the conform stage returns the result at the take's own size. A 1024×576, 3 s broadcast clip recast this way on 2026-10-30 (by hand, before the resolver did it) kept everyone but the recast player as shot.
 
 Verified offline in a local ComfyUI 0.41 with VideoHelperSuite (`artifacts/background-job/cloud/small/`), the same checks the earlier ffmpeg container passed: C4 (25 fps, 153 frames) against a 24 fps, 145-frame edit with burned-in frame numbers gives 153 frames at 25 fps with the last two edit frames held, and output frames 50, 100 and 152 show edit frames 48, 96 and 144. The lock of the first live run's parts matches the container's lock at 39 dB PSNR (40 dB at 720p on Cloud), and a 4:3-pixel clip comes back at its 640×360 display size.
 

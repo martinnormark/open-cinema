@@ -23,8 +23,12 @@ export interface ResolvedAsset {
    * An https URL a provider can fetch: `publicUrl` when set, otherwise the
    * bytes uploaded to Comfy's API-node storage (signed for about 24 h). Use it
    * for models that accept media by URL only. Never persist it.
+   *
+   * `minShortSide` is for models that refuse small video (Kling: 720). A clip
+   * whose short side is below it is enlarged on Comfy Cloud, keeping its shape,
+   * just enough to pass; clips that already pass are sent as they are.
    */
-  fetchableUrl(): Promise<string>;
+  fetchableUrl(options?: { minShortSide?: number }): Promise<string>;
 }
 
 export interface BuildContext {

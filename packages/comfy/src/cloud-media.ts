@@ -155,6 +155,8 @@ export async function runCloudMedia(options: {
   operation: MediaOperation;
   parts: readonly CloudMediaPart[];
   pixelAspect?: number | null | undefined;
+  /** `square` only; see MediaGraphOptions.minShortSide. */
+  minShortSide?: number | null | undefined;
   signal: AbortSignal;
   /** Between status reads. */
   pollMs?: number;
@@ -199,6 +201,7 @@ export async function runCloudMedia(options: {
     operation: options.operation,
     files,
     pixelAspect: options.pixelAspect,
+    minShortSide: options.minShortSide,
   });
   // Every loader the graph has was filled from an upload above.
   for (const name of MEDIA_GRAPH_PARTS[options.operation])

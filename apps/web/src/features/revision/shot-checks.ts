@@ -27,6 +27,12 @@ export interface PersonDetection {
   facing: Facing;
   /** Head height from pose keypoints, for faces too small to detect. */
   headHeight: number | null;
+  /**
+   * Where the head is, 0–1 of the frame: the nose, else between the eyes or
+   * ears. A second click there makes SAM 3 take the whole person, not the
+   * shirt under the creator's click.
+   */
+  head: { x: number; y: number } | null;
 }
 
 export interface FaceDetection {
@@ -65,6 +71,7 @@ const KEYPOINT_MIN = 0.35;
 export function facingFromKeypoints(keypoints: readonly Keypoint[]): {
   facing: Facing;
   headHeight: number | null;
+  head: { x: number; y: number } | null;
 } {
   const get = (part: string) => {
     const k = keypoints.find((p) => p.part === part);
@@ -102,7 +109,15 @@ export function facingFromKeypoints(keypoints: readonly Keypoint[]): {
   else if (eyes.length === 2)
     headHeight =
       Math.hypot(eyes[0]!.x - eyes[1]!.x, eyes[0]!.y - eyes[1]!.y) * 2.6;
-  return { facing, headHeight };
+  const middle = (points: readonly Keypoint[]) =>
+    points.length
+      ? {
+          x: points.reduce((sum, k) => sum + k.x, 0) / points.length,
+          y: points.reduce((sum, k) => sum + k.y, 0) / points.length,
+        }
+      : null;
+  const head = nose ? { x: nose.x, y: nose.y } : (middle(eyes) ?? middle(ears));
+  return { facing, headHeight, head };
 }
 
 const area = (b: Box) => Math.max(0, b.w) * Math.max(0, b.h);
@@ -335,7 +350,16 @@ export function preflight(
     if (faceFrames === 0 && largestFace === null) reasons.push("small-face");
     if (reasons.length) verdict = "warn";
   }
-  const marked = track.find((t) => t.person);
+  // The box goes to SAM 3.1 with the mark's time, so it must come from the
+  // sampled frame nearest the mark, not the first frame they were found on.
+  const marked = found.reduce<TrackedFrame | null>(
+    (best, t) =>
+      !best ||
+      Math.abs(t.timeMs - mark.timeMs) < Math.abs(best.timeMs - mark.timeMs)
+        ? t
+        : best,
+    null,
+  );
   return {
     verdict,
     reasons: [...new Set(reasons)],

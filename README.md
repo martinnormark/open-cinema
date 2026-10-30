@@ -77,7 +77,7 @@ bun run setup
 bun run dev
 ```
 
-Vite runs on http://localhost:5173. Development uses the same SQLite, file storage and coordinators as Docker, stored in `.data/`. Run the production build with `bun run build && bun run start` on port 3000.
+Vite runs on http://localhost:5173 and reads `.env`, then `.env.local` (git-ignored, for your keys), from the repository root; variables already set in the shell win. Development uses the same SQLite, file storage and coordinators as Docker, stored in `.data/`. Run the production build with `bun run build && bun run start` on port 3000.
 
 The build prepares the on-device face/pose models used by revision checks. It downloads the pinned pose model when unavailable locally; if the download fails, those optional checks report unavailable.
 

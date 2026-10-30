@@ -157,8 +157,8 @@ export class ShotDetector {
         y: k.positionRaw[1],
         score: k.score,
       }));
-      const { facing, headHeight } = facingFromKeypoints(keypoints);
-      people.push({ box, score: body.score, facing, headHeight });
+      const { facing, headHeight, head } = facingFromKeypoints(keypoints);
+      people.push({ box, score: body.score, facing, headHeight, head });
 
       // Small faces vanish at the detector's input size; look again, closer.
       if (!faceOf(box, faces) && facing !== "back") {

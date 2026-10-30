@@ -267,7 +267,7 @@ export function minimaxH3RecastGraph(o: MinimaxH3RecastOptions): Graph {
 export function castTarget(target: TargetSelection): CastTarget {
   if (target.type !== "person")
     throw new Error("Select the person to recast in the source video");
-  const { point, box } = target;
+  const { point, box, head } = target;
   if (!point && !box)
     throw new Error("Click the person to recast on the frame");
   return {
@@ -277,6 +277,7 @@ export function castTarget(target: TargetSelection): CastTarget {
     ...(box
       ? { box: { x: box.x, y: box.y, w: box.width, h: box.height } }
       : {}),
+    ...(head ? { head: { x: head.x, y: head.y } } : {}),
   };
 }
 

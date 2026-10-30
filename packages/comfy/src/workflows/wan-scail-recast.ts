@@ -29,9 +29,11 @@ import { castTrackNodes, type CastTarget } from "./wan3-cast";
  * 1. The take is loaded on a 24 fps grid, so its frame count, and with it the
  *    run's 81-frame segments, are known when the graph is built.
  * 2. SAM 3.1 tracks the person the creator clicked (the tracker of
- *    ./wan3-cast.ts) and, from that track's first frame, again at the size
- *    SCAIL-2 reads. The template tracks every "human", which would replace
- *    everyone in a shot with several people.
+ *    ./wan3-cast.ts) and again at the size SCAIL-2 reads. That second track
+ *    starts from the clicked frame, put in front of the take: seeded from the
+ *    take's first frame, where the person may be a sliver at the edge, it
+ *    drifted to other people on 2026-10-30 (job 179471b6). The template
+ *    tracks every "human", which would replace everyone in the shot.
  * 3. FLUX 3 Klein redraws the clicked frame with the Character in that
  *    person's place, so SCAIL-2's reference has the Character's face, outfit
  *    and build in the take's own light and scale. SAM 3.1 masks them there.
@@ -75,11 +77,15 @@ export const WAN_SCAIL_RECAST_MEDIA_INPUTS = {
   reference: (i: number) => ({ node: `reference_${i}`, field: "image" }),
 } as const;
 
-/** The recast first (the conform stage reads it), then the tracks and keyframe. */
+/**
+ * The recast first (the conform stage reads it), then the tracks, keyframe and
+ * the masks SCAIL-2 was driven by.
+ */
 export const WAN_SCAIL_RECAST_OUTPUT_NODES = [
   "save_result",
   "save_tracks",
   "save_keyframe",
+  "save_drive_masks",
 ] as const;
 
 /** Frames read from a take of `seconds`, a frame short so the cap never overshoots. */
@@ -213,13 +219,29 @@ export function wanScailRecastGraph(o: WanScailRecastOptions): Graph {
   };
   point("x", o.target.x, keySize[0]);
   point("y", o.target.y, keySize[1]);
+  // The Character stands where the person did, so their head is where the
+  // person's was; with it, the reference mask is the whole Character rather
+  // than the clothing under the click, as in the take's track.
+  const head = o.target.head;
+  if (head) {
+    point("head_x", head.x, keySize[0]);
+    point("head_y", head.y, keySize[1]);
+  }
   graph.key_point = {
     class_type: "StringFormat",
-    inputs: {
-      "values.a": int("key_x"),
-      "values.b": int("key_y"),
-      f_string: '[{{"x": {a}, "y": {b}}}]',
-    },
+    inputs: head
+      ? {
+          "values.a": int("key_x"),
+          "values.b": int("key_y"),
+          "values.c": int("key_head_x"),
+          "values.d": int("key_head_y"),
+          f_string: '[{{"x": {a}, "y": {b}}}, {{"x": {c}, "y": {d}}}]',
+        }
+      : {
+          "values.a": int("key_x"),
+          "values.b": int("key_y"),
+          f_string: '[{{"x": {a}, "y": {b}}}]',
+        },
   };
   graph.key_detect = {
     class_type: "SAM3_Detect",
@@ -263,12 +285,18 @@ export function wanScailRecastGraph(o: WanScailRecastOptions): Graph {
         crop: "disabled",
       },
     },
-    // The clicked person's first-frame mask, at SCAIL-2's size, seeds one
-    // track there; SCAIL-2 reads SAM 3's track data, not a plain mask.
+    // SCAIL-2 reads SAM 3's track data, not a plain mask, so the clicked
+    // person is tracked again at its size. The clicked frame goes first, with
+    // their mask there, so the tracker starts where they are clear and keeps
+    // that frame in memory for the whole take; it is dropped afterwards.
     seed_image: { class_type: "MaskToImage", inputs: { mask: track } },
     seed_first: {
       class_type: "ImageFromBatch",
-      inputs: { image: ["seed_image", 0], batch_index: 0, length: 1 },
+      inputs: {
+        image: ["seed_image", 0],
+        batch_index: int("click_index"),
+        length: 1,
+      },
     },
     seed_fit: {
       class_type: "ImageScale",
@@ -284,10 +312,22 @@ export function wanScailRecastGraph(o: WanScailRecastOptions): Graph {
       class_type: "ImageToMask",
       inputs: { image: ["seed_fit", 0], channel: "red" },
     },
+    drive_seed_frame: {
+      class_type: "ImageFromBatch",
+      inputs: {
+        image: ["pose", 0],
+        batch_index: int("click_index"),
+        length: 1,
+      },
+    },
+    drive_frames: {
+      class_type: "ImageBatch",
+      inputs: { image1: ["drive_seed_frame", 0], image2: ["pose", 0] },
+    },
     drive_track: {
       class_type: "SAM3_VideoTrack",
       inputs: {
-        images: ["pose", 0],
+        images: ["drive_frames", 0],
         model: sam,
         initial_mask: ["seed_mask", 0],
         detection_threshold: 0.5,
@@ -303,6 +343,26 @@ export function wanScailRecastGraph(o: WanScailRecastOptions): Graph {
         object_indices: "",
         sort_by: "left_to_right",
         replacement_mode: true,
+      },
+    },
+    // The take's own frames, without the clicked frame put in front.
+    drive_masks: {
+      class_type: "ImageFromBatch",
+      inputs: { image: ["colour_masks", 0], batch_index: 1, length: 4096 },
+    },
+    drive_masks_video: {
+      class_type: "CreateVideo",
+      inputs: { images: ["drive_masks", 0], fps },
+    },
+    save_drive_masks: {
+      class_type: "SaveVideo",
+      inputs: {
+        video: ["drive_masks_video", 0],
+        filename_prefix: "open_cinema/recast_scail_drive_masks",
+        format: "mp4",
+        "format.codec": "h264",
+        "format.codec.encoding": "re-encode",
+        "format.codec.encoding.crf": 20,
       },
     },
     unet: {
@@ -385,7 +445,7 @@ export function wanScailRecastGraph(o: WanScailRecastOptions): Graph {
       inputs: { image, batch_index: start, length },
     });
     graph[`${s}_pose`] = slice(["pose", 0]);
-    graph[`${s}_mask`] = slice(["colour_masks", 0]);
+    graph[`${s}_mask`] = slice(["drive_masks", 0]);
     graph[`${s}_condition`] = {
       class_type: "WanSCAILToVideo",
       inputs: {

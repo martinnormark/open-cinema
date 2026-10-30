@@ -11,7 +11,8 @@ import type { MediaOperation } from "./types";
  *
  *   lock     source, edit, matte -> the source foreground over the edit
  *   conform  source, edit        -> the edit on the source's frame grid
- *   square   source              -> the source with square pixels
+ *   square   source              -> the source with square pixels, enlarged
+ *                                   to a minimum short side when asked
  *   append   source, edit        -> the source, then the edit on its grid
  *   dub      source, edit        -> the edit as made, with the source's audio
  *
@@ -49,6 +50,11 @@ export interface MediaGraphOptions {
   files: Partial<Record<MediaPartName, string>>;
   /** The source's sample aspect (display width over stored width); 1 when unknown. */
   pixelAspect?: number | null | undefined;
+  /**
+   * `square` only: enlarge the display size, keeping its shape, until its
+   * short side is at least this many pixels. Kling refuses clips under 720.
+   */
+  minShortSide?: number | null | undefined;
 }
 
 type Link = [string, number];
@@ -102,6 +108,12 @@ export function mediaGraph(options: MediaGraphOptions): Graph {
 
   if (operation === "dub") return dubGraph(files.source!, files.edit!);
 
+  const minShortSide =
+    operation === "square" && options.minShortSide ? options.minShortSide : 0;
+  // Values are named a, b in order: a lone `b` blocks the graph on Cloud.
+  const size = { a: ["source_size", 0] as Link, b: ["source_size", 1] as Link };
+  const grow = `max(1, ${minShortSide} / min(a * ${sar}, b))`;
+
   const graph: Graph = {
     source: { class_type: "LoadVideo", inputs: { file: files.source } },
     source_frames: {
@@ -109,12 +121,25 @@ export function mediaGraph(options: MediaGraphOptions): Graph {
       inputs: { video: ["source", 0] },
     },
     source_size: { class_type: "GetImageSize", inputs: { image: frames } },
-    // The display size (what a player shows), even-sized for H.264.
-    width: math(`max(2, round(a * ${sar} / 2) * 2)`, {
-      a: ["source_size", 0],
-    }),
-    height: math("max(2, round(a / 2) * 2)", { a: ["source_size", 1] }),
-    source_fit: fit(frames, width, height),
+    // The display size (what a player shows), even-sized for H.264, and
+    // enlarged only when a minimum short side asks for it.
+    ...(minShortSide
+      ? {
+          width: math(`max(2, round(a * ${sar} * ${grow} / 2) * 2)`, size),
+          height: math(`max(2, round(b * ${grow} / 2) * 2)`, size),
+        }
+      : {
+          width: math(`max(2, round(a * ${sar} / 2) * 2)`, {
+            a: ["source_size", 0],
+          }),
+          height: math("max(2, round(a / 2) * 2)", { a: ["source_size", 1] }),
+        }),
+    source_fit: fit(
+      frames,
+      width,
+      height,
+      minShortSide ? "lanczos" : "bicubic",
+    ),
     video: {
       class_type: "CreateVideo",
       inputs: { images: ["result", 0], fps, audio: ["source_frames", 1] },

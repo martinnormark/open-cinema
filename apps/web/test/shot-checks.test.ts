@@ -29,6 +29,8 @@ test("shoulder order tells a person facing the camera from one walking away", ()
   ]);
   expect(front.facing).toBe("front");
   expect(front.headHeight).toBeCloseTo(0.104, 2);
+  // The head is the nose, so SAM 3 can be given a click on it.
+  expect(front.head).toEqual({ x: 0.5, y: 0.2 });
   // MoveNet still places a nose on the back of a head (U4); shoulders decide.
   const back = facingFromKeypoints([
     kp("nose", 0.5, 0.2, 0.6),
@@ -48,6 +50,7 @@ const person = (
   score: 0.6,
   facing,
   headHeight: null,
+  head: null,
 });
 const face = (x: number, h: number, embedding: number[]): FaceDetection => ({
   box: { x: x + 0.05, y: 0.12, w: h * 0.56, h },
@@ -107,6 +110,19 @@ test("warns when the target's face stays small, and passes a clear medium face",
     reasons: [],
     faceFrames: 10,
   });
+});
+
+test("takes the person's box from the frame nearest the mark", () => {
+  // The target walks right; they are marked on the fourth frame (1750 ms).
+  const walking = scan(
+    Array.from({ length: 6 }, (_, i) => ({
+      people: [person(0.1 + i * 0.1, "front")],
+      faces: [],
+    })),
+  );
+  const result = preflight(walking, { x: 0.5, y: 0.5, timeMs: 1750 });
+  expect(result.tracked).toBe(6);
+  expect(result.box?.x).toBeCloseTo(0.4);
 });
 
 test("says when nobody is under the mark", () => {

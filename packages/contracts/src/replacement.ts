@@ -42,6 +42,8 @@ export const targetSelectionSchema = z.discriminatedUnion("type", [
     type: z.literal("person"),
     point: framePointSchema.optional(),
     box: frameBoxSchema.optional(),
+    /** Their head on the same frame, when the studio's pose model found it. */
+    head: framePointSchema.optional(),
     description: z.string().trim().max(300).optional(),
   }),
   /** A creator-supplied or previously generated alpha matte. */

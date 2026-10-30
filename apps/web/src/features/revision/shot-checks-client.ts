@@ -5,6 +5,7 @@ import {
   personUnder,
   sampleTimes,
   type Box,
+  type PersonDetection,
   type ResultChecks,
   type ShotScan,
 } from "./shot-checks";
@@ -128,6 +129,43 @@ export async function scanClip(url: string, times?: Times): Promise<ShotScan> {
 /** A cut-out's shorter side; Wan 3.0 refuses reference images under 240 px. */
 const CUT_OUT_MIN_SIDE = 512;
 
+/** The clicked frame, and the person the pose model finds under the click. */
+async function personOnFrame(
+  url: string,
+  mark: { x: number; y: number; timeMs: number },
+) {
+  const sampled = await sampleFrames(url, [mark.timeMs]);
+  const frame = sampled.frames[0];
+  if (!frame) throw new Error("That frame could not be read.");
+  let person: PersonDetection | null = null;
+  try {
+    // The worker takes its own copy; the caller keeps this one.
+    const copy = await createImageBitmap(frame.bitmap);
+    const response = await call(
+      { type: "frames", frames: [{ bitmap: copy, timeMs: mark.timeMs }] },
+      [copy],
+    );
+    const people = response.ok ? (response.frames?.[0]?.people ?? []) : [];
+    person = personUnder(people, mark);
+  } catch {
+    // Detection is a help, not a requirement.
+  }
+  return { sampled, frame, person };
+}
+
+/**
+ * The person under a click on that exact frame, or null. The scan's boxes
+ * come from sampled frames, where someone moving fast stands elsewhere.
+ */
+export async function personAt(
+  url: string,
+  mark: { x: number; y: number; timeMs: number },
+): Promise<PersonDetection | null> {
+  const { frame, person } = await personOnFrame(url, mark);
+  frame.bitmap.close();
+  return person;
+}
+
 /**
  * The person under a click, cut out of that frame: found by the pose model
  * when it can, otherwise a person-shaped box around the click. The cut-out
@@ -137,23 +175,9 @@ export async function cutOutPerson(
   url: string,
   mark: { x: number; y: number; timeMs: number },
 ): Promise<{ box: Box; found: boolean; blob: Blob }> {
-  const sampled = await sampleFrames(url, [mark.timeMs]);
-  const frame = sampled.frames[0];
-  if (!frame) throw new Error("That frame could not be read.");
+  const { sampled, frame, person } = await personOnFrame(url, mark);
   const { width, height } = sampled;
-  let box: Box | null = null;
-  try {
-    // The worker takes its own copy; this one is cut from.
-    const copy = await createImageBitmap(frame.bitmap);
-    const response = await call(
-      { type: "frames", frames: [{ bitmap: copy, timeMs: mark.timeMs }] },
-      [copy],
-    );
-    const people = response.ok ? (response.frames?.[0]?.people ?? []) : [];
-    box = personUnder(people, mark)?.box ?? null;
-  } catch {
-    // Detection is a help, not a requirement.
-  }
+  let box = person?.box ?? null;
   const found = box !== null;
   // Unfound: a standing figure around the click, a third of the frame tall.
   box ??= {

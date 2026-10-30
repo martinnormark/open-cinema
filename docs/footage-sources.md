@@ -8,7 +8,7 @@ The recast and background guardrails ([phase0-recast.md](phase0-recast.md#suppor
 
 - one or two people, the target's face at medium size or larger for part of the take;
 - a locked-off or slow camera, no cuts inside the clip;
-- 5 to 10 seconds (Kling takes 3 to 10 s), 9:16, 720 px or more on the short side.
+- 5 to 10 seconds (Kling takes 3 to 10 s), 9:16, 720 px or more on the short side (the app enlarges smaller clips to 720 for Kling, but native resolution looks better).
 
 Many stock "vertical" clips are short edits with several cuts (Coverr's especially). Trim to a single shot before using one.
 

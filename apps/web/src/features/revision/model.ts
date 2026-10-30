@@ -518,10 +518,14 @@ export function checkKlingSource(source: SourceFacts) {
     width !== null &&
     height !== null &&
     Math.min(width, height) < KLING_EDIT_LIMITS.minShortSidePx
-  )
-    problems.push(
-      `Kling needs at least ${KLING_EDIT_LIMITS.minShortSidePx} pixels on the short side; this clip is ${width}×${height}.`,
+  ) {
+    // Matches the job's enlargement (media-graphs.ts): just enough, same shape.
+    const scale = KLING_EDIT_LIMITS.minShortSidePx / Math.min(width, height);
+    const even = (n: number) => Math.round((n * scale) / 2) * 2;
+    notes.push(
+      `This clip is ${width}×${height}, under the ${KLING_EDIT_LIMITS.minShortSidePx} pixels Kling needs on the short side. It is enlarged to ${even(width)}×${even(height)} first; the result comes back at the clip's own size.`,
     );
+  }
   if (
     fps !== null &&
     (fps < KLING_EDIT_LIMITS.minFps || fps > KLING_EDIT_LIMITS.maxFps)

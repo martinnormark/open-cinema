@@ -28,6 +28,8 @@ export async function renderCloudMedia(
   signal: AbortSignal,
   /** The source's sample aspect, when its pixels are not square. */
   pixelAspect?: number | null,
+  /** `square` only: the short side the result must reach, enlarging if needed. */
+  minShortSide?: number | null,
 ): Promise<{ body: ReadableStream<Uint8Array>; size: number }> {
   try {
     return await runCloudMedia({
@@ -44,6 +46,7 @@ export async function renderCloudMedia(
         },
       })),
       pixelAspect,
+      minShortSide,
       signal,
     });
   } catch (error) {

@@ -37,6 +37,7 @@ import {
   DEFAULT_PRESERVATION,
   EXTEND_PIPELINES,
   EXTEND_SECONDS,
+  KLING_EDIT_LIMITS,
   MOMENT_LIMITS,
   MOTION_ENGINES,
   MOTION_LIMITS,
@@ -88,9 +89,10 @@ import {
   useCostPreferences,
 } from "@/features/settings/preferences";
 import { estimateReplacement } from "./estimate";
-import { preflight, type Preflight } from "./shot-checks";
+import { preflight, type PersonDetection, type Preflight } from "./shot-checks";
 import {
   cutOutPerson,
+  personAt,
   requestScan,
   useShotScan,
   type ScanState,
@@ -98,7 +100,9 @@ import {
 import {
   castFromWords,
   clampBox,
+  clampPoint,
   nextPerson,
+  padBox,
   personMention,
   withoutPerson,
   type ClipPerson,
@@ -312,6 +316,11 @@ export function ReplacementStudio({
   const [target, setTarget] = useState<Target | null>(
     draft?.targetPoint ?? null,
   );
+  /** The person the pose model found on the exact frame of that click. */
+  const [marked, setMarked] = useState<{
+    at: Target;
+    person: PersonDetection | null;
+  } | null>(null);
   const [targetNote, setTargetNote] = useState(draft?.draft?.targetNote ?? "");
   const [wardrobe, setWardrobe] = useState<WardrobeIntent>(
     draft?.wardrobe ?? "character",
@@ -523,6 +532,10 @@ export function ReplacementStudio({
         : null,
     [kind, target, scanState],
   );
+  // Their box and head on the clicked frame itself; the scan's box, from the
+  // nearest sampled frame, stands in until that detection lands.
+  const markedPerson = marked && marked.at === target ? marked.person : null;
+  const personBox = markedPerson?.box ?? shotCheck?.box ?? null;
 
   /** Words put something new in the area; otherwise it is cleared. */
   const areaAdds = direction.trim().length >= 3;
@@ -587,13 +600,6 @@ export function ReplacementStudio({
     wardrobeNote.trim().length < 3
   )
     problems.push("Describe the wardrobe, or choose another option.");
-  if (
-    kind === "character" &&
-    !tracked &&
-    clipSeconds !== null &&
-    clipSeconds < 4
-  )
-    problems.push("Recasting needs a clip of at least 4 seconds.");
   if (tracked && !target)
     problems.push(
       "Click the person to recast on the frame; SAM 3.1 follows them from there.",
@@ -1210,8 +1216,10 @@ export function ReplacementStudio({
                                 },
                               }
                             : {}),
-                          // SAM 3.1 takes the whole person from their box.
-                          ...(tracked && target && shotCheck?.box
+                          // SAM 3.1 takes the whole person from their box and
+                          // a second click on their head; the click alone
+                          // gives it the shirt under it.
+                          ...(tracked && target && personBox
                             ? {
                                 box: (({ x, y, w, h }) => ({
                                   x,
@@ -1219,7 +1227,15 @@ export function ReplacementStudio({
                                   width: w,
                                   height: h,
                                   timeMs: target.timeMs,
-                                }))(clampBox(shotCheck.box)),
+                                }))(clampBox(padBox(personBox))),
+                              }
+                            : {}),
+                          ...(tracked && target && markedPerson?.head
+                            ? {
+                                head: {
+                                  ...clampPoint(markedPerson.head),
+                                  timeMs: target.timeMs,
+                                },
                               }
                             : {}),
                           ...(targetNote.trim()
@@ -1406,10 +1422,16 @@ export function ReplacementStudio({
             if (kind === "moves") return tagPerson(next);
             setTarget(next);
             setPendingKey(null);
+            if (kind !== "character" || !source) return;
+            setMarked(null);
+            personAt(source.url, next).then(
+              (person) => setMarked({ at: next, person }),
+              () => setMarked({ at: next, person: null }),
+            );
           }}
           scanOnMark={kind === "character"}
           people={kind === "moves" ? people : []}
-          personBox={shotCheck?.box ?? null}
+          personBox={personBox}
           onMetadata={setMeasured}
           paint={kind === "area"}
           paintKey={maskEpoch}
@@ -2784,8 +2806,7 @@ function RecastMethod({
   const methods = {
     kling: {
       label: "Edit the take",
-      detail:
-        "Kling 3.0 Omni swaps the person and keeps everyone else close to the take. Clips of 4 to 10 seconds, at 1080p.",
+      detail: `Kling 3.0 Omni swaps the person and keeps everyone else close to the take. Clips of ${KLING_EDIT_LIMITS.minSeconds} to ${KLING_EDIT_LIMITS.maxSeconds} seconds.`,
     },
     "minimax-h3": {
       label: "Regenerate the shot",

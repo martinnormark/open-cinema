@@ -74,6 +74,13 @@ export interface CastTarget {
    * the box makes SAM 3 take the whole person.
    */
   box?: { x: number; y: number; w: number; h: number } | undefined;
+  /**
+   * Their head on that frame, 0–1. A box from a frame a moment off, or one
+   * that stops at the shoulders, still left SAM 3 with the shirt under the
+   * click on 2026-10-30; a second positive click on the head gave the whole
+   * person in every combination tried.
+   */
+  head?: { x: number; y: number } | undefined;
 }
 
 export interface Wan3CastOptions {
@@ -286,13 +293,29 @@ export function castTrackNodes(graph: Graph, o: CastTrackOptions): Link[] {
       const t = o.targets[i]!;
       graph[`${p}_x`] = math(`round(${fixed(t.x)} * a)`, { a: width });
       graph[`${p}_y`] = math(`round(${fixed(t.y)} * a)`, { a: height });
+      if (t.head) {
+        graph[`${p}_head_x`] = math(`round(${fixed(t.head.x)} * a)`, {
+          a: width,
+        });
+        graph[`${p}_head_y`] = math(`round(${fixed(t.head.y)} * a)`, {
+          a: height,
+        });
+      }
       graph[`${p}_point`] = {
         class_type: "StringFormat",
-        inputs: {
-          "values.a": int(`${p}_x`),
-          "values.b": int(`${p}_y`),
-          f_string: '[{{"x": {a}, "y": {b}}}]',
-        },
+        inputs: t.head
+          ? {
+              "values.a": int(`${p}_x`),
+              "values.b": int(`${p}_y`),
+              "values.c": int(`${p}_head_x`),
+              "values.d": int(`${p}_head_y`),
+              f_string: '[{{"x": {a}, "y": {b}}}, {{"x": {c}, "y": {d}}}]',
+            }
+          : {
+              "values.a": int(`${p}_x`),
+              "values.b": int(`${p}_y`),
+              f_string: '[{{"x": {a}, "y": {b}}}]',
+            },
       };
       graph[`${p}_detect`] = {
         class_type: "SAM3_Detect",

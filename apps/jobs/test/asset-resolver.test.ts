@@ -17,6 +17,7 @@ import {
 } from "@open-cinema/database/mutations";
 import { createAssetResolver } from "../src/asset-resolver";
 import { mediaLinkExpiry } from "../src/generation-coordinator";
+import { cloudMedia } from "./cloud-media";
 
 const network = setupNetwork();
 beforeAll(() => network.enable());
@@ -121,4 +122,77 @@ it("signs media links that outlive the longest wait in Router's queue", async ()
   expect(mediaLinkExpiry(createdAt, recovered)).toBeGreaterThan(recovered);
   // Fixed per job, so a rebuilt request is identical.
   expect(mediaLinkExpiry(createdAt, deadline)).toBe(expiresAt);
+});
+
+it("enlarges a clip under a model's minimum size on Comfy Cloud, and sends others as they are", async () => {
+  const scope = { ownerId: crypto.randomUUID() };
+  const db = createDatabase(env.DB);
+  const clip = async (width: number, height: number) => {
+    const bytes = new Uint8Array([
+      0,
+      0,
+      0,
+      24,
+      102,
+      116,
+      121,
+      112,
+      width % 256,
+    ]);
+    const id = crypto.randomUUID();
+    const r2Key = `uploads/${scope.ownerId}/${id}`;
+    await env.GENERATED_ASSETS.put(r2Key, bytes, {
+      httpMetadata: { contentType: "video/mp4" },
+    });
+    await createPendingMediaAsset(db, scope, {
+      id,
+      r2Key,
+      filename: "take.mp4",
+      mediaType: "video/mp4",
+      sizeBytes: bytes.length,
+      width,
+      height,
+    });
+    await markMediaAssetReady(db, scope, id, {
+      sizeBytes: bytes.length,
+      etag: "e",
+    });
+    return { id, bytes };
+  };
+  const small = await clip(1024, 576);
+  const large = await clip(1280, 720);
+  const enlarged = new Uint8Array([7, 7, 7, 7]);
+  const cloud = cloudMedia({ square: enlarged });
+  const received: Uint8Array[] = [];
+  network.use(
+    ...cloud.handlers,
+    http.post("https://api.comfy.org/customers/storage", () =>
+      HttpResponse.json({
+        upload_url: `https://storage.test/put/${received.length}`,
+        download_url: `https://storage.test/get/${received.length}`,
+      }),
+    ),
+    http.put("https://storage.test/put/:n", async ({ request }) => {
+      received.push(new Uint8Array(await request.arrayBuffer()));
+      return new HttpResponse(null, { status: 200 });
+    }),
+  );
+  const resolve = createAssetResolver(env, scope, Date.now() + 60_000);
+
+  const smallAsset = await resolve({ type: "media-asset", assetId: small.id });
+  await smallAsset.fetchableUrl({ minShortSide: 720 });
+  expect(cloud.runs).toHaveLength(1);
+  expect(cloud.runs[0]!.operation).toBe("square");
+  expect(cloud.runs[0]!.parts.source).toEqual(small.bytes);
+  expect(JSON.stringify(cloud.runs[0]!.graph.height!.inputs)).toContain(
+    "720 / min(a * 1, b)",
+  );
+  expect(received).toEqual([enlarged]);
+
+  // Without a minimum, the same clip goes as it was uploaded.
+  await smallAsset.fetchableUrl();
+  const largeAsset = await resolve({ type: "media-asset", assetId: large.id });
+  await largeAsset.fetchableUrl({ minShortSide: 720 });
+  expect(cloud.runs).toHaveLength(1);
+  expect(received.slice(1)).toEqual([small.bytes, large.bytes]);
 });

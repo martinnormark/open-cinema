@@ -794,7 +794,10 @@
         "seed_image",
         0
       ],
-      "batch_index": 0,
+      "batch_index": [
+        "click_index",
+        1
+      ],
       "length": 1
     }
   },
@@ -827,11 +830,38 @@
       "channel": "red"
     }
   },
+  "drive_seed_frame": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "pose",
+        0
+      ],
+      "batch_index": [
+        "click_index",
+        1
+      ],
+      "length": 1
+    }
+  },
+  "drive_frames": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "drive_seed_frame",
+        0
+      ],
+      "image2": [
+        "pose",
+        0
+      ]
+    }
+  },
   "drive_track": {
     "class_type": "SAM3_VideoTrack",
     "inputs": {
       "images": [
-        "pose",
+        "drive_frames",
         0
       ],
       "model": [
@@ -861,6 +891,44 @@
       "object_indices": "",
       "sort_by": "left_to_right",
       "replacement_mode": true
+    }
+  },
+  "drive_masks": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "colour_masks",
+        0
+      ],
+      "batch_index": 1,
+      "length": 4096
+    }
+  },
+  "drive_masks_video": {
+    "class_type": "CreateVideo",
+    "inputs": {
+      "images": [
+        "drive_masks",
+        0
+      ],
+      "fps": [
+        "source_fps",
+        0
+      ]
+    }
+  },
+  "save_drive_masks": {
+    "class_type": "SaveVideo",
+    "inputs": {
+      "video": [
+        "drive_masks_video",
+        0
+      ],
+      "filename_prefix": "open_cinema/recast_scail_drive_masks",
+      "format": "mp4",
+      "format.codec": "h264",
+      "format.codec.encoding": "re-encode",
+      "format.codec.encoding.crf": 20
     }
   },
   "unet": {
@@ -989,7 +1057,7 @@
     "class_type": "ImageFromBatch",
     "inputs": {
       "image": [
-        "colour_masks",
+        "drive_masks",
         0
       ],
       "batch_index": 0,
@@ -1109,7 +1177,7 @@
     "class_type": "ImageFromBatch",
     "inputs": {
       "image": [
-        "colour_masks",
+        "drive_masks",
         0
       ],
       "batch_index": 76,

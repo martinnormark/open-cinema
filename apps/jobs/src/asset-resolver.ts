@@ -36,6 +36,25 @@ export function needsSquarePixels(pixelAspect: number | null | undefined) {
 }
 
 /**
+ * A video whose displayed short side is below what a model accepts. Unknown
+ * sizes are sent as they are; the model then answers for itself.
+ */
+export function tooSmall(
+  stored: {
+    mediaType: string;
+    width?: number | null;
+    height?: number | null;
+    pixelAspect?: number | null;
+  },
+  minShortSide: number,
+) {
+  if (!stored.mediaType.startsWith("video/") || !stored.width || !stored.height)
+    return false;
+  const width = stored.width * (stored.pixelAspect ?? 1);
+  return Math.min(width, stored.height) < minShortSide - 0.5;
+}
+
+/**
  * Comfy storage links this job already created, by asset key. A request
  * rebuilt after a lost receipt must reuse them: a new link changes the request,
  * and Router answers a changed request under the same idempotency key with 409.
@@ -63,6 +82,8 @@ export async function storedAsset(
         sizeBytes: own.sizeBytes,
         // Generated outputs have square pixels.
         pixelAspect: null,
+        width: own.width ?? null,
+        height: own.height ?? null,
         posterKey: own.posterKey ?? null,
       };
   }
@@ -109,19 +130,24 @@ export function createAssetResolver(
       });
       publicUrl = `${origin}/api/media/${encodeURIComponent(ref.assetId)}?${query}`;
     }
-    let uploaded: Promise<string> | null = null;
-    const fetchableUrl = () => {
-      if (publicUrl) return Promise.resolve(publicUrl);
-      const cached = uploads?.get(assetRefKey(ref));
+    const uploaded = new Map<string, Promise<string>>();
+    const fetchableUrl = ({ minShortSide }: { minShortSide?: number } = {}) => {
+      const enlarge =
+        minShortSide && tooSmall(stored, minShortSide) ? minShortSide : null;
+      if (publicUrl && !enlarge) return Promise.resolve(publicUrl);
+      // An enlarged copy is its own upload, cached apart from the original.
+      const key = enlarge ? `${assetRefKey(ref)}@${enlarge}` : assetRefKey(ref);
+      const cached = uploads?.get(key) ?? uploaded.get(key);
       if (cached) return Promise.resolve(cached);
-      uploaded ??= (async () => {
+      const upload = (async () => {
         const signal = AbortSignal.timeout(10 * 60_000);
         let body: ReadableStream<Uint8Array>;
         let size: number;
         let contentType = stored.mediaType;
-        if (square) {
-          // Resampled to its display size with square pixels as a Comfy Cloud
-          // graph (packages/comfy/src/workflows/media-graphs.ts).
+        if (square || enlarge) {
+          // Resampled to its display size with square pixels, and enlarged to
+          // the short side asked for, as a Comfy Cloud graph
+          // (packages/comfy/src/workflows/media-graphs.ts).
           ({ body, size } = await renderCloudMedia(
             env,
             "square",
@@ -134,6 +160,7 @@ export function createAssetResolver(
             ],
             signal,
             stored.pixelAspect,
+            enlarge,
           ));
           contentType = "video/mp4";
         } else {
@@ -152,10 +179,11 @@ export function createAssetResolver(
           body,
           signal,
         });
-        uploads?.set(assetRefKey(ref), url);
+        uploads?.set(key, url);
         return url;
       })();
-      return uploaded;
+      uploaded.set(key, upload);
+      return upload;
     };
     return {
       ref,

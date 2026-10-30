@@ -228,6 +228,7 @@ it("recasts on MiniMax H3 as a Cloud graph that tracks the clicked person with S
       ...base.target,
       point: { x: 0.7, y: 0.4, timeMs: 1500 },
       box: { x: 0.55, y: 0.1, width: 0.3, height: 0.85, timeMs: 1500 },
+      head: { x: 0.68, y: 0.18, timeMs: 1500 },
     },
     preservation: { preserve: ["performance", "audio"] },
   });
@@ -256,8 +257,14 @@ it("recasts on MiniMax H3 as a Cloud graph that tracks the clicked person with S
   const detect = Object.values(graph).find(
     (n) => n.class_type === "SAM3_Detect",
   )!;
-  expect(detect.inputs.positive_coords).toBeDefined();
   expect(detect.inputs.bboxes).toBeDefined();
+  // The click and their head, both positive: a click alone gives the shirt.
+  const points = graph[(detect.inputs.positive_coords as [string, number])[0]]!;
+  expect(points.inputs.f_string).toBe(
+    '[{{"x": {a}, "y": {b}}}, {{"x": {c}, "y": {d}}}]',
+  );
+  const head = graph[(points.inputs["values.c"] as [string, number])[0]]!;
+  expect(head.inputs.expression).toBe("round(0.68 * a)");
   const condition = graph.condition!.inputs;
   expect(condition["ref_videos.ref_video_0"]).toEqual(["source", 0]);
   expect(condition["ref_videos.ref_video_1"]).toEqual(["tracks_frames", 0]);
@@ -322,7 +329,11 @@ it("recasts on Wan SCAIL-2 as a Cloud graph from a click and a Klein keyframe", 
     ...base,
     pipeline: "wan-scail2",
     seconds: 6.1,
-    target: { ...base.target, point: { x: 0.7, y: 0.4, timeMs: 1500 } },
+    target: {
+      ...base.target,
+      point: { x: 0.7, y: 0.4, timeMs: 1500 },
+      head: { x: 0.68, y: 0.18, timeMs: 1500 },
+    },
     preservation: { preserve: ["performance", "audio"] },
   });
   expect(definition.provider?.(inputs)).toBe("cloud-workflow");
@@ -346,11 +357,19 @@ it("recasts on Wan SCAIL-2 as a Cloud graph from a click and a Klein keyframe", 
     force_rate: 24,
     frame_load_cap: 145,
   });
-  // Only the clicked person is replaced, seeded from their own track.
+  // Only the clicked person is replaced, tracked from the clicked frame put
+  // in front of the take, which is dropped from the masks SCAIL-2 reads.
+  expect(graph.seed_first!.inputs.batch_index).toEqual(["click_index", 1]);
+  expect(graph.drive_frames!.inputs.image1).toEqual(["drive_seed_frame", 0]);
   expect(graph.drive_track!.inputs).toMatchObject({
+    images: ["drive_frames", 0],
     initial_mask: ["seed_mask", 0],
     max_objects: 1,
   });
+  expect(graph.drive_masks!.inputs).toMatchObject({ batch_index: 1 });
+  expect(graph.segment_0_mask!.inputs.image).toEqual(["drive_masks", 0]);
+  // The keyframe's mask takes the whole Character: the click and the head.
+  expect(graph.key_point!.inputs["values.d"]).toEqual(["key_head_y", 1]);
   expect(graph.colour_masks!.inputs.replacement_mode).toBe(true);
   // The second segment continues from the first.
   expect(graph.segment_1_condition!.inputs).toMatchObject({

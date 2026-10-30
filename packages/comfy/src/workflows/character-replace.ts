@@ -182,8 +182,11 @@ export async function characterReplaceRequest(
   const source = await context.asset(inputs.source);
   if (!source.mediaType.startsWith("video/"))
     throw new Error("Recasting needs a source video");
-  // Kling fetches the edited video itself; it accepts no inline video.
-  const videoUrl = await source.fetchableUrl();
+  // Kling fetches the edited video itself; it accepts no inline video, and a
+  // clip under its minimum size is enlarged just enough on the way.
+  const videoUrl = await source.fetchableUrl({
+    minShortSide: KLING_EDIT_LIMITS.minShortSidePx,
+  });
 
   const keepSourceWardrobe = inputs.preservation.preserve.includes("wardrobe");
   const refs = [
