@@ -1,4 +1,9 @@
 import {
+  characterSheetGraph,
+  CHARACTER_SHEET_OUTPUTS,
+} from "./character-sheet";
+import { characterSheetInputsSchema } from "@open-cinema/contracts";
+import {
   CAMERA_MOVES,
   REFRAME_ASPECTS,
   RESTAGE_ANGLES,
@@ -514,8 +519,58 @@ function recast(): WorkflowExport {
   };
 }
 
+function characterSheet(
+  variant: "generate" | "state" | "edit" | "portrait" | "smile",
+): WorkflowExport {
+  const reference = {
+    type: "media-asset" as const,
+    assetId: "approved-portrait",
+  };
+  const inputs = characterSheetInputsSchema.parse({
+    prompt:
+      "Mara, a lighthouse keeper in her late thirties, olive skin, short dark hair, wearing a navy wool sweater, tan trousers and black boots",
+    shot: variant === "portrait" || variant === "smile" ? variant : "sheet",
+    ...(variant === "state"
+      ? {
+          state: {
+            name: "Wet",
+            description: "Rain-soaked hair and visibly drenched clothing",
+          },
+          references: [reference],
+        }
+      : {}),
+    ...(variant === "edit"
+      ? {
+          source: reference,
+          edit: "Change only the sweater to forest green in every view",
+        }
+      : {}),
+  });
+  const graph = characterSheetGraph(inputs);
+  return {
+    file: `character-sheet/${variant}.api.json`,
+    title: `Character reference: ${variant}`,
+    usedBy: "image.character-sheet",
+    outputs: CHARACTER_SHEET_OUTPUTS,
+    ...withFiles(
+      graph,
+      variant === "state" || variant === "edit"
+        ? [
+            [
+              { node: "10", field: "image" },
+              variant === "edit" ? "source-sheet.png" : "approved-portrait.png",
+            ],
+          ]
+        : [],
+    ),
+  };
+}
+
 export function workflowExports(): WorkflowExport[] {
   return [
+    ...(["generate", "state", "edit", "portrait", "smile"] as const).map(
+      characterSheet,
+    ),
     media("lock"),
     media("conform"),
     media("square"),

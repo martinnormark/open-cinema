@@ -1,5 +1,73 @@
 [
   {
+    "file": "character-sheet/generate.api.json",
+    "title": "Character reference: generate",
+    "usedBy": "image.character-sheet",
+    "inputs": [],
+    "outputs": [
+      "100"
+    ],
+    "models": [
+      "mediapipe_face_fp32.safetensors"
+    ]
+  },
+  {
+    "file": "character-sheet/state.api.json",
+    "title": "Character reference: state",
+    "usedBy": "image.character-sheet",
+    "inputs": [
+      {
+        "node": "10",
+        "field": "image",
+        "file": "approved-portrait.png"
+      }
+    ],
+    "outputs": [
+      "100"
+    ],
+    "models": [
+      "mediapipe_face_fp32.safetensors"
+    ]
+  },
+  {
+    "file": "character-sheet/edit.api.json",
+    "title": "Character reference: edit",
+    "usedBy": "image.character-sheet",
+    "inputs": [
+      {
+        "node": "10",
+        "field": "image",
+        "file": "source-sheet.png"
+      }
+    ],
+    "outputs": [
+      "100"
+    ],
+    "models": [
+      "mediapipe_face_fp32.safetensors"
+    ]
+  },
+  {
+    "file": "character-sheet/portrait.api.json",
+    "title": "Character reference: portrait",
+    "usedBy": "image.character-sheet",
+    "inputs": [],
+    "outputs": [
+      "100"
+    ],
+    "models": []
+  },
+  {
+    "file": "character-sheet/smile.api.json",
+    "title": "Character reference: smile",
+    "usedBy": "image.character-sheet",
+    "inputs": [],
+    "outputs": [
+      "100"
+    ],
+    "models": []
+  },
+  {
     "file": "media/lock.api.json",
     "title": "Lock the performers: source foreground over the edit",
     "usedBy": "video.background-replace, as-shot variant (lock stage)",

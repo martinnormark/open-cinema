@@ -242,7 +242,8 @@ function compatState(status: unknown): JobState {
 function hasPartnerNode(graph: unknown) {
   return Object.values(graph as Record<string, { class_type?: unknown }>).some(
     (node) =>
-      typeof node?.class_type === "string" && /Api$/.test(node.class_type),
+      typeof node?.class_type === "string" &&
+      (/Api$/.test(node.class_type) || node.class_type === "Flux3ImageNode"),
   );
 }
 

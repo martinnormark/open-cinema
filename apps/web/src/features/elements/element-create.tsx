@@ -431,7 +431,7 @@ export function ElementCreate({
                 </span>
                 <span className="block text-xs leading-5 text-muted-foreground">
                   {canExplore
-                    ? `Generates the ${anchor.label.toLowerCase()} first. Once you approve it, the rest of the sheet is made to match it in one step. FLUX 3 Image · uses your Comfy Router credits.`
+                    ? `Generates the ${anchor.label.toLowerCase()} first. Once you approve it, the rest of the sheet is made to match it in one step. ${type === "character" ? "FLUX 3 Image workflow · uses your Comfy Cloud credits." : "FLUX 3 Image · uses your Comfy Router credits."}`
                     : "Add a description to explore generated looks."}
                 </span>
               </span>

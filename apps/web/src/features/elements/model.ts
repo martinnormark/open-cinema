@@ -2,6 +2,7 @@
  * guidance, sheet review and prompts for complementary views. */
 import type {
   AssetRef,
+  CharacterSheetInputs,
   Element,
   ElementReference,
   ElementState,
@@ -23,7 +24,6 @@ import type {
   ImageResolution,
   StateKind,
 } from "@open-cinema/contracts";
-import { characterShotPrompt, type CharacterShot } from "./sheet-prompt";
 
 export type {
   Element,
@@ -46,8 +46,8 @@ export interface GuidanceSlot {
   required: boolean;
   /** Framing appended to the identity description for complementary views. */
   framing: string;
-  /** Character views follow the sheet rules in sheet-prompt.ts instead. */
-  shot?: CharacterShot;
+  /** Character views use the ComfyUI character-sheet workflow's prompt template. */
+  shot?: CharacterSheetInputs["shot"];
   /** A Location's moving reference: a short clip of the empty place. */
   move?: MovingView;
   /**
@@ -133,7 +133,7 @@ export const elementTypes: Record<ElementType, ElementTypeInfo> = {
       {
         id: "sheet",
         label: "Character sheet",
-        hint: "Front and back full body beside a large portrait. The bodies lose their heads, so the face only comes from the portrait.",
+        hint: "Front and back full body beside a large portrait. The front face is blanked in the workflow, so facial detail comes from the close portrait.",
         required: true,
         framing: "",
         shot: "sheet",
@@ -447,18 +447,12 @@ function hasBaseMove(element: Element) {
 }
 
 /** Prompt for a complementary reference view of the Element or one of its states. */
-export function viewPrompt(
+function viewPrompt(
   element: Element,
   slot: GuidanceSlot,
   state: ElementState | null,
   guided = false,
 ): string {
-  if (slot.shot)
-    return characterShotPrompt(slot.shot, {
-      identity: element.description.trim() || `A person called ${element.name}`,
-      state,
-      guided,
-    });
   const subject =
     element.description.trim() ||
     `${elementTypes[element.type].label} ${element.name}`;
@@ -583,6 +577,19 @@ export function viewRequest(
 ): GenerationRequest {
   if (slot.move) return moveRequest(element, slot, state);
   const references = conditioningReferences(element, state, 6, slot);
+  if (element.type === "character" && slot.shot) {
+    return generationRequestSchema.parse({
+      workflowKind: "image.character-sheet",
+      inputs: {
+        prompt: element.description.trim() || `A person called ${element.name}`,
+        shot: slot.shot,
+        ...(state
+          ? { state: { name: state.name, description: state.description } }
+          : {}),
+        references,
+      },
+    });
+  }
   const guided = references.length > 0;
   const prompt = viewPrompt(element, slot, state, guided);
   const size = {
@@ -593,17 +600,15 @@ export function viewRequest(
     ? generationRequestSchema.parse({
         workflowKind: "image.flux-reference",
         inputs: {
-          prompt: slot.shot
-            ? prompt
-            : slot.closeUp
-              ? `${prompt} The materials and finish match the ${SUBJECT_NOUN[element.type]} in the reference images.`.slice(
-                  0,
-                  2000,
-                )
-              : `Same ${SUBJECT_NOUN[element.type]} as the reference images. ${prompt}`.slice(
-                  0,
-                  2000,
-                ),
+          prompt: slot.closeUp
+            ? `${prompt} The materials and finish match the ${SUBJECT_NOUN[element.type]} in the reference images.`.slice(
+                0,
+                2000,
+              )
+            : `Same ${SUBJECT_NOUN[element.type]} as the reference images. ${prompt}`.slice(
+                0,
+                2000,
+              ),
           ...size,
           references,
         },

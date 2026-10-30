@@ -1,0 +1,242 @@
+{
+  "1": {
+    "class_type": "PrimitiveStringMultiline",
+    "inputs": {
+      "value": "Mara, a lighthouse keeper in her late thirties, olive skin, short dark hair, wearing a navy wool sweater, tan trousers and black boots"
+    },
+    "_meta": {
+      "title": "Character identity from the UI"
+    }
+  },
+  "2": {
+    "class_type": "PrimitiveStringMultiline",
+    "inputs": {
+      "value": "Base appearance"
+    },
+    "_meta": {
+      "title": "State direction from the UI"
+    }
+  },
+  "3": {
+    "class_type": "PrimitiveStringMultiline",
+    "inputs": {
+      "value": "Create this reference view"
+    },
+    "_meta": {
+      "title": "Edit instructions from the UI"
+    }
+  },
+  "4": {
+    "class_type": "StringFormat",
+    "inputs": {
+      "values.a": [
+        "1",
+        0
+      ],
+      "values.b": [
+        "2",
+        0
+      ],
+      "values.c": [
+        "3",
+        0
+      ],
+      "f_string": "Identity: {a}. State: {b}.\nExactly three equal vertical panels, side by side in one wide image. Left third: one full body directly facing camera, head to shoes, standing straight, hands empty and relaxed. Middle third: the same full body directly from behind, head to shoes, face not visible. Right third: one large sharp three-quarter face close-up, head and shoulders, neutral expression, mouth closed. Same person, clothing and proportions in every panel. Keep each view entirely inside its third, no borders or gutters.\nPlain seamless neutral grey backdrop (#808080), soft even diffused light, no hard shadows, no blown-out highlights. No studio, no equipment, no walls, no props, no text, no labels. Photorealistic photograph."
+    },
+    "_meta": {
+      "title": "Character reference prompt template v1"
+    }
+  },
+  "20": {
+    "class_type": "Flux3ImageNode",
+    "inputs": {
+      "prompt": [
+        "4",
+        0
+      ],
+      "aspect_ratio": "21:9",
+      "resolution": "1.5K",
+      "grounding": false,
+      "safety_tolerance": 4,
+      "seed": 42
+    },
+    "_meta": {
+      "title": "FLUX 3 Image: generate or edit"
+    }
+  },
+  "30": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "20",
+        0
+      ],
+      "upscale_method": "lanczos",
+      "width": 2352,
+      "height": 1008,
+      "crop": "disabled"
+    },
+    "_meta": {
+      "title": "Normalize the 21:9 sheet"
+    }
+  },
+  "31": {
+    "class_type": "ImageCropV2",
+    "inputs": {
+      "image": [
+        "30",
+        0
+      ],
+      "crop_region": {
+        "x": 0,
+        "y": 0,
+        "width": 784,
+        "height": 1008
+      }
+    },
+    "_meta": {
+      "title": "Front panel only"
+    }
+  },
+  "32": {
+    "class_type": "LoadMediaPipeFaceLandmarker",
+    "inputs": {
+      "model_name": "mediapipe_face_fp32.safetensors"
+    },
+    "_meta": {
+      "title": "Front-face detector"
+    }
+  },
+  "33": {
+    "class_type": "MediaPipeFaceLandmarker",
+    "inputs": {
+      "face_detection_model": [
+        "32",
+        0
+      ],
+      "image": [
+        "39",
+        0
+      ],
+      "detector_variant": "both",
+      "num_faces": 1,
+      "min_confidence": 0.5,
+      "missing_frame_fallback": "empty"
+    },
+    "_meta": {
+      "title": "Find faces only in the front panel"
+    }
+  },
+  "34": {
+    "class_type": "MediaPipeFaceMask",
+    "inputs": {
+      "face_landmarks": [
+        "33",
+        0
+      ],
+      "regions": "all"
+    },
+    "_meta": {
+      "title": "Remove facial features"
+    }
+  },
+  "35": {
+    "class_type": "GrowMask",
+    "inputs": {
+      "mask": [
+        "34",
+        0
+      ],
+      "expand": 8,
+      "tapered_corners": true
+    },
+    "_meta": {
+      "title": "Cover the edge of the face"
+    }
+  },
+  "36": {
+    "class_type": "EmptyImage",
+    "inputs": {
+      "width": 784,
+      "height": 256,
+      "batch_size": 1,
+      "color": 8421504
+    },
+    "_meta": {
+      "title": "Neutral grey face replacement"
+    }
+  },
+  "37": {
+    "class_type": "ImageCompositeMasked",
+    "inputs": {
+      "destination": [
+        "31",
+        0
+      ],
+      "source": [
+        "36",
+        0
+      ],
+      "mask": [
+        "35",
+        0
+      ],
+      "x": 0,
+      "y": 0,
+      "resize_source": false
+    },
+    "_meta": {
+      "title": "Blank the front face"
+    }
+  },
+  "38": {
+    "class_type": "ImageCompositeMasked",
+    "inputs": {
+      "destination": [
+        "30",
+        0
+      ],
+      "source": [
+        "37",
+        0
+      ],
+      "x": 0,
+      "y": 0,
+      "resize_source": false
+    },
+    "_meta": {
+      "title": "Restore front; preserve rear and close-up"
+    }
+  },
+  "39": {
+    "class_type": "ImageCropV2",
+    "inputs": {
+      "image": [
+        "31",
+        0
+      ],
+      "crop_region": {
+        "x": 0,
+        "y": 0,
+        "width": 784,
+        "height": 256
+      }
+    },
+    "_meta": {
+      "title": "Limit face detection to the top of the standing figure"
+    }
+  },
+  "100": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": [
+        "38",
+        0
+      ],
+      "filename_prefix": "open_cinema_character_sheet"
+    },
+    "_meta": {
+      "title": "Finished reference ready for review"
+    }
+  }
+}

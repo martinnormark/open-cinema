@@ -2,6 +2,7 @@ import { useMemo, useSyncExternalStore } from "react";
 import {
   isActiveJob,
   type GenerationRequest,
+  type AssetRef,
   type Job,
 } from "@open-cinema/contracts";
 import { estimateGeneration } from "@open-cinema/comfy/estimates";
@@ -24,7 +25,7 @@ import type {
   GuidanceSlot,
   ReferenceView,
 } from "./model";
-import { viewRequest } from "./model";
+import { elementTypes, viewRequest } from "./model";
 import { reloadElements } from "./store";
 
 export interface JobView {
@@ -178,6 +179,10 @@ export async function generateViews(
   let submitted = 0;
   for (const slot of slots) {
     const request = viewRequest(element, slot, state);
+    if (request.workflowKind === "image.character-sheet")
+      request.inputs.cacheNonce = crypto.getRandomValues(
+        new Uint32Array(1),
+      )[0]!;
     const result = await submitWorkflow({
       data: { idempotencyKey: crypto.randomUUID(), request },
     });
@@ -206,6 +211,8 @@ export async function generateViews(
 
 /** What one view request runs on, in words. */
 function requestModel(request: GenerationRequest) {
+  if (request.workflowKind === "image.character-sheet")
+    return "FLUX 3 Image · ComfyUI workflow";
   if (request.workflowKind !== "video.ltx") return "FLUX 3 Image";
   return request.inputs.firstFrame
     ? "FLUX 3 Video, continuing from the establishing view"
@@ -222,11 +229,12 @@ export function describeViewRequests(
 ) {
   const parts = [...new Set(requests.map(requestModel))];
   const guides = requests.flatMap((r) =>
-    r.workflowKind === "image.flux-reference"
+    r.workflowKind === "image.flux-reference" ||
+    r.workflowKind === "image.character-sheet"
       ? [r.inputs.references.length]
       : [],
   );
-  if (guides.length) {
+  if (guides.some((count) => count > 0)) {
     const n = Math.max(...guides);
     parts.push(
       `guided by ${n} approved ${n === 1 ? "reference" : "references"}`,
@@ -251,6 +259,55 @@ export function describeViewRequests(
     parts.push(
       `about ${formatCost(credits, preferences.unit)}, ${Math.round(seconds.min)}–${Math.round(seconds.max)} s`,
     );
-  } else parts.push("uses your Comfy Router credits");
+  } else
+    parts.push(
+      requests.some((r) => r.workflowKind === "image.character-sheet")
+        ? "uses your Comfy Cloud credits"
+        : "uses your Comfy Router credits",
+    );
   return parts.join(" · ");
+}
+
+/** Keep the source approved until the creator accepts the new edit. */
+export async function editCharacterReference(
+  element: Element,
+  view: ReferenceView,
+  stateId: string | null,
+  source: AssetRef,
+  edit: string,
+) {
+  const slot = elementTypes.character.slots.find((s) => s.id === view);
+  if (!slot?.shot)
+    throw new Error("Choose a character sheet or close portrait to edit");
+  const state = element.states.find((s) => s.id === stateId) ?? null;
+  const original = viewRequest(element, slot, state);
+  if (original.workflowKind !== "image.character-sheet")
+    throw new Error("Choose a character reference");
+  const request: GenerationRequest = {
+    ...original,
+    inputs: {
+      ...original.inputs,
+      source,
+      edit,
+      references: [],
+      cacheNonce: crypto.getRandomValues(new Uint32Array(1))[0]!,
+    },
+  };
+  const result = await submitWorkflow({
+    data: { idempotencyKey: crypto.randomUUID(), request },
+  });
+  if (!result.ok) throw new Error(result.error);
+  acceptSnapshot(result.snapshot);
+  if (result.jobId)
+    writePending([
+      ...readPending(),
+      {
+        jobId: result.jobId,
+        elementId: element.id,
+        stateId,
+        view,
+        prompt: edit,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
 }

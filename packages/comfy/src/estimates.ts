@@ -285,6 +285,13 @@ export function estimateGeneration(
   options: { references?: number | undefined } = {},
 ): GenerationEstimate {
   switch (request.workflowKind) {
+    case "image.character-sheet":
+      return {
+        credits: null,
+        seconds: { min: 30, max: 300 },
+        basis: "heuristic",
+        note: "Uses Comfy Cloud credits for FLUX 3 Image and face masking; the exact charge is not available in advance.",
+      };
     case "image.flux":
     case "image.flux-reference": {
       const [low, high] = FLUX_GPU_SECONDS[request.inputs.resolution];

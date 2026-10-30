@@ -1,0 +1,80 @@
+{
+  "1": {
+    "class_type": "PrimitiveStringMultiline",
+    "inputs": {
+      "value": "Mara, a lighthouse keeper in her late thirties, olive skin, short dark hair, wearing a navy wool sweater, tan trousers and black boots"
+    },
+    "_meta": {
+      "title": "Character identity from the UI"
+    }
+  },
+  "2": {
+    "class_type": "PrimitiveStringMultiline",
+    "inputs": {
+      "value": "Base appearance"
+    },
+    "_meta": {
+      "title": "State direction from the UI"
+    }
+  },
+  "3": {
+    "class_type": "PrimitiveStringMultiline",
+    "inputs": {
+      "value": "Create this reference view"
+    },
+    "_meta": {
+      "title": "Edit instructions from the UI"
+    }
+  },
+  "4": {
+    "class_type": "StringFormat",
+    "inputs": {
+      "values.a": [
+        "1",
+        0
+      ],
+      "values.b": [
+        "2",
+        0
+      ],
+      "values.c": [
+        "3",
+        0
+      ],
+      "f_string": "Identity: {a}. State: {b}.\nOne sharp three-quarter close portrait, head and shoulders filling the frame, eyes toward camera, neutral expression, mouth closed. No collage.\nPlain seamless neutral grey backdrop (#808080), soft even diffused light, no hard shadows, no blown-out highlights. No studio, no equipment, no walls, no props, no text, no labels. Photorealistic photograph."
+    },
+    "_meta": {
+      "title": "Character reference prompt template v1"
+    }
+  },
+  "20": {
+    "class_type": "Flux3ImageNode",
+    "inputs": {
+      "prompt": [
+        "4",
+        0
+      ],
+      "aspect_ratio": "3:4",
+      "resolution": "1K",
+      "grounding": false,
+      "safety_tolerance": 4,
+      "seed": 42
+    },
+    "_meta": {
+      "title": "FLUX 3 Image: generate or edit"
+    }
+  },
+  "100": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": [
+        "20",
+        0
+      ],
+      "filename_prefix": "open_cinema_character_portrait"
+    },
+    "_meta": {
+      "title": "Finished reference ready for review"
+    }
+  }
+}

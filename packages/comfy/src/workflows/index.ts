@@ -1,3 +1,4 @@
+import { characterSheetWorkflow } from "./character-sheet";
 import type { WorkflowKind } from "@open-cinema/contracts";
 import {
   backgroundReplaceWorkflow,
@@ -159,6 +160,7 @@ type Registry = { [K in WorkflowKind]?: WorkflowDefinition<K> };
  * the coordinator needs no change. Unregistered kinds are rejected at submission.
  */
 const registry: Registry = {
+  "image.character-sheet": characterSheetWorkflow,
   "image.flux": fluxImageWorkflow,
   "image.flux-reference": fluxReferenceWorkflow,
   "video.ltx": ltxVideoWorkflow,

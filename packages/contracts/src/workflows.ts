@@ -67,6 +67,29 @@ export const fluxReferenceInputsSchema = fluxImageInputsSchema.extend({
 });
 export type FluxReferenceInputs = z.infer<typeof fluxReferenceInputsSchema>;
 
+/** A versioned ComfyUI character workflow; prompt is the creator's identity text. */
+export const characterSheetInputsSchema = z
+  .object({
+    prompt,
+    shot: z.enum(["sheet", "portrait", "smile"]).default("sheet"),
+    /** Cache invalidation only; FLUX 3 chooses its own random seed. */
+    cacheNonce: z.number().int().min(0).max(4294967295).default(42),
+    state: z
+      .object({
+        name: z.string().trim().min(1).max(100),
+        description: z.string().trim().max(2000),
+      })
+      .optional(),
+    references: z.array(assetRefSchema).max(6).default([]),
+    source: assetRefSchema.optional(),
+    edit: z.string().trim().min(3).max(1000).optional(),
+    mentions,
+  })
+  .refine((v) => Boolean(v.source) === Boolean(v.edit), {
+    message: "An edit needs both a source image and edit instructions",
+  });
+export type CharacterSheetInputs = z.infer<typeof characterSheetInputsSchema>;
+
 export const videoResolutionSchema = z.enum([
   "1280x720",
   "720x1280",
@@ -355,6 +378,7 @@ export type ReframeInputs = z.infer<typeof reframeInputsSchema>;
 
 export const workflowInputsSchemas = {
   "image.flux": fluxImageInputsSchema,
+  "image.character-sheet": characterSheetInputsSchema,
   "image.flux-reference": fluxReferenceInputsSchema,
   "video.ltx": ltxVideoInputsSchema,
   "video.reference": referenceVideoInputsSchema,
@@ -377,6 +401,10 @@ export type WorkflowInputs<K extends WorkflowKind = WorkflowKind> = z.infer<
 
 /** A typed generation request: the workflow kind plus its validated inputs. */
 export const generationRequestSchema = z.discriminatedUnion("workflowKind", [
+  z.object({
+    workflowKind: z.literal("image.character-sheet"),
+    inputs: characterSheetInputsSchema,
+  }),
   z.object({
     workflowKind: z.literal("image.flux"),
     inputs: fluxImageInputsSchema,
@@ -466,6 +494,11 @@ export function requestAssetRefs(request: GenerationRequest): AssetRef[] {
       return request.inputs.firstFrame ? [request.inputs.firstFrame] : [];
     case "image.flux-reference":
       return request.inputs.references;
+    case "image.character-sheet":
+      return [
+        ...(request.inputs.source ? [request.inputs.source] : []),
+        ...request.inputs.references,
+      ];
     case "video.background-replace":
       return [
         request.inputs.source,
@@ -575,6 +608,12 @@ export interface WorkflowDescriptor {
 }
 
 export const WORKFLOW_DESCRIPTORS = {
+  "image.character-sheet": {
+    kind: "image.character-sheet",
+    label: "Character reference",
+    output: "image",
+    models: ["comfy-cloud/character-sheet-v1"],
+  },
   "image.flux": {
     kind: "image.flux",
     label: "Image",

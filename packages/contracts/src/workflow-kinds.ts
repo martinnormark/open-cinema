@@ -3,6 +3,7 @@ import { z } from "zod";
 /** The studio's supported generation workflows; each maps to one provider request builder. */
 export const workflowKindSchema = z.enum([
   "image.flux",
+  "image.character-sheet",
   "image.flux-reference",
   "video.ltx",
   "video.reference",

@@ -23,6 +23,11 @@ const cloud = (maker: string): ModelCard => ({
 
 export const MODEL_CARDS: Record<string, ModelCard> = {
   "FLUX 3 Image": router("Black Forest Labs"),
+  "FLUX 3 Image · character workflow": {
+    maker: "Black Forest Labs",
+    weights: "hosted",
+    runsOn: "Comfy Cloud",
+  },
   "FLUX 3 Image Klein": cloud("Black Forest Labs"),
   "FLUX 3 Video": router("Black Forest Labs"),
   "LTX 2.5": router("Lightricks"),

@@ -1,4 +1,4 @@
-import { Suspense, use, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   AlertTriangle,
@@ -32,6 +32,7 @@ import { cn } from "@/lib/utils";
 import { useCostPreferences } from "@/features/settings/preferences";
 import {
   generateViews,
+  editCharacterReference,
   retagPendingView,
   settlePendingView,
   useJobViews,
@@ -72,7 +73,6 @@ import {
 import { MediaPicker, uploadFiles, type AssetRef } from "@/features/library";
 import { ConfirmDelete } from "./confirm-delete";
 import { SessionRequired, typeIcons } from "./visuals";
-import { headlessSheet } from "./headless";
 import { CharacterLooks } from "./state-sheets";
 import { MovingReference } from "./moving-reference";
 import { mentionOf, NextStepPanel, useInStudio } from "./next-step";
@@ -1235,6 +1235,12 @@ function SavedReference({
           </>
         )}
       </div>
+      <CharacterReferenceEdit
+        element={element}
+        view={reference.view}
+        stateId={reference.stateId}
+        source={reference.asset}
+      />
     </figure>
   );
 }
@@ -1267,28 +1273,15 @@ function PendingReference({
   const output = job?.output ?? null;
   const failed = !!job && !job.active && !output;
   const replaces = replacedBy(element, view.stateId, view.view);
-  // A generated sheet still has its heads; the headless copy is what is kept.
-  const sheet =
-    output && view.view === "sheet" && element.type === "character"
-      ? headlessSheet(output.url, `${element.name} character sheet`)
-      : null;
-
   async function decide(status: "approved" | "rejected") {
     if (!output) return;
     setBusy(true);
     try {
-      let asset: AssetRef = {
+      const asset: AssetRef = {
         type: "job-output",
         jobId: output.jobId,
         outputId: output.outputId,
       };
-      if (sheet && status === "approved") {
-        const edited = await sheet;
-        if ("error" in edited) throw new Error(edited.error);
-        const [stored] = await uploadFiles([edited.file]);
-        if (!stored) throw new Error("The headless sheet could not be saved.");
-        asset = stored.ref;
-      }
       const input = {
         elementId: element.id,
         ...(view.stateId ? { stateId: view.stateId } : {}),
@@ -1315,11 +1308,7 @@ function PendingReference({
         )}
       >
         {output ? (
-          sheet ? (
-            <Suspense fallback={<PendingBadge text="Removing heads" />}>
-              <HeadlessImage sheet={sheet} alt={alt} />
-            </Suspense>
-          ) : output.kind === "video" ? (
+          output.kind === "video" ? (
             <MovingReference src={output.url} label={alt} />
           ) : (
             <img
@@ -1362,9 +1351,7 @@ function PendingReference({
         />
         <p className="truncate text-xs text-muted-foreground">
           {output
-            ? sheet
-              ? "Generated · heads removed from the full-body panels · not saved yet"
-              : "Generated · not saved yet"
+            ? "Generated · not saved yet"
             : failed
               ? "Not generated"
               : "Generating"}
@@ -1406,7 +1393,119 @@ function PendingReference({
           </>
         )}
       </div>
+      {output && (
+        <CharacterReferenceEdit
+          element={element}
+          view={view.view}
+          stateId={view.stateId}
+          source={{
+            type: "job-output",
+            jobId: output.jobId,
+            outputId: output.outputId,
+          }}
+        />
+      )}
     </figure>
+  );
+}
+
+function CharacterReferenceEdit({
+  element,
+  view,
+  stateId,
+  source,
+}: {
+  element: Element;
+  view: ReferenceView | null;
+  stateId: string | null;
+  source: AssetRef;
+}) {
+  const [open, setOpen] = useState(false);
+  const [instruction, setInstruction] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  if (
+    element.type !== "character" ||
+    !view ||
+    !["sheet", "face-closeup", "smile"].includes(view)
+  )
+    return null;
+  if (!open)
+    return (
+      <Button
+        className="mt-2"
+        size="xs"
+        variant="outline"
+        onClick={() => setOpen(true)}
+      >
+        Edit this reference
+      </Button>
+    );
+  return (
+    <form
+      className="mt-3 space-y-2"
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (busy) return;
+        setBusy(true);
+        setError(null);
+        try {
+          await editCharacterReference(
+            element,
+            view,
+            stateId,
+            source,
+            instruction,
+          );
+          setOpen(false);
+          setInstruction("");
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "Could not start the edit");
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <label className="block space-y-1 text-sm">
+        <span>What should change?</span>
+        <Input
+          value={instruction}
+          onChange={(e) => setInstruction(e.target.value)}
+          placeholder="Change only the sweater to forest green"
+          minLength={3}
+          maxLength={1000}
+          required
+          disabled={busy}
+        />
+      </label>
+      <p className="text-xs text-muted-foreground">
+        Makes a new version to review. The original stays available. Uses Comfy
+        Cloud credits.
+      </p>
+      {error && (
+        <p role="alert" className="text-xs text-destructive">
+          {error}
+        </p>
+      )}
+      <div className="flex gap-2">
+        <Button
+          size="xs"
+          type="submit"
+          disabled={busy || instruction.trim().length < 3}
+        >
+          {busy ? "Starting edit…" : "Generate edit"}
+        </Button>
+        <Button
+          size="xs"
+          type="button"
+          variant="ghost"
+          disabled={busy}
+          onClick={() => setOpen(false)}
+        >
+          Cancel
+        </Button>
+      </div>
+    </form>
   );
 }
 
@@ -1420,30 +1519,6 @@ function PendingBadge({ text }: { text: string }) {
         {text}
       </span>
     </div>
-  );
-}
-
-function HeadlessImage({
-  sheet,
-  alt,
-}: {
-  sheet: ReturnType<typeof headlessSheet>;
-  alt: string;
-}) {
-  const edited = use(sheet);
-  if ("error" in edited)
-    return (
-      <div className="flex size-full items-end p-3">
-        <span className="text-xs text-destructive">{edited.error}</span>
-      </div>
-    );
-  return (
-    <img
-      src={edited.url}
-      alt={alt}
-      decoding="async"
-      className="reference-reveal size-full object-cover"
-    />
   );
 }
 
