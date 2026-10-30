@@ -172,9 +172,11 @@ function Settings() {
                 <span className="text-sm">
                   {settings.auth.mode === "password"
                     ? "Studio password"
-                    : settings.auth.mode === "local"
-                      ? "Local test session"
-                      : "Not configured"}
+                    : settings.auth.mode === "public"
+                      ? "Public, no sign-in"
+                      : settings.auth.mode === "local"
+                        ? "Local test session"
+                        : "Not configured"}
                 </span>
                 <Badge variant={settings.auth.ready ? "success" : "warning"}>
                   {settings.auth.ready ? "Ready" : "Needs setup"}

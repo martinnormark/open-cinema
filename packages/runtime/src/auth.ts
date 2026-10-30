@@ -1,6 +1,11 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { env } from "./index";
 
+/** The shared studio account; derived from the username so work survives mode changes. */
+export function accountIdentity(): string {
+  return `account-${createHash("sha256").update(env.BASIC_AUTH_USER).digest("hex")}`;
+}
+
 export function passwordIdentity(request: Request): string | null {
   if (!env.BASIC_AUTH_PASSWORD || !env.BASIC_AUTH_USER) return null;
   const authorization = request.headers.get("Authorization") ?? "";
@@ -12,7 +17,7 @@ export function passwordIdentity(request: Request): string | null {
     const expected = `${env.BASIC_AUTH_USER}:${env.BASIC_AUTH_PASSWORD}`;
     const hash = (text: string) => createHash("sha256").update(text).digest();
     if (!timingSafeEqual(hash(value), hash(expected))) return null;
-    return `account-${createHash("sha256").update(env.BASIC_AUTH_USER).digest("hex")}`;
+    return accountIdentity();
   } catch {
     return null;
   }
@@ -30,6 +35,8 @@ export function passwordChallenge() {
 export function authorizeHttp(request: Request): Response | null {
   const url = new URL(request.url);
   if (url.pathname === "/healthz") return null;
+  // Public mode: anyone who can reach the studio uses the shared account.
+  if (env.AUTH_MODE === "public") return null;
   if (env.AUTH_MODE === "local") {
     if (
       env.LOCAL_MVP_ENABLED !== "true" ||

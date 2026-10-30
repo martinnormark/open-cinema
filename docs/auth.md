@@ -1,6 +1,6 @@
 # Authentication
 
-Docker deployments use `AUTH_MODE=local` or `AUTH_MODE=password`. Unknown or incomplete configurations fail closed. The implementation is in `apps/web/src/server/session.ts` and `packages/runtime/src/auth.ts`.
+Docker deployments use `AUTH_MODE=local`, `AUTH_MODE=password` or `AUTH_MODE=public`. Unknown or incomplete configurations fail closed. The implementation is in `apps/web/src/server/session.ts` and `packages/runtime/src/auth.ts`.
 
 ## Local sessions
 
@@ -26,5 +26,9 @@ Passwords can be mounted through `BASIC_AUTH_PASSWORD_FILE`. Missing credentials
 Database queries still enforce owner scope. Writes and WebSocket upgrades also require the same Origin as the request, resolved from `APP_ORIGIN` when configured. Status sockets are read-only and close when their session expires.
 
 The health endpoint is public. Signed media GET/HEAD requests bypass the password challenge only to reach the media route's signature verification. Invalid or expired signatures cannot read objects. Other media and all generation commands require authentication.
+
+## Public studio
+
+`AUTH_MODE=public` serves the studio with no sign-in. Every visitor uses the same account as password mode with the same `BASIC_AUTH_USER`, so switching between the two keeps existing work. Anyone who can reach the URL can browse the library and spend the configured Comfy credits. Writes still require a same-origin request.
 
 See [Docker deployment](deployment.md) for complete configuration and secret mounting.

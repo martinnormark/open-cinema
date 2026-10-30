@@ -34,7 +34,7 @@ Both commands require only Docker, not a host Bun or Node installation. The imag
 | `LOCAL_SESSION_SECRET` | Optional 32+ character signing secret; generated and persisted when omitted       |
 | `MEDIA_SIGNING_SECRET` | Optional separate signing key for provider media links                            |
 | `MEDIA_PUBLIC_ORIGIN`  | Optional public HTTPS studio origin for signed input-media links                  |
-| `AUTH_MODE`            | `local` or `password`                                                             |
+| `AUTH_MODE`            | `local`, `password` or `public` (no sign-in; see [authentication](auth.md))       |
 | `BASIC_AUTH_USER`      | Hosted studio username, default `studio`; keep stable to retain account ownership |
 | `BASIC_AUTH_PASSWORD`  | Required in password mode                                                         |
 | `APP_ORIGIN`           | Public origin, e.g. `https://cinema.example.com`, when behind a reverse proxy     |
@@ -83,12 +83,12 @@ Signed provider-media links, if enabled, must reach `/api/media/:id` without add
 
 ## Fly.io
 
-`fly.toml` deploys the same image (build target `fly`, which claims the root-owned Fly volume before dropping to the `bun` user) as one always-on machine with a `studio_data` volume at `/data`. It runs in password mode at `https://open-cinema.fly.dev`; change `app` and `APP_ORIGIN` together for another name.
+`fly.toml` deploys the same image (build target `fly`, which claims the root-owned Fly volume before dropping to the `bun` user) as one always-on machine with a `studio_data` volume at `/data`. It runs in public mode, with no sign-in, at `https://open-cinema.fly.dev`; change `app` and `APP_ORIGIN` together for another name.
 
 ```sh
 fly apps create open-cinema
 fly volumes create studio_data --region ams --size 10 --yes
-fly secrets set --stage BASIC_AUTH_PASSWORD=... COMFY_API_KEY=...
+fly secrets set --stage COMFY_API_KEY=...
 fly deploy
 ```
 

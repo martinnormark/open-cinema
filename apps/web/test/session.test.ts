@@ -66,6 +66,16 @@ test("unknown modes and an empty deployment password fail closed", async () => {
   expect(getAuthStatus().mode).toBe("unconfigured");
   await expect(requireSession()).rejects.toHaveProperty("status", 401);
 });
+test("public mode admits anyone as the password account, without a password", async () => {
+  const account = (await requireSession()).userId;
+  process.env.AUTH_MODE = "public";
+  process.env.BASIC_AUTH_PASSWORD = "";
+  request = new Request("https://studio.example.com/");
+  expect(authorizeHttp(request)).toBeNull();
+  expect(getAuthStatus()).toMatchObject({ mode: "public", ready: true });
+  expect((await requireSession()).userId).toBe(account);
+  expect((await startLocalSession()).userId).toBe(account);
+});
 test("local sessions reject public addresses even with valid configuration", async () => {
   process.env.AUTH_MODE = "local";
   expect(getAuthStatus().ready).toBe(false);

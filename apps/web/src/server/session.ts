@@ -2,10 +2,14 @@ import "@tanstack/react-start/server-only";
 import { env } from "@open-cinema/runtime";
 import { getCookie, getRequest, setCookie } from "@tanstack/react-start/server";
 
-import { passwordIdentity, passwordChallenge } from "@open-cinema/runtime/auth";
+import {
+  accountIdentity,
+  passwordIdentity,
+  passwordChallenge,
+} from "@open-cinema/runtime/auth";
 
-/** Local signed sessions or a password-protected, self-hosted studio. */
-export type AuthMode = "local" | "password";
+/** Local signed sessions, a password-protected studio, or an open one. */
+export type AuthMode = "local" | "password" | "public";
 
 export interface Session {
   userId: string;
@@ -24,7 +28,9 @@ const LOOPBACK = ["127.0.0.1", "localhost", "[::1]"];
 
 function authMode(): AuthMode | null {
   const mode = (env.AUTH_MODE || "local").trim();
-  return mode === "local" || mode === "password" ? mode : null;
+  return mode === "local" || mode === "password" || mode === "public"
+    ? mode
+    : null;
 }
 
 function unauthorized(message: string): never {
@@ -34,6 +40,13 @@ function unauthorized(message: string): never {
 /** Display-safe description of how this deployment authenticates people. */
 export function getAuthStatus(): AuthStatus {
   const mode = authMode();
+  if (mode === "public")
+    return {
+      mode,
+      ready: true,
+      detail:
+        "Anyone who can reach this studio shares one account and its provider keys.",
+    };
   if (mode === "password") {
     const ready = Boolean(env.BASIC_AUTH_USER && env.BASIC_AUTH_PASSWORD);
     return {
@@ -57,13 +70,14 @@ export function getAuthStatus(): AuthStatus {
   return {
     mode: "unconfigured",
     ready: false,
-    detail: `AUTH_MODE must be "local" or "password".`,
+    detail: `AUTH_MODE must be "local", "password" or "public".`,
   };
 }
 
 export async function requireSession(): Promise<Session> {
   const mode = authMode();
   if (mode === "password") return requirePasswordSession();
+  if (mode === "public") return publicSession();
   if (mode === "local") return requireLocalSession();
   return unauthorized("Authentication is not configured for this deployment.");
 }
@@ -81,6 +95,7 @@ export async function optionalSession(): Promise<Session | null> {
 /** Creates a local identity, or verifies the hosted account. */
 export async function startLocalSession(): Promise<Session> {
   if (authMode() === "password") return requirePasswordSession();
+  if (authMode() === "public") return publicSession();
   const secret = localConfiguration(true);
   try {
     return await requireLocalSession();
@@ -175,4 +190,11 @@ async function requirePasswordSession(): Promise<Session> {
   const userId = passwordIdentity(getRequest());
   if (!userId) throw passwordChallenge();
   return { userId, expiresAt: Date.now() + 24 * 60 * 60_000 };
+}
+
+function publicSession(): Session {
+  return {
+    userId: accountIdentity(),
+    expiresAt: Date.now() + 24 * 60 * 60_000,
+  };
 }
