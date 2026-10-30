@@ -7,7 +7,6 @@ import {
   type ElementType,
 } from "@open-cinema/contracts";
 import { CropMarks } from "@/components/empty-state";
-import { LoopingClip } from "@/components/looping-clip";
 import {
   Select,
   SelectContent,
@@ -384,22 +383,9 @@ function TakeStage({ goal }: { goal: TakeGoal }) {
       <div
         {...drop.handlers}
         data-active={drop.active || undefined}
-        className="start-drop relative isolate flex min-h-80 flex-col justify-end overflow-hidden rounded-sm sm:aspect-video sm:min-h-0"
+        className="start-drop relative isolate flex min-h-56 flex-col justify-end overflow-hidden rounded-sm"
       >
-        <div key={goal.id} aria-hidden="true" className="start-example">
-          <LoopingClip
-            src={`/examples/${goal.id}.mp4`}
-            poster={`/examples/${goal.id}.jpg`}
-          />
-        </div>
-        <div aria-hidden="true" className="start-scrim" />
         <CropMarks />
-        <p
-          key={`example-${goal.id}`}
-          className="start-swap absolute top-3 left-3 max-w-[calc(100%-1.5rem)] truncate rounded-sm bg-background/80 px-2 py-1 text-xs text-foreground/85"
-        >
-          Example: {goal.example}
-        </p>
         <div className="relative flex flex-wrap items-end justify-between gap-x-6 gap-y-4 p-5 sm:p-6">
           <div className="min-w-0 max-w-sm">
             <h2

@@ -23,8 +23,6 @@ export interface TakeGoal extends GoalBase {
   /** The top bar's label: one or two words. */
   short: string;
   keeps: string;
-  /** What the example loop in public/examples shows, as a caption. */
-  example: string;
   /** Said up front when the workflow only holds inside a narrow envelope. */
   caution?: string;
   /** Listed under "More ways to change a take", so the first list stays short. */
@@ -48,7 +46,6 @@ export const goals = [
     promise: "The same take in a new place, with the people exactly as filmed.",
     element: "location",
     keeps: "Keeps the performers, their timing and the camera.",
-    example: "the kitchen table take, moved to a cottage by the sea",
   },
   {
     id: "recast",
@@ -59,7 +56,6 @@ export const goals = [
     promise: "The same performance, played by one of your Characters.",
     element: "character",
     keeps: "Keeps the acting, the camera and everyone else.",
-    example: "the young man at the table, played by another Character",
     caution:
       "Experimental. Holds while the face stays clear and medium or larger.",
   },
@@ -73,7 +69,6 @@ export const goals = [
       "A dance, a stunt or a gesture from any clip, performed by one of your Characters.",
     element: "character",
     keeps: "Keeps every step, the timing, the camera and the sound.",
-    example: "a studio dance, performed by Cal at the Tide Mill",
   },
   {
     id: "swap",
@@ -84,7 +79,6 @@ export const goals = [
     promise: "One thing in the shot becomes one of your Things.",
     element: "thing",
     keeps: "Keeps every pixel outside the object.",
-    example: "the table lamp swapped for the storm lantern",
   },
   {
     id: "fix",
@@ -95,7 +89,6 @@ export const goals = [
     promise: "Paint over something to remove it, or say what goes there.",
     element: null,
     keeps: "Keeps every pixel outside what you paint.",
-    example: "the glass on the table painted out",
   },
   {
     id: "redo",
@@ -106,7 +99,6 @@ export const goals = [
     promise: "A few seconds acted again; the take either side stays.",
     element: "character",
     keeps: "Keeps the take before and after the moment, and its sound.",
-    example: "a second and a half of his answer, acted again",
   },
   {
     id: "longer",
@@ -117,7 +109,6 @@ export const goals = [
     promise: "The shot carries on past its last frame, without a cut.",
     element: "character",
     keeps: "Keeps the whole take as shot; the new seconds follow it.",
-    example: "the kitchen take, carried on three seconds past its end",
   },
   {
     id: "reframe",
@@ -128,7 +119,6 @@ export const goals = [
     promise: "Vertical, square or wide, with the new edges drawn in.",
     element: null,
     keeps: "Keeps the take whole in the middle of the new frame.",
-    example: "a wide take made vertical, the ceiling and floor drawn in",
   },
   {
     id: "effect",
@@ -139,7 +129,6 @@ export const goals = [
     promise: "Rain or a flood, day for night, or a cleared set.",
     element: null,
     keeps: "Keeps the performance, the camera and the framing.",
-    example: "day for night on a street-side take",
     more: true,
   },
   {
@@ -151,7 +140,6 @@ export const goals = [
     promise: "The whole take repainted from a Location or a style image.",
     element: "location",
     keeps: "Keeps the performance and the camera. Faces restyle too.",
-    example: "a daytime café take restyled to evening",
     more: true,
   },
   {
@@ -163,7 +151,6 @@ export const goals = [
     promise: "The same take, filmed from a little closer or to one side.",
     element: null,
     keeps: "Keeps the performance and the timing.",
-    example: "the café take, filmed from a step further back",
     more: true,
   },
   {

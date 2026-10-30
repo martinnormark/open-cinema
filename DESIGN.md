@@ -236,7 +236,7 @@ Assets: `apps/web/public/favicon.svg` (and `favicon.png`, `apple-touch-icon.png`
 - **Captions over media:** `bg-scrim/85 text-on-media text-caption`, `rounded-md` (the film's caption pill).
 - **Job state:** `.job-status` with a dot that repeats the word, never replaces it; live state breathes in tungsten, progress fills move by `transform`.
 - **End card:** the film's closing frame (`.end-card` in `styles.css`): a tungsten flood with the ink mark, display type in ink, secondary text tinted from the ink (never grey), and an ink pill action with tungsten type. Used where the reel runs out (the not-found page). Not for errors, which stay quiet in `EmptyState`, and never inside the working studio.
-- **Real work on screen:** each take goal on the front page and at the top of its task page plays a short loop of that mode done on real footage (`apps/web/public/examples`); where the studio is empty it offers the Tide Mill starter world ([`starter-world.ts`](apps/web/src/features/start/starter-world.ts)). Use media the studio actually made; never stock.
+- **Real work on screen:** task pages show the creator's own take, not sample footage; where the studio is empty the front page offers the Tide Mill starter world ([`starter-world.ts`](apps/web/src/features/start/starter-world.ts)). Use media the studio actually made; never stock.
 
 ### Motion
 

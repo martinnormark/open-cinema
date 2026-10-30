@@ -4,7 +4,6 @@ import { expect, test } from "bun:test";
 import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { readWorldManifest } from "@open-cinema/contracts";
-import { goals } from "../src/features/start/goals";
 import {
   SAMPLE_TAKE,
   STARTER_BASE,
@@ -21,12 +20,4 @@ test("every starter file is shipped, at the size the manifest says", () => {
     expect(statSync(file).size).toBe(media.sizeBytes!);
   }
   expect(manifest.media.some((m) => m.path === SAMPLE_TAKE.path)).toBe(true);
-});
-
-test("every take goal has an example loop and its still", () => {
-  for (const goal of goals.filter((g) => g.source === "take"))
-    for (const ext of ["mp4", "jpg"])
-      expect(existsSync(join(PUBLIC, "examples", `${goal.id}.${ext}`))).toBe(
-        true,
-      );
 });

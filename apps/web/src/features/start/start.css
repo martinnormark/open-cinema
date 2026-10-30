@@ -142,38 +142,6 @@
   transform: scaleY(-1);
 }
 
-/* The example in the drop frame: finished work on real footage, playing where
-   the creator's take will land. It cross-blurs in when the goal changes and
-   steps back while a file is dragged over, so the drop stays the subject. */
-.start-example {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  transition: opacity var(--duration-quick) var(--ease-smooth-out);
-  animation: start-example var(--duration-slow) var(--ease-smooth-out);
-}
-@keyframes start-example {
-  from {
-    opacity: 0;
-    filter: blur(3px);
-  }
-}
-.start-drop[data-active] .start-example {
-  opacity: 0.3;
-}
-.start-scrim {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background: linear-gradient(
-    to top,
-    color-mix(in oklab, var(--background) 92%, transparent) 0%,
-    color-mix(in oklab, var(--background) 60%, transparent) 34%,
-    transparent 66%
-  );
-}
-
 /* The page's one entrance: goals rise into place in reading order. */
 .start-rise {
   animation: start-rise var(--duration-very-slow) var(--ease-smooth-out)
@@ -189,7 +157,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .start-example,
   .start-rise {
     animation: none;
   }
