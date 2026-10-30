@@ -81,6 +81,19 @@ Leave the Compose host binding on loopback when the proxy runs on the host. For 
 
 Signed provider-media links, if enabled, must reach `/api/media/:id` without additional proxy-level login. The app verifies their signature, owner, path and expiry. All other application requests still require the studio password. If this cannot be arranged, omit `MEDIA_PUBLIC_ORIGIN` and the app uses Comfy storage uploads instead.
 
+## Fly.io
+
+`fly.toml` deploys the same image (build target `fly`, which claims the root-owned Fly volume before dropping to the `bun` user) as one always-on machine with a `studio_data` volume at `/data`. It runs in password mode at `https://open-cinema.fly.dev`; change `app` and `APP_ORIGIN` together for another name.
+
+```sh
+fly apps create open-cinema
+fly volumes create studio_data --region ams --size 10 --yes
+fly secrets set --stage BASIC_AUTH_PASSWORD=... COMFY_API_KEY=...
+fly deploy
+```
+
+Keep exactly one machine: do not `fly scale count` above 1, since each machine would get its own volume and catalog. Back up with `fly volumes snapshots create`.
+
 ## Persistence, upgrades and backups
 
 The named `studio-data` volume holds the catalog, job checkpoints, media and generated signing secret. Restarting or rebuilding a container preserves those files. `docker compose down` preserves the volume; **`docker compose down -v` deletes it**.

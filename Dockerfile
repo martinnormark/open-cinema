@@ -38,3 +38,11 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD bun -e 'const r = await fetch("http://127.0.0.1:" + (process.env.PORT || "3000") + "/healthz"); process.exit(r.ok ? 0 : 1)'
 CMD ["bun", "apps/web/server.ts"]
+
+# Fly.io mounts volumes root-owned: claim /data, then drop to the bun user.
+FROM runtime AS fly
+USER root
+CMD ["sh", "-c", "chown bun:bun /data && exec setpriv --reuid=bun --regid=bun --init-groups bun apps/web/server.ts"]
+
+# Default target for `docker build` and Compose.
+FROM runtime
