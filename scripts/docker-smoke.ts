@@ -1,7 +1,7 @@
 /** End-to-end checks of a built image, with disposable volumes and fixture secrets.
  * No generation request is submitted and no real provider key is used. */
 import { strict as assert } from "node:assert";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -9,10 +9,14 @@ const image = process.argv[2] ?? "open-cinema:ci";
 const name = `cinema-smoke-${crypto.randomUUID()}`;
 const volume = `${name}-data`;
 const directory = mkdtempSync(join(tmpdir(), "cinema-secrets-"));
+// Mount a traversable child for the container's non-root user, while keeping
+// the temporary parent private on the host (whose UID may differ in CI).
+const secretsDirectory = join(directory, "secrets");
+mkdirSync(secretsDirectory, { mode: 0o755 });
 const password = crypto.randomUUID();
 const providerKey = `fixture-${crypto.randomUUID()}`;
-writeFileSync(join(directory, "password"), password);
-writeFileSync(join(directory, "comfy"), providerKey);
+writeFileSync(join(secretsDirectory, "password"), password, { mode: 0o644 });
+writeFileSync(join(secretsDirectory, "comfy"), providerKey, { mode: 0o644 });
 const publicOrigin = "https://studio.example.test";
 const authorization = `Basic ${btoa(`studio:${password}`)}`;
 async function docker(...args: string[]) {
@@ -54,7 +58,7 @@ try {
     "-v",
     `${volume}:/data`,
     "--mount",
-    `type=bind,src=${directory},dst=/run/secrets,readonly`,
+    `type=bind,src=${secretsDirectory},dst=/run/secrets,readonly`,
     "-e",
     "AUTH_MODE=password",
     "-e",
@@ -164,6 +168,9 @@ try {
   console.log(
     "Docker smoke passed: secrets, auth, SSR, uploads, ranges, WebSockets and restart persistence.",
   );
+} catch (error) {
+  console.error(await docker("logs", name).catch(() => "No container logs"));
+  throw error;
 } finally {
   await docker("rm", "-f", name).catch(() => {});
   await docker("volume", "rm", volume).catch(() => {});
